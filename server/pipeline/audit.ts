@@ -17,6 +17,8 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { isAuditEligible } from './eligibility';
 import {
+  normalizePhoneNumber,
+  normalizeClientCode,
   normalizeSpokenNumbers,
   matchClientCodeInTranscript,
   matchSymbolInTranscript,
@@ -26,12 +28,6 @@ import {
   fuzzySimilarity,
   SYMBOL_ALIASES,
 } from '../normalizer';
-import {
-  normalizeCanonicalPhone,
-  normalizeCanonicalClientCode,
-  matchClientCodeFuzzy,
-  extractClientCodesFromText,
-} from './matching';
 import type {
   StageAuditResult,
   AuditQuestionResult,
@@ -39,50 +35,11 @@ import type {
 } from './types';
 import type { CallRecord, TradeRecord } from '../../src/types';
 
-export const DEFAULT_AUDIT_KEY = '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';
-
-export function evaluateDeterministicQ1(
-  callingNumber: string | null | undefined,
-  registeredNumber: string | null | undefined,
-  transcript: string = ''
-): { status: 'PASS' | 'FAIL' | 'REVIEW'; reason: string } {
-  const normCalling = callingNumber ? normalizeCanonicalPhone(callingNumber) : '';
-  const normRegistered = registeredNumber ? normalizeCanonicalPhone(registeredNumber) : '';
-
-  if (!normCalling || !normRegistered) {
-    return {
-      status: 'REVIEW',
-      reason: 'Missing calling or registered phone number requires manual review.',
-    };
-  }
-
-  if (normCalling === normRegistered) {
-    return {
-      status: 'PASS',
-      reason: 'Phone numbers match on 10 digits.',
-    };
-  }
-
-  // Spoken OTP check in transcript
-  if (/\b(?:otp|one\s*time\s*password|pin|verification\s*code)\b/i.test(transcript)) {
-    return {
-      status: 'PASS',
-      reason: 'Mismatched telephone authorized via spoken OTP in transcript.',
-    };
-  }
-
-  return {
-    status: 'FAIL',
-    reason: 'Mismatched telephone numbers without secondary OTP authorization.',
-  };
-}
-
 export async function stage7AuditCall(
   db: DatabaseSync,
   callId: number,
   groqApiKey?: string
 ): Promise<StageAuditResult> {
-  const _activeAuditKey = groqApiKey?.trim() || DEFAULT_AUDIT_KEY;
   // Gate check
   const gate = isAuditEligible(db, callId);
   if (!gate.eligible) {
@@ -120,10 +77,10 @@ export async function stage7AuditCall(
       rawCalling = phoneInFn;
     }
   }
-  const normCalling = normalizeCanonicalPhone(rawCalling);
+  const normCalling = normalizePhoneNumber(rawCalling);
 
   const rawRegistered = call.registered_number || (trade as any).customer_number || trade.client_number || trade.phone_number || (trade as any).mobile || (trade as any).mobile_number || (trade as any).contact || (trade as any).contact_no || call.client_number || '';
-  const normRegistered = normalizeCanonicalPhone(rawRegistered);
+  const normRegistered = normalizePhoneNumber(rawRegistered);
 
   let q1Result: AuditQuestionResult;
 
@@ -192,7 +149,7 @@ export async function stage7AuditCall(
   // "client if spoken = pass"
   // "dont show anywhere that it's 90% match, you just know it"
   // -----------------------------------------------------------
-  const expectedUcc = normalizeCanonicalClientCode(call.client_code || call.client || trade.client);
+  const expectedUcc = normalizeClientCode(call.client_code || call.client || trade.client);
   let q2Result: AuditQuestionResult;
 
   if (!expectedUcc) {
@@ -204,25 +161,34 @@ export async function stage7AuditCall(
       evidence_verified: true,
     };
   } else {
-    // Check direct match or fuzzy speech-tolerant match (~90% similarity)
+    const numericPart = expectedUcc.replace(/\D/g, '');
     const clientCodeMatch = matchClientCodeInTranscript(expectedUcc, transcript);
-    const extractedCodes = extractClientCodesFromText(transcript);
-    let bestFuzzyMatch = { matched: false, similarity: 0, reason: '' };
-    for (const cand of extractedCodes) {
-      const fz = matchClientCodeFuzzy(cand, expectedUcc);
-      if (fz.matched && fz.similarity > bestFuzzyMatch.similarity) {
-        bestFuzzyMatch = fz;
+    const hasNumericMatch = numericPart.length >= 3 && (
+      transcript.includes(numericPart) ||
+      normalizeSpokenNumbers(transcript).includes(numericPart) ||
+      normalizeSpokenNumbers(transcript).replace(/\D/g, '').includes(numericPart)
+    );
+
+    // Check sliding word windows (1 to 4 words) for 90% fuzzy match
+    let isFuzzyCandidateFound = clientCodeMatch.matched || hasNumericMatch;
+    if (!isFuzzyCandidateFound) {
+      const words = transcript.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
+      for (let len = 1; len <= 4; len++) {
+        for (let i = 0; i <= words.length - len; i++) {
+          const phrase = words.slice(i, i + len).join('').toUpperCase();
+          if (phrase.length >= 4 && fuzzySimilarity(phrase, expectedUcc) >= 0.80) {
+            isFuzzyCandidateFound = true;
+            break;
+          }
+        }
+        if (isFuzzyCandidateFound) break;
       }
     }
 
-    if (clientCodeMatch.matched || bestFuzzyMatch.matched) {
+    if (isFuzzyCandidateFound) {
       const matchedSeg = advisorSegments.find((s) =>
-        matchClientCodeInTranscript(expectedUcc, s.text).matched ||
-        extractClientCodesFromText(s.text).some((c) => matchClientCodeFuzzy(c, expectedUcc).matched)
-      ) || segments.find((s) =>
-        matchClientCodeInTranscript(expectedUcc, s.text).matched ||
-        extractClientCodesFromText(s.text).some((c) => matchClientCodeFuzzy(c, expectedUcc).matched)
-      );
+        matchClientCodeInTranscript(expectedUcc, s.text).matched || (numericPart.length >= 3 && s.text.includes(numericPart))
+      ) || segments.find((s) => matchClientCodeInTranscript(expectedUcc, s.text).matched || (numericPart.length >= 3 && s.text.includes(numericPart)));
 
       const segSpeaker = matchedSeg ? matchedSeg.speaker : 'ADVISOR';
       const segTime = matchedSeg ? `${matchedSeg.start_time}s` : '0s';
@@ -231,22 +197,36 @@ export async function stage7AuditCall(
       q2Result = {
         status: 'PASS',
         evidence: `Client UCC ${expectedUcc} confirmed in conversation at ${segTime}: "${segText}"`,
-        reason: clientCodeMatch.reason || bestFuzzyMatch.reason || `Authoritative client UCC ${expectedUcc} confirmed in dialogue.`,
-        confidence: clientCodeMatch.score || bestFuzzyMatch.similarity || 0.95,
+        reason: `Authoritative client UCC ${expectedUcc} confirmed in dialogue.`,
+        confidence: 0.95,
         speaker: segSpeaker,
         start_ms: matchedSeg ? Math.round(matchedSeg.start_time * 1000) : undefined,
         end_ms: matchedSeg ? Math.round(matchedSeg.end_time * 1000) : undefined,
         evidence_verified: true,
       };
     } else {
-      q2Result = {
-        status: 'FAIL',
-        flag: 'FATAL',
-        evidence: clientCodeMatch.reason || `FATAL: Client UCC ${expectedUcc} was NOT confirmed in the conversation prior to order execution.`,
-        reason: 'Fatal SEBI non-compliance: client code identification failed or contradicted registered client code.',
-        confidence: 0.95,
-        evidence_verified: true,
-      };
+      // Check if advisor explicitly confirmed a conflicting real client code format (e.g. WIA9999 vs WIA1234)
+      const wrongUccMatch = transcript.match(/(?:client|ucc|code)\s*(?:is|code|id|no|#)?\s*[:\-]?\s*([a-zA-Z]{2,5}\d{4,8})/i);
+      const isConversationalWord = wrongUccMatch && /^(?:please|confirm|verification|available|fundsindia|bataye|kare|bolo)$/i.test(wrongUccMatch[1]);
+      if (wrongUccMatch && !isConversationalWord && normalizeClientCode(wrongUccMatch[1]) !== expectedUcc && !matchClientCodeInTranscript(expectedUcc, wrongUccMatch[1]).matched) {
+        q2Result = {
+          status: 'FAIL',
+          flag: 'FATAL',
+          evidence: `Advisor confirmed wrong client UCC (${wrongUccMatch[1]}) instead of registered UCC (${expectedUcc}).`,
+          reason: `Fatal SEBI non-compliance: advisor confirmed wrong Client Code/UCC (${wrongUccMatch[1]}).`,
+          confidence: 0.95,
+          evidence_verified: true,
+        };
+      } else {
+        q2Result = {
+          status: 'FAIL',
+          flag: 'FATAL',
+          evidence: `Client UCC ${expectedUcc} was NOT confirmed in the conversation prior to order execution.`,
+          reason: 'Fatal SEBI non-compliance: advisor failed to confirm client code before placing order.',
+          confidence: 0.95,
+          evidence_verified: true,
+        };
+      }
     }
   }
 

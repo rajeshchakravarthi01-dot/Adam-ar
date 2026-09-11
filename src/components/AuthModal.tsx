@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Key, CheckCircle2, AlertCircle, X, Sparkles, Shield, Mic, Cpu } from 'lucide-react';
+import { Lock, Mail, Key, CheckCircle2, AlertCircle, X, Sparkles, Shield } from 'lucide-react';
 import type { UserProfile } from '../types';
 
 interface AuthModalProps {
@@ -8,9 +8,7 @@ interface AuthModalProps {
   currentUser: UserProfile | null;
   onLoginSuccess: (user: UserProfile, token: string) => void;
   onSaveApiKey: (key: string) => Promise<boolean>;
-  onSaveSarvamKey?: (key: string) => Promise<boolean>;
   groqConfigured: boolean;
-  sarvamConfigured?: boolean;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -19,20 +17,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   currentUser,
   onLoginSuccess,
   onSaveApiKey,
-  onSaveSarvamKey,
   groqConfigured,
-  sarvamConfigured,
 }) => {
   const [mode, setMode] = useState<'account' | 'apikey'>('account');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [apiKeyInput, setApiKeyInput] = useState('');
-  const [sarvamKeyInput, setSarvamKeyInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [apiTesting, setApiTesting] = useState(false);
-  const [sarvamTesting, setSarvamTesting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -67,13 +61,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleTestAndSaveAuditKey = async (e: React.FormEvent) => {
+  const handleTestAndSaveApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setSuccess(null);
 
     if (!apiKeyInput.trim()) {
-      setError('Please enter a valid Audit Engine / Groq API key.');
+      setError('Please enter a valid Groq API key.');
       return;
     }
 
@@ -81,46 +75,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     try {
       const ok = await onSaveApiKey(apiKeyInput.trim());
       if (ok) {
-        setSuccess('Audit Engine API Key verified and saved successfully!');
+        setSuccess('Groq API Key verified and saved successfully!');
         setApiKeyInput('');
       } else {
-        setError('Failed to verify API key. Pipeline will default to high-precision deterministic scoring.');
+        setError('Failed to verify API key. Please verify with Groq.');
       }
     } catch (err: unknown) {
       setError((err as Error).message);
     } finally {
       setApiTesting(false);
-    }
-  };
-
-  const handleTestAndSaveSarvamKey = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setSuccess(null);
-
-    if (!sarvamKeyInput.trim()) {
-      setError('Please enter a valid Sarvam AI API subscription key.');
-      return;
-    }
-
-    if (!onSaveSarvamKey) {
-      setError('Sarvam save handler not configured.');
-      return;
-    }
-
-    setSarvamTesting(true);
-    try {
-      const ok = await onSaveSarvamKey(sarvamKeyInput.trim());
-      if (ok) {
-        setSuccess('Sarvam AI Subscription Key verified and saved successfully! Saaras v3 active.');
-        setSarvamKeyInput('');
-      } else {
-        setError('Sarvam AI verification failed. Please verify your api-subscription-key.');
-      }
-    } catch (err: unknown) {
-      setError((err as Error).message);
-    } finally {
-      setSarvamTesting(false);
     }
   };
 
@@ -264,99 +227,49 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {mode === 'apikey' && (
-            <div className="space-y-6">
-              {/* Sarvam AI Subscription Key */}
-              <form onSubmit={handleTestAndSaveSarvamKey} className="space-y-3 pb-5 border-b border-neutral-200">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
-                      <Mic className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Sarvam AI Key (Speech-to-Text &amp; Diarization)</span>
-                    </label>
-                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                      {sarvamConfigured ? '✓ Active & Ready' : 'Key Required'}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Key className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
-                    <input
-                      type="password"
-                      value={sarvamKeyInput}
-                      onChange={(e) => setSarvamKeyInput(e.target.value)}
-                      placeholder={sarvamConfigured ? '•••••••••••••••• (Default Configured)' : 'sk_... (api-subscription-key)'}
-                      className="w-full pl-9 pr-3 py-2 text-xs border border-neutral-300 rounded-xl focus:border-amber-400 focus:outline-hidden font-mono"
-                    />
-                  </div>
-                  <p className="text-[10px] text-neutral-500 mt-1">
-                    Saaras v3 Indian languages &amp; Hinglish diarized speech recognition (<a href="https://www.sarvam.ai/" target="_blank" rel="noreferrer" className="underline text-amber-600">sarvam.ai</a>).
-                  </p>
+            <form onSubmit={handleTestAndSaveApiKey} className="space-y-4">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-neutral-700">
+                    Groq Cloud API Key
+                  </label>
+                  <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                    {groqConfigured ? '✓ Active & Ready' : 'Key Required'}
+                  </span>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={sarvamTesting || !sarvamKeyInput.trim()}
-                  className="w-full py-2 bg-neutral-900 hover:bg-black text-amber-400 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 border border-neutral-800"
-                >
-                  {sarvamTesting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                      <span>Testing Sarvam AI API...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Save &amp; Test Sarvam AI Key</span>
-                    </>
-                  )}
-                </button>
-              </form>
-
-              {/* Regulatory Compliance Audit Engine Key */}
-              <form onSubmit={handleTestAndSaveAuditKey} className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-800">
-                      <Cpu className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Regulatory Audit Engine Key (GPT-OSS / Groq)</span>
-                    </label>
-                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                      {groqConfigured ? '✓ Active & Ready' : 'Optional (Fallback Active)'}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <Key className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
-                    <input
-                      type="password"
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      placeholder={groqConfigured ? '•••••••••••••••• (Default Configured)' : 'gsk_...'}
-                      className="w-full pl-9 pr-3 py-2 text-xs border border-neutral-300 rounded-xl focus:border-amber-400 focus:outline-hidden font-mono"
-                    />
-                  </div>
-                  <p className="text-[10px] text-neutral-500 mt-1">
-                    Powers GPT-OSS 120B SEBI regulatory compliance checking and non-negotiable verification.
-                  </p>
+                <div className="relative">
+                  <Key className="w-4 h-4 absolute left-3 top-3 text-neutral-400" />
+                  <input
+                    type="password"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    placeholder="gsk_..."
+                    className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-300 rounded-xl focus:border-amber-400 focus:outline-hidden font-mono"
+                  />
                 </div>
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  Used for Whisper Large v3 speech transcription and automated pre-order quality auditing.
+                </p>
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={apiTesting || !apiKeyInput.trim()}
-                  className="w-full py-2 bg-neutral-900 hover:bg-black text-amber-400 font-bold text-xs rounded-xl shadow-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 border border-neutral-800"
-                >
-                  {apiTesting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                      <span>Testing Audit Engine API...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Cpu className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Save &amp; Test Audit Key</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            </div>
+              <button
+                type="submit"
+                disabled={apiTesting || !apiKeyInput.trim()}
+                className="w-full py-2.5 bg-black hover:bg-neutral-900 text-amber-400 font-bold text-sm rounded-xl shadow-md transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 border border-amber-400/30"
+              >
+                {apiTesting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Verifying with Groq Cloud...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    <span>Test &amp; Save API Key</span>
+                  </>
+                )}
+              </button>
+            </form>
           )}
         </div>
       </div>

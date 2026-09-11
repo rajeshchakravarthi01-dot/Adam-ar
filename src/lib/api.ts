@@ -11,7 +11,6 @@ import type {
   SystemIntegrations,
   UserProfile,
   FailedJobItem,
-  AdamBeeTicketRecord,
 } from '../types';
 
 export const AUTH_TOKEN_KEY = 'auditeq_auth_token';
@@ -136,18 +135,6 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ groq_key: key }),
     }),
-  testSarvam: (key?: string) =>
-    apiRequest<{ ok: boolean; message?: string; error?: string }>('/api/integrations/test-sarvam', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sarvam_key: key }),
-    }),
-  testAuditEngine: (key?: string) =>
-    apiRequest<{ ok: boolean; message?: string; error?: string }>('/api/integrations/test-audit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ audit_key: key }),
-    }),
   getDiagnostics: () => apiRequest<any>('/api/diagnostics'),
   getLogs: (perPage = 100) => apiRequest<LogEntry[]>(`/api/logs?per_page=${perPage}`),
 
@@ -239,18 +226,6 @@ export const api = {
     apiRequest<{ ok: boolean; updated: number; message: string }>('/api/calls/classify-all', {
       method: 'POST',
     }),
-  reclassifyAndReauditAllCalls: () =>
-    apiRequest<{
-      ok: boolean;
-      total_eligible_calls: number;
-      processed: number;
-      pre_order_calls: number;
-      audited_calls: number;
-      message: string;
-      errors?: string[];
-    }>('/api/calls/reclassify-and-reaudit-all', {
-      method: 'POST',
-    }),
   downloadCallsZipUrl: (type = 'all', search = '', advisor = '') => {
     const params = new URLSearchParams();
     if (type) params.append('type', type);
@@ -276,7 +251,7 @@ export const api = {
       body: JSON.stringify(options),
     }),
   testSmtpConnection: (config?: { host?: string; port?: number; user?: string; pass?: string; secure?: boolean }) =>
-    apiRequest<{ ok: boolean; message?: string; error?: string }>('/api/mail/test-connection', {
+    apiRequest<{ ok: boolean; message: string }>('/api/mail/test-connection', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config || {}),
@@ -305,20 +280,8 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(config || {}),
     }),
-  getAdamBeeTickets: () =>
-    apiRequest<AdamBeeTicketRecord[]>('/api/adambee/tickets'),
-  captureAdamBeeTicket: (data: Partial<AdamBeeTicketRecord>) =>
-    apiRequest<{ ok: boolean; message?: string; ticket: AdamBeeTicketRecord }>('/api/adambee/capture', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    }),
-  clearAdamBeeTickets: (id?: string) =>
-    apiRequest<{ ok: boolean; message: string }>(id ? `/api/adambee/tickets?id=${encodeURIComponent(id)}` : '/api/adambee/tickets', {
-      method: 'DELETE',
-    }),
   syncTata: (params?: { from_date?: string; to_date?: string; limit?: number; api_key?: string; account_id?: string; api_url?: string }) =>
-    apiRequest<{ ok: boolean; synced_count: number; duplicates_skipped?: number; total_fetched: number; pages_processed?: number; message: string }>('/api/tata/sync', {
+    apiRequest<{ ok: boolean; synced_count: number; total_fetched: number; message: string }>('/api/tata/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params || {}),
@@ -379,74 +342,8 @@ export const api = {
     }),
 
   // Manual Trade Audit (Missing Call / Mail Confirmation)
-  getMissingCallTrades: (options?: { includeAudited?: boolean; status?: 'PENDING' | 'AUDITED' | 'ALL' }) => {
-    const params = new URLSearchParams();
-    if (options?.includeAudited) params.set('include_audited', 'true');
-    if (options?.status) params.set('status', options.status);
-    const qs = params.toString() ? `?${params.toString()}` : '';
-    return apiRequest<{
-      ok: boolean;
-      missing_trades: any[];
-      total_missing?: number;
-      pending_count?: number;
-      audited_count?: number;
-    }>(`/api/trades/missing-calls${qs}`);
-  },
-  matchMailConfirmationFiles: (filesOrMails: {
-    files?: File[];
-    mails?: Array<{ fileName: string; content: string }>;
-  }) => {
-    if (filesOrMails.files && filesOrMails.files.length > 0) {
-      const formData = new FormData();
-      for (const file of filesOrMails.files) {
-        formData.append('files', file);
-      }
-      return apiRequest<{
-        ok: boolean;
-        total_files: number;
-        matched_count: number;
-        unmatched_count: number;
-        remaining_unconfirmed_count: number;
-        message?: string;
-        results: Array<{
-          fileName: string;
-          matched: boolean;
-          tradeId?: number;
-          trade?: any;
-          confidenceScore?: number;
-          reason: string;
-          evidence?: any;
-          scorecardId?: number;
-        }>;
-      }>('/api/trades/match-mail-files', {
-        method: 'POST',
-        body: formData,
-      });
-    } else {
-      return apiRequest<{
-        ok: boolean;
-        total_files: number;
-        matched_count: number;
-        unmatched_count: number;
-        remaining_unconfirmed_count: number;
-        message?: string;
-        results: Array<{
-          fileName: string;
-          matched: boolean;
-          tradeId?: number;
-          trade?: any;
-          confidenceScore?: number;
-          reason: string;
-          evidence?: any;
-          scorecardId?: number;
-        }>;
-      }>('/api/trades/match-mail-files', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mails: filesOrMails.mails || [] }),
-      });
-    }
-  },
+  getMissingCallTrades: () =>
+    apiRequest<{ ok: boolean; missing_trades: any[] }>('/api/trades/missing-calls'),
   manualAuditTrade: (tradeId: number, data: any) =>
     apiRequest<{ ok: boolean; scorecard_id: number; audit_id: number; message: string }>(
       `/api/trades/${tradeId}/manual-audit`,

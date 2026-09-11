@@ -15,7 +15,6 @@ export interface ScorecardRecord {
   registered_number: string;
   trade_date: string;
   call_date: string;
-  audit_date?: string;
   score: number;
   is_fatal: boolean;
   fatal_reasons: string;
@@ -72,7 +71,7 @@ export interface CallRecord {
   duration_seconds?: number;
   source: string;
   status: 'imported' | 'transcribing' | 'transcribed' | 'linked_duplicate' | 'failed' | 'audited' | 'scrap' | 'regular' | 'needs_review' | 'blocked';
-  call_type?: 'unknown' | 'pre_order' | 'regular' | 'scrap' | 'non_pre_order' | 'review' | 'pending' | 'needs_review';
+  call_type?: 'unknown' | 'pre_order' | 'regular' | 'scrap' | 'non_pre_order' | 'review';
   preorder_confidence?: number;
   preorder_evidence?: string;
   preorder_speaker?: string;
@@ -310,7 +309,7 @@ export interface AuditRecord {
 
 export interface QueueJob {
   id: number;
-  job_type: 'transcribe' | 'preorder_classify' | 'match_verify' | 'preorder_audit' | 'audit' | 'score' | 'email' | 'email_dispatch';
+  job_type: 'transcribe' | 'preorder_classify' | 'match_verify' | 'preorder_audit' | 'audit' | 'score' | 'email';
   entity_id: number;
   status: 'queued' | 'processing' | 'completed' | 'failed';
   attempts: number;
@@ -446,7 +445,6 @@ export interface AdamBeeTicketRecord {
   id: string;
   sourceUrl: string;
   pageTitle: string;
-  siteProfile?: string;
   extractedAt: string;
   ticketId?: string;
   clientId?: string;
@@ -458,7 +456,6 @@ export interface AdamBeeTicketRecord {
   complianceStatus: 'COMPLIANT' | 'FLAGGED' | 'FATAL' | 'PENDING';
   rawSnippets: string[];
   findings: string;
-  fullContent?: string;
 }
 
 export interface ComplianceQuestionResult {
@@ -519,7 +516,7 @@ export interface TataCallRecord {
   direction?: 'inbound' | 'outbound';
   recording_url?: string;
   status: string;
-  call_type?: 'pre_order' | 'regular' | 'scrap' | 'unknown' | 'pending' | 'needs_review';
+  call_type?: 'pre_order' | 'regular' | 'scrap' | 'unknown';
   ingested: boolean;
   already_in_db?: boolean;
 }
@@ -534,20 +531,12 @@ export interface ChatMessage {
 }
 
 export interface SystemIntegrations {
-  ai_provider: 'groq' | 'sarvam';
-  transcription_provider?: string;
+  ai_provider: 'groq';
   transcription_model: string;
   groq_transcription_model: string;
-  sarvam_transcription_model?: string;
-  sarvam_transcription_mode?: string;
-  sarvam_language_code?: string;
-  sarvam_configured?: boolean;
-  sarvam_key_masked?: string;
   audit_model: string;
   groq_audit_model: string;
   groq_configured: boolean;
-  audit_configured?: boolean;
-  audit_key_masked?: string;
   tata_configured: boolean;
   tata_account_id?: string;
   tata_api_url?: string;
@@ -563,19 +552,6 @@ export interface SystemIntegrations {
   smtp_encryption?: string;
   smtp_from_email?: string;
   smtp_from_name?: string;
-  smtp_last_test_timestamp?: string;
-  smtp_last_test_status?: string;
-  groq_last_test_timestamp?: string;
-  groq_last_test_status?: string;
-  sarvam_last_test_timestamp?: string;
-  sarvam_last_test_status?: string;
-  tata_auto_sync_enabled?: boolean;
-  tata_sync_interval_mins?: string;
-  tata_last_sync_timestamp?: string;
-  tata_last_sync_status?: string;
-  tata_last_sync_count?: number;
-  tata_last_test_timestamp?: string;
-  tata_last_test_status?: string;
   versions: {
     rubric: string;
     prompt: string;

@@ -37,7 +37,7 @@ interface CallsViewProps {
   isLoading?: boolean;
 }
 
-type CallCategoryFilter = 'all' | 'pre_order' | 'regular' | 'scrap' | 'pending';
+type CallCategoryFilter = 'all' | 'pre_order' | 'regular' | 'scrap';
 
 export const CallsView: React.FC<CallsViewProps> = ({
   calls,
@@ -222,22 +222,20 @@ export const CallsView: React.FC<CallsViewProps> = ({
     let preOrder = 0;
     let regular = 0;
     let scrap = 0;
-    let pending = 0;
 
     calls.forEach((c) => {
       const dur = c.duration_seconds || 0;
-      if (c.call_type === 'pre_order') {
-        preOrder++;
-      } else if (c.call_type === 'scrap' || (dur > 0 && dur <= 6)) {
+      const isScrap = c.call_type === 'scrap' || (dur > 0 && dur <= 6);
+      if (isScrap) {
         scrap++;
-      } else if (c.call_type === 'pending' || c.call_type === 'unknown' || (!c.transcript && !c.call_type)) {
-        pending++;
+      } else if (c.call_type === 'pre_order') {
+        preOrder++;
       } else {
         regular++;
       }
     });
 
-    return { all: calls.length, preOrder, regular, scrap, pending };
+    return { all: calls.length, preOrder, regular, scrap };
   }, [calls]);
 
   // Filtering
@@ -246,14 +244,12 @@ export const CallsView: React.FC<CallsViewProps> = ({
       // Category filter
       const dur = c.duration_seconds || 0;
       const isScrap = c.call_type === 'scrap' || (dur > 0 && dur <= 6);
-      const isPreOrder = c.call_type === 'pre_order';
-      const isPending = (c.call_type === 'pending' || c.call_type === 'unknown' || (!c.transcript && !c.call_type)) && !isScrap && !isPreOrder;
-      const isRegular = !isScrap && !isPreOrder && !isPending;
+      const isPreOrder = c.call_type === 'pre_order' && !isScrap;
+      const isRegular = !isScrap && !isPreOrder;
 
       if (categoryFilter === 'pre_order' && !isPreOrder) return false;
       if (categoryFilter === 'regular' && !isRegular) return false;
       if (categoryFilter === 'scrap' && !isScrap) return false;
-      if (categoryFilter === 'pending' && !isPending) return false;
 
       // Text search
       if (search) {
@@ -544,22 +540,6 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 {counts.scrap}
               </span>
             </button>
-
-            {counts.pending > 0 && (
-              <button
-                onClick={() => setCategoryFilter('pending')}
-                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-                  categoryFilter === 'pending'
-                    ? 'bg-sky-600 text-white'
-                    : 'bg-sky-50 text-sky-800 hover:bg-sky-100 border border-sky-200'
-                }`}
-              >
-                <span>Pending Analysis</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'pending' ? 'bg-sky-800 text-sky-100' : 'bg-sky-200 text-sky-800'}`}>
-                  {counts.pending}
-                </span>
-              </button>
-            )}
           </div>
 
           {/* Action Buttons: ZIP Download & Re-classify */}
@@ -684,7 +664,6 @@ export const CallsView: React.FC<CallsViewProps> = ({
                   const dur = call.duration_seconds || 0;
                   const isShortScrap = call.call_type === 'scrap' || (dur > 0 && dur <= 6);
                   const isPreOrder = call.call_type === 'pre_order';
-                  const isPending = (call.call_type === 'pending' || call.call_type === 'unknown' || (!call.transcript && !call.call_type)) && !isShortScrap && !isPreOrder;
                   const isEditingThis = editingCallId === call.id;
 
                   return (
@@ -732,7 +711,6 @@ export const CallsView: React.FC<CallsViewProps> = ({
                               <option value="pre_order">Pre-Order</option>
                               <option value="regular">Regular</option>
                               <option value="scrap">Scrap</option>
-                              <option value="pending">Pending</option>
                             </select>
                             <button
                               onClick={() => handleUpdateCategory(call.id)}
@@ -756,13 +734,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
                                   ? 'bg-amber-100 text-amber-900 border border-amber-300'
                                   : isShortScrap
                                   ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                  : isPending
-                                  ? 'bg-sky-100 text-sky-900 border border-sky-300'
                                   : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
                               }`}
-                              title={call.preorder_evidence || (call as any).classification_reason || undefined}
                             >
-                              {isPreOrder ? 'Pre-Order' : isShortScrap ? 'Scrap Call' : isPending ? 'Pending Analysis' : 'Regular Call'}
+                              {isPreOrder ? 'Pre-Order' : isShortScrap ? 'Scrap Call' : 'Regular Call'}
                             </span>
                             <button
                               onClick={() => {

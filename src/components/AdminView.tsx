@@ -361,7 +361,7 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
                     </tr>
                   ) : (
                     users.map((u) => {
-                      const isPrimaryAdmin = u.username === 'admin' || (u.role === 'admin' && users.filter((x) => x.role === 'admin').length <= 1);
+                      const isPrimaryAdmin = u.email === 'ashutosh.kumar@fundsindia.com';
                       return (
                         <tr key={u.id} className="hover:bg-neutral-50/80 transition-colors">
                           <td className="py-3 px-4">

@@ -13,7 +13,7 @@ export const FUNDSINDIA_ADVISOR_DIRECTORY: FundsIndiaAdvisorEntry[] = [
   {
     dealer: 'W2649',
     advisor_name: 'Ashutosh',
-    to_email: 'ashutosh@fundsindia.com',
+    to_email: 'imaashutoshjha@gmil.com',
     cc_emails: ['niranjan@fundsindia.com', 'bharathidasan@fundsindia.com', 'ashwini.prabhu@fundsindia.com'],
   },
   {
@@ -150,8 +150,8 @@ export const FUNDSINDIA_ADVISOR_DIRECTORY: FundsIndiaAdvisorEntry[] = [
   },
 ];
 
-export const DEFAULT_SENDER_EMAIL = (typeof process !== 'undefined' && process.env?.SMTP_FROM) || '';
-export const FATAL_CC_EMAIL = (typeof process !== 'undefined' && process.env?.FATAL_CC_EMAIL) || 'compliance@fundsindia.com';
+export const DEFAULT_SENDER_EMAIL = 'ashutosh.kumar@fundsindia.com';
+export const FATAL_CC_EMAIL = 'sambath.s@fundsindia.com';
 
 function cleanName(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '');

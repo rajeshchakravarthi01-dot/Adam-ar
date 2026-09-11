@@ -20,13 +20,9 @@ import {
   FileText,
   Clock,
   ArrowRight,
-  Upload,
-  FileUp,
-  FileCheck,
 } from 'lucide-react';
 import type { MissingCallTrade } from '../types';
 import { api } from '../lib/api';
-import { MailConfirmationModal } from './MailConfirmationModal';
 
 interface ManualTradeAuditViewProps {
   onScorecardCreated?: () => void;
@@ -60,12 +56,9 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Automated Mail Confirmation Upload Modal
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-
-  // Filters & Search — Default to PENDING (Only unconfirmed trades)
+  // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'AUDITED'>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'AUDITED'>('ALL');
   const [sortField, setSortField] = useState<SortField>('id');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
@@ -79,8 +72,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
     setIsLoading(true);
     setErrorMessage(null);
     try {
-      // Fetch all missing trades so we can track pending vs audited accurately
-      const res = await api.getMissingCallTrades({ includeAudited: true });
+      const res = await api.getMissingCallTrades();
       if (res.ok && Array.isArray(res.missing_trades)) {
         setTrades(res.missing_trades);
       }
@@ -371,14 +363,6 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-amber-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5 text-amber-400" />
-            <span>Upload Mail Confirmations</span>
-          </button>
-
           {pendingCount > 0 && (
             <button
               onClick={handleBulkApprovePending}
@@ -386,7 +370,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
               className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>{isBulkSubmitting ? 'Auditing...' : `Approve All (${pendingCount})`}</span>
+              <span>{isBulkSubmitting ? 'Auditing...' : `Approve & Publish All (${pendingCount})`}</span>
             </button>
           )}
 
@@ -426,7 +410,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
-              Pending Confirmation (Unconfirmed)
+              Pending Mail Audit
             </div>
             <div className="text-xl font-bold text-amber-600 mt-0.5">{pendingCount}</div>
           </div>
@@ -438,7 +422,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
           <div>
             <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
-              Verified & Audited via Mail
+              Audited & Sent to Scorecards
             </div>
             <div className="text-xl font-bold text-emerald-600 mt-0.5">{auditedCount}</div>
           </div>
@@ -448,7 +432,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         </div>
       </div>
 
-      {/* Filters Bar & Tab Selectors */}
+      {/* Filters Bar */}
       <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -461,56 +445,19 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-1.5 w-full sm:w-auto">
-          <div className="inline-flex p-1 bg-neutral-100 rounded-xl text-xs font-semibold">
-            <button
-              onClick={() => setStatusFilter('PENDING')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'PENDING'
-                  ? 'bg-white text-neutral-900 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              Pending Confirmation ({pendingCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('AUDITED')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'AUDITED'
-                  ? 'bg-white text-neutral-900 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              Audited via Mail ({auditedCount})
-            </button>
-            <button
-              onClick={() => setStatusFilter('ALL')}
-              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
-                statusFilter === 'ALL'
-                  ? 'bg-white text-neutral-900 font-bold shadow-xs'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              All Records ({trades.length})
-            </button>
-          </div>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <span className="text-xs text-neutral-500 whitespace-nowrap">Filter Status:</span>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as any)}
+            className="px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+          >
+            <option value="ALL">All ({trades.length})</option>
+            <option value="PENDING">Pending Audit ({pendingCount})</option>
+            <option value="AUDITED">Audited ({auditedCount})</option>
+          </select>
         </div>
       </div>
-
-      {/* Mail Confirmation Upload & Match Modal */}
-      <MailConfirmationModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onMatchesCompleted={(_results, summary) => {
-          fetchMissingTrades();
-          if (onScorecardCreated) onScorecardCreated();
-          setActionMessage(
-            `Batch Audit Complete: ${summary.matched_count} trades verified via client mail confirmations and removed from pending missing list.`
-          );
-        }}
-        pendingTradesCount={pendingCount}
-        candidateTrades={trades.filter((t) => !t.has_scorecard)}
-      />
 
       {/* Table Container */}
       <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
@@ -621,36 +568,11 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
               {filteredTrades.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="py-12 text-center text-neutral-400">
-                    <CheckCircle2 className="w-10 h-10 mx-auto text-emerald-500 mb-2" />
-                    <div className="text-sm font-bold text-neutral-800">
-                      {statusFilter === 'PENDING'
-                        ? 'All Missing Call Trades Are Verified!'
-                        : 'No Trades Match Current Filters'}
+                    <Mail className="w-8 h-8 mx-auto text-neutral-300 mb-2" />
+                    <div className="text-sm font-semibold text-neutral-600">No Missing Call Trades Found</div>
+                    <div className="text-xs text-neutral-400 mt-0.5">
+                      All uploaded trades currently have linked audio call recordings or no trades match filters.
                     </div>
-                    <div className="text-xs text-neutral-500 mt-1 max-w-md mx-auto">
-                      {statusFilter === 'PENDING'
-                        ? 'Every executed trade has a confirmed telephone call recording or verified mail scorecard. There are currently 0 unconfirmed trades.'
-                        : 'Try adjusting your search keywords or switching filter tabs.'}
-                    </div>
-                    {statusFilter === 'PENDING' && (
-                      <div className="mt-4 flex items-center justify-center gap-2">
-                        <button
-                          onClick={() => setIsUploadModalOpen(true)}
-                          className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-black text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer inline-flex items-center gap-1.5"
-                        >
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Upload More Mail Confirmations</span>
-                        </button>
-                        {auditedCount > 0 && (
-                          <button
-                            onClick={() => setStatusFilter('AUDITED')}
-                            className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-                          >
-                            View {auditedCount} Audited via Mail
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </td>
                 </tr>
               ) : (

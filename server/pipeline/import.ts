@@ -8,7 +8,6 @@ import type { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import type { ImportBatchRecord } from './types';
 import { normalizePhoneNumber } from '../normalizer';
-import { normalizeDateToIso } from './matching';
 
 export interface UploadedFileInfo {
   original_filename: string;
@@ -129,7 +128,7 @@ export function stage1ImportCalls(
 
     const duration = file.duration_seconds || 0;
     const recordingName = path.basename(file.storage_path);
-    const callDate = normalizeDateToIso(file.call_date) || (file.call_date ? String(file.call_date).slice(0, 10) : '') || now.slice(0, 10);
+    const callDate = file.call_date || now.slice(0, 10);
     const callTime = file.call_time || now.slice(11, 19);
 
     const res = insertStmt.run(

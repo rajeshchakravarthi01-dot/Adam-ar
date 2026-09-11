@@ -8,12 +8,7 @@
 // =============================================================
 
 import type { DatabaseSync } from 'node:sqlite';
-import {
-  normalizeCanonicalPhone,
-  normalizeCanonicalClientCode,
-  getValidBrokerPrefixes,
-  extractClientCodesFromText,
-} from './matching';
+import { normalizePhoneNumber, normalizeClientCode } from '../normalizer';
 import { FUNDSINDIA_ADVISOR_DIRECTORY } from '../fundsindia-directory';
 import type { ResolvedIdentity, IdentityStatus, IdentitySource } from './types';
 import type { CallRecord, TradeRecord } from '../../src/types';
@@ -32,14 +27,11 @@ export function stage2ResolveIdentity(
     };
   }
 
-  const validPrefixes = getValidBrokerPrefixes(db);
-
   // 1. Resolve Caller ID from Call Record, Filename, Matched Trade, or Transcript
-  let rawCallerId = call.calling_number || call.phone_number || (call as any).caller_id || (call as any).cli || '';
+  let rawCallerId = call.calling_number || call.phone_number || '';
   if (!rawCallerId && (call.original_filename || call.recording_name)) {
     const fn = call.original_filename || call.recording_name;
-    const phoneMatch = fn.match(/(?:^|[^0-9])([6-9]\d{9})(?:[^0-9]|$)/)
-      || fn.match(/(?:^|[^0-9])91([6-9]\d{9})(?:[^0-9]|$)/);
+    const phoneMatch = fn.match(/(?:^|[^0-9])([6-9]\d{9})(?:[^0-9]|$)/);
     if (phoneMatch) {
       rawCallerId = phoneMatch[1];
     }
@@ -59,28 +51,27 @@ export function stage2ResolveIdentity(
       rawCallerId = phoneMatch[1];
     }
   }
-  const callerId = normalizeCanonicalPhone(rawCallerId) || '';
+  const callerId = normalizePhoneNumber(rawCallerId) || '';
 
   // 2. Extract Client Code / UCC from Metadata, Filename, Matched Trade, or Transcript
-  // Enforces valid broker prefixes and excludes price/index levels like "AT24400"
   let rawClientCode = call.client || call.client_code || '';
   if (!rawClientCode && (call.original_filename || call.recording_name)) {
     const fn = call.original_filename || call.recording_name;
-    const codes = extractClientCodesFromText(fn, validPrefixes);
-    if (codes.length > 0) {
-      rawClientCode = codes[0];
+    const uccMatch = fn.match(/\b([A-Z]{2,4}[0-9]{3,7})\b/i);
+    if (uccMatch) {
+      rawClientCode = uccMatch[1].toUpperCase();
     }
   }
   if (!rawClientCode && matchedTradeRecord?.client) {
     rawClientCode = matchedTradeRecord.client;
   }
   if (!rawClientCode && call.transcript) {
-    const codes = extractClientCodesFromText(call.transcript, validPrefixes);
-    if (codes.length > 0) {
-      rawClientCode = codes[0];
+    const uccMatch = call.transcript.match(/\b([A-Z]{2,4}[0-9]{3,7})\b/i);
+    if (uccMatch) {
+      rawClientCode = uccMatch[1].toUpperCase();
     }
   }
-  const normalizedUcc = normalizeCanonicalClientCode(rawClientCode);
+  const normalizedUcc = normalizeClientCode(rawClientCode);
 
   // 3. Resolve Advisor, Dealer, and Team
   let dealer = call.dealer || matchedTradeRecord?.dealer || '';
@@ -126,7 +117,7 @@ export function stage2ResolveIdentity(
     // Check if trades agree
     if (tradesForClient.length > 0) {
       const matchingTradePhone = tradesForClient.find(
-        (t) => normalizeCanonicalPhone(t.phone_number || t.client_number || '') === callerId
+        (t) => normalizePhoneNumber(t.phone_number || t.client_number || '') === callerId
       );
       if (matchingTradePhone) {
         // Perfect 3-way match: client_number <-> client_code <-> trade records
@@ -140,14 +131,15 @@ export function stage2ResolveIdentity(
         resolutionNotes = 'Authoritative exact 3-way match across metadata and trade records.';
       } else {
         // Trade has different phone than calling number!
+        // Calling number might be unauthorized or needs review
         const tradePhone = tradesForClient[0].phone_number || tradesForClient[0].client_number || '';
-        registeredNumber = normalizeCanonicalPhone(tradePhone);
+        registeredNumber = normalizePhoneNumber(tradePhone);
         identityStatus = 'CONFIRMED'; // UCC is confirmed, registered number found for Q1 check
         identitySource = 'METADATA';
         resolutionNotes = `Confirmed client UCC ${normalizedUcc}. Note: Calling number (${callerId}) differs from registered trade phone (${registeredNumber}).`;
       }
     } else {
-      // UCC and phone present from metadata, but no trades uploaded yet
+      // UCC and phone present from metadata, but no trades uploaded yet or exact match
       identityStatus = 'CONFIRMED';
       identitySource = 'METADATA';
       registeredNumber = callerId;
@@ -157,14 +149,16 @@ export function stage2ResolveIdentity(
     // UCC present, but caller ID missing
     if (tradesForClient.length > 0) {
       const tradePhone = tradesForClient[0].phone_number || tradesForClient[0].client_number || '';
-      registeredNumber = normalizeCanonicalPhone(tradePhone);
+      registeredNumber = normalizePhoneNumber(tradePhone);
     }
     identityStatus = 'REVIEW';
     identitySource = 'METADATA';
     resolutionNotes = `Client UCC ${normalizedUcc} present, but caller ID is missing. Requires manual review.`;
   } else if (callerId && !normalizedUcc) {
     // Caller ID present from metadata/filename
-    const uniqueUccs = Array.from(new Set(tradesForPhone.map((t) => normalizeCanonicalClientCode(t.client)).filter(Boolean)));
+    // User mandate: "get the client number from meta data and trade infor from trade data.
+    // match the last 10 digit number in both meta data and trade data - if number matchnig Q1 pass"
+    const uniqueUccs = Array.from(new Set(tradesForPhone.map((t) => normalizeClientCode(t.client)).filter(Boolean)));
 
     if (uniqueUccs.length === 1) {
       // Exactly one unique client UCC in trades for this phone

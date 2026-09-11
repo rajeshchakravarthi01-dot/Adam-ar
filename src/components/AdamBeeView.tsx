@@ -16,10 +16,6 @@ import {
   FileSpreadsheet,
   Plus,
   RefreshCw,
-  Eye,
-  Globe,
-  Archive,
-  Layers,
 } from 'lucide-react';
 import type { AdamBeeTicketRecord } from '../types';
 
@@ -28,7 +24,6 @@ interface AdamBeeViewProps {
   onTriggerBee: () => void;
   onClearTickets: () => void;
   onAddTicket: (ticket: AdamBeeTicketRecord) => void;
-  onRefresh?: () => void;
 }
 
 export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
@@ -36,33 +31,25 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
   onTriggerBee,
   onClearTickets,
   onAddTicket,
-  onRefresh,
 }) => {
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'COMPLIANT' | 'FLAGGED' | 'FATAL'>('ALL');
-  const [filterProfile, setFilterProfile] = useState<string>('ALL');
   const [copiedCode, setCopiedCode] = useState(false);
   const [showManualModal, setShowManualModal] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState<AdamBeeTicketRecord | null>(null);
-
-  // Manual ticket form state
   const [manualTicketText, setManualTicketText] = useState('');
   const [manualTicketId, setManualTicketId] = useState('');
   const [manualClient, setManualClient] = useState('');
   const [manualAdvisor, setManualAdvisor] = useState('');
-  const [manualProfile, setManualProfile] = useState('FundsIndia CRM');
 
   const filteredTickets = tickets.filter((t) => {
     if (filterStatus !== 'ALL' && t.complianceStatus !== filterStatus) return false;
-    if (filterProfile !== 'ALL' && (t.siteProfile || 'Generic') !== filterProfile) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
       const inId = (t.ticketId || '').toLowerCase().includes(q);
       const inClient = (t.clientId || '').toLowerCase().includes(q);
       const inAdv = (t.advisorName || '').toLowerCase().includes(q);
-      const inFind = (t.findings || '').toLowerCase().includes(q);
-      const inProfile = (t.siteProfile || '').toLowerCase().includes(q);
-      return inId || inClient || inAdv || inFind || inProfile;
+      const inFind = t.findings.toLowerCase().includes(q);
+      return inId || inClient || inAdv || inFind;
     }
     return true;
   });
@@ -85,8 +72,8 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
       phoneNumber: phoneMatch ? phoneMatch[0] : '',
       complianceStatus: 'PENDING',
       riskScore: 2,
-      findings: 'Harvested externally from ' + url,
-      rawSnippets: [bodyText.slice(0, 500)]
+      findings: 'Harveted externally from ' + url,
+      rawSnippets: [bodyText.slice(0, 400)]
     };
     alert('🐝 AdamBee harvested ticket ' + beeData.ticketId + '! Sending to AuditEQ workspace...');
     window.open('${window.location.origin}/#adambee?data=' + encodeURIComponent(JSON.stringify(beeData)), '_blank');
@@ -108,15 +95,14 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
 
     const newTicket: AdamBeeTicketRecord = {
       id: `manual-${Date.now()}`,
-      sourceUrl: `Manual CRM (${manualProfile})`,
+      sourceUrl: 'Manual CRM Ticket Input',
       pageTitle: `CRM Ticket #${manualTicketId || 'NEW'}`,
       extractedAt: new Date().toISOString(),
       ticketId: manualTicketId.trim() || `TKT-${Math.floor(10000 + Math.random() * 90000)}`,
       clientId: manualClient.trim() || 'INP-CLIENT',
       advisorName: manualAdvisor.trim() || 'Advisor',
       phoneNumber: phoneMatch ? phoneMatch[0] : undefined,
-      siteProfile: manualProfile,
-      complianceStatus: hasGuarantee ? 'FATAL' : hasCancellation ? 'FLAGGED' : 'COMPLIANT',
+      complianceStatus: hasGuarantee || hasCancellation ? 'FLAGGED' : 'COMPLIANT',
       riskScore: hasGuarantee ? 5 : hasCancellation ? 3 : 1,
       rawSnippets: [manualTicketText.slice(0, 500)],
       findings: hasGuarantee
@@ -136,13 +122,12 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
 
   const handleExportCSV = () => {
     if (tickets.length === 0) return;
-    const headers = ['Ticket ID', 'Client ID', 'Advisor', 'Phone', 'Profile', 'Risk Score', 'Compliance Status', 'Source URL', 'Findings', 'Extracted At'];
+    const headers = ['Ticket ID', 'Client ID', 'Advisor', 'Phone', 'Risk Score', 'Compliance Status', 'Source URL', 'Findings', 'Extracted At'];
     const rows = tickets.map((t) => [
       t.ticketId || '',
       t.clientId || '',
       t.advisorName || '',
       t.phoneNumber || '',
-      t.siteProfile || 'Generic',
       t.riskScore,
       t.complianceStatus,
       `"${(t.sourceUrl || '').replace(/"/g, '""')}"`,
@@ -167,13 +152,13 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
           <div>
             <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-1">
               <span className="text-lg">🐝</span>
-              <span>AdamBee Autonomous Web &amp; Screen Extractor</span>
+              <span>Function 12 · AdamBee Autonomous Web &amp; Ticket Extractor</span>
             </div>
             <h2 className="text-2xl font-black text-white tracking-tight">
               Screen Crawler &amp; CRM Ticket Compliance Auditor
             </h2>
             <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-              Autonomous crawler and browser extension auditor: Harvest full-page DOM elements, CRM support tickets, UCC codes, and advisor communications to detect SEBI compliance infractions in real time.
+              When triggered, the AdamBee mascot sweeps the active screen DOM and external web pages, harvesting customer support tickets, UCC codes, trade references, and advisor communications to audit compliance risk in real time.
             </p>
           </div>
 
@@ -184,45 +169,25 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
               title="Launch AdamBee to crawl this screen"
             >
               <span className="text-base">🐝</span>
-              <span>Release AdamBee (Screen Crawl)</span>
+              <span>Release AdamBee (Fly &amp; Crawl)</span>
             </button>
-
-            <a
-              href="/api/adambee/download-extension"
-              download="adambee-extension.zip"
-              className="px-3.5 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Download standalone Chrome/Edge extension ZIP"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Download Extension (ZIP)</span>
-            </a>
 
             <button
               onClick={() => setShowManualModal(true)}
               className="px-3.5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-amber-400 text-xs font-bold rounded-xl border border-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Import Ticket</span>
+              <span>Import Ticket Data</span>
             </button>
-
-            {onRefresh && (
-              <button
-                onClick={onRefresh}
-                className="p-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white rounded-xl border border-neutral-700 cursor-pointer"
-                title="Refresh Tickets from Backend"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Extension Integration & Ingestion Info */}
+        {/* Extension Integration Bar */}
         <div className="mt-5 pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-400">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-amber-400" />
+            <Code className="w-4 h-4 text-amber-400" />
             <span>
-              <b>Site-Specific Profiles:</b> FundsIndia CRM, Freshdesk, Zendesk, Salesforce &amp; Tata Smartflo portals.
+              <b>AdamBee Web Bookmarklet:</b> Drag or copy code to audit tickets across FundsIndia CRM, Zendesk, or Tata Teleservices portal.
             </span>
           </div>
           <button
@@ -240,7 +205,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
           <div className="text-[11px] font-bold uppercase text-neutral-500">Harvested Tickets</div>
           <div className="text-2xl font-black text-neutral-900 mt-1">{tickets.length}</div>
-          <div className="text-[10px] text-neutral-400 mt-0.5">Persisted in SQLite database</div>
+          <div className="text-[10px] text-neutral-400 mt-0.5">Scanned from DOM &amp; CRM</div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
@@ -269,15 +234,15 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex flex-1 flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px] max-w-sm">
+      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex flex-1 items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
             <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search Ticket ID, Client, Advisor, findings..."
+              placeholder="Search by Ticket ID, Client Code, Advisor, or findings..."
               className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs text-neutral-900 focus:outline-hidden focus:border-amber-400"
             />
           </div>
@@ -294,22 +259,6 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                 }`}
               >
                 {st}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl text-xs">
-            {['ALL', 'FundsIndia CRM', 'Freshdesk', 'Zendesk', 'Salesforce', 'Generic'].map((prof) => (
-              <button
-                key={prof}
-                onClick={() => setFilterProfile(prof)}
-                className={`px-2.5 py-1.5 rounded-lg font-semibold text-[10px] transition-all cursor-pointer ${
-                  filterProfile === prof
-                    ? 'bg-amber-400 text-black shadow-xs font-bold'
-                    : 'text-neutral-600 hover:text-neutral-900'
-                }`}
-              >
-                {prof}
               </button>
             ))}
           </div>
@@ -347,7 +296,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
             <span className="text-base">🐝</span>
             <span>Harvested Tickets &amp; Audit Trail ({filteredTickets.length})</span>
           </h3>
-          <span className="text-[11px] font-mono text-neutral-400">Click any row to view full capture</span>
+          <span className="text-[11px] font-mono text-neutral-400">SEBI Pre-Order &amp; CRM Ticket Verification</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -355,23 +304,22 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
             <thead>
               <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-semibold uppercase tracking-wider">
                 <th className="py-3 px-4">Ticket ID</th>
-                <th className="py-3 px-3">Profile</th>
                 <th className="py-3 px-3">Client Code</th>
                 <th className="py-3 px-3">Advisor</th>
+                <th className="py-3 px-3">Contact</th>
                 <th className="py-3 px-3">Status</th>
                 <th className="py-3 px-4">Audit Findings &amp; Risk Cues</th>
                 <th className="py-3 px-3">Harvested At</th>
-                <th className="py-3 px-3 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100">
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-neutral-400 space-y-2">
+                  <td colSpan={7} className="py-12 text-center text-neutral-400 space-y-2">
                     <div className="text-3xl">🐝</div>
-                    <div className="text-sm font-bold text-neutral-700">No tickets matching filters</div>
+                    <div className="text-sm font-bold text-neutral-700">No tickets harvested yet</div>
                     <p className="text-xs max-w-sm mx-auto text-neutral-500">
-                      Release AdamBee, download the browser extension, or use &ldquo;Import Ticket&rdquo; to analyze CRM data.
+                      Click the small bee icon in the top right corner, click &ldquo;Release AdamBee&rdquo; above, or paste CRM ticket logs to begin ticket auditing.
                     </p>
                   </td>
                 </tr>
@@ -379,24 +327,15 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                 filteredTickets.map((t) => {
                   const isFatal = t.complianceStatus === 'FATAL';
                   const isFlagged = t.complianceStatus === 'FLAGGED';
+                  const isCompliant = t.complianceStatus === 'COMPLIANT';
 
                   return (
-                    <tr
-                      key={t.id}
-                      onClick={() => setSelectedTicket(t)}
-                      className="hover:bg-neutral-50/80 transition-colors cursor-pointer"
-                    >
+                    <tr key={t.id} className="hover:bg-neutral-50/80 transition-colors">
                       <td className="py-3 px-4">
                         <div className="font-mono font-bold text-neutral-900 flex items-center gap-1.5">
                           <span>{t.ticketId || 'TKT-AUTO'}</span>
                         </div>
                         <div className="text-[10px] text-neutral-400 truncate max-w-[140px]">{t.pageTitle}</div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <span className="font-semibold text-neutral-700 bg-neutral-100 px-2 py-0.5 rounded text-[10px]">
-                          {t.siteProfile || 'CRM'}
-                        </span>
                       </td>
 
                       <td className="py-3 px-3">
@@ -407,6 +346,10 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
 
                       <td className="py-3 px-3">
                         <div className="font-medium text-neutral-800">{t.advisorName || 'CRM Agent'}</div>
+                      </td>
+
+                      <td className="py-3 px-3 font-mono text-neutral-600">
+                        {t.phoneNumber || '—'}
                       </td>
 
                       <td className="py-3 px-3">
@@ -444,19 +387,6 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                       <td className="py-3 px-3 text-[11px] font-mono text-neutral-500 whitespace-nowrap">
                         {t.extractedAt ? t.extractedAt.slice(0, 16).replace('T', ' ') : '—'}
                       </td>
-
-                      <td className="py-3 px-3 text-right">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedTicket(t);
-                          }}
-                          className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
                     </tr>
                   );
                 })
@@ -465,91 +395,6 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
           </table>
         </div>
       </div>
-
-      {/* Ticket Details Modal */}
-      {selectedTicket && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-neutral-300 shadow-2xl p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">🐝</span>
-                <div>
-                  <h3 className="text-sm font-bold text-neutral-900">
-                    Ticket Audit Inspection: #{selectedTicket.ticketId}
-                  </h3>
-                  <p className="text-[11px] text-neutral-500">{selectedTicket.pageTitle}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="text-neutral-400 hover:text-black font-bold text-base cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-neutral-50 p-3.5 rounded-xl border border-neutral-200">
-              <div>
-                <span className="text-[10px] uppercase font-bold text-neutral-500 block">Status</span>
-                <span className="font-bold text-neutral-900">{selectedTicket.complianceStatus}</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-neutral-500 block">Risk Score</span>
-                <span className="font-bold text-neutral-900">{selectedTicket.riskScore} / 5</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-neutral-500 block">Client (UCC)</span>
-                <span className="font-bold text-neutral-900">{selectedTicket.clientId || '—'}</span>
-              </div>
-              <div>
-                <span className="text-[10px] uppercase font-bold text-neutral-500 block">Site Profile</span>
-                <span className="font-bold text-neutral-900">{selectedTicket.siteProfile || 'CRM'}</span>
-              </div>
-            </div>
-
-            <div>
-              <h4 className="text-xs font-bold text-neutral-900 mb-1">Audit Findings &amp; Regulatory Analysis</h4>
-              <p className="text-xs text-neutral-700 bg-amber-50/50 p-3 rounded-xl border border-amber-200/60 leading-relaxed">
-                {selectedTicket.findings}
-              </p>
-            </div>
-
-            {selectedTicket.sourceUrl && (
-              <div>
-                <h4 className="text-xs font-bold text-neutral-900 mb-1">Source Origin</h4>
-                <div className="text-xs font-mono text-neutral-600 bg-neutral-100 p-2.5 rounded-lg break-all">
-                  {selectedTicket.sourceUrl}
-                </div>
-              </div>
-            )}
-
-            {selectedTicket.rawSnippets && selectedTicket.rawSnippets.length > 0 && (
-              <div>
-                <h4 className="text-xs font-bold text-neutral-900 mb-1">Extracted Text Snippets</h4>
-                <div className="space-y-2">
-                  {selectedTicket.rawSnippets.map((snippet, idx) => (
-                    <pre
-                      key={idx}
-                      className="text-[11px] font-mono bg-neutral-950 text-neutral-200 p-3 rounded-xl whitespace-pre-wrap max-h-48 overflow-y-auto"
-                    >
-                      {snippet}
-                    </pre>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-end pt-2 border-t border-neutral-100">
-              <button
-                onClick={() => setSelectedTicket(null)}
-                className="px-4 py-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs rounded-xl cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Manual CRM Ticket Modal */}
       {showManualModal && (
@@ -592,32 +437,15 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 mb-1">Advisor / Agent Name</label>
-                  <input
-                    type="text"
-                    value={manualAdvisor}
-                    onChange={(e) => setManualAdvisor(e.target.value)}
-                    placeholder="e.g. Ajeetkumar"
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 mb-1">Site Profile</label>
-                  <select
-                    value={manualProfile}
-                    onChange={(e) => setManualProfile(e.target.value)}
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
-                  >
-                    <option value="FundsIndia CRM">FundsIndia CRM</option>
-                    <option value="Freshdesk">Freshdesk</option>
-                    <option value="Zendesk">Zendesk</option>
-                    <option value="Salesforce">Salesforce</option>
-                    <option value="Zoho Desk">Zoho Desk</option>
-                    <option value="Generic">Generic Web Portal</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-[11px] font-bold text-neutral-700 mb-1">Advisor / Agent Name</label>
+                <input
+                  type="text"
+                  value={manualAdvisor}
+                  onChange={(e) => setManualAdvisor(e.target.value)}
+                  placeholder="e.g. Ajeetkumar"
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                />
               </div>
 
               <div>

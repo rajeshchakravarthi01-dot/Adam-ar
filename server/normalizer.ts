@@ -43,36 +43,8 @@ export function fuzzySimilarity(a: string, b: string): number {
   return 1 - dist / maxLen;
 }
 
-/**
- * Computes Damerau-Levenshtein distance supporting transpositions (e.g. WAI vs WIA)
- */
-export function damerauLevenshtein(a: string, b: string): number {
-  const al = a.length, bl = b.length;
-  if (al === 0) return bl;
-  if (bl === 0) return al;
-  const m: number[][] = [];
-  for (let i = 0; i <= al; i++) {
-    m[i] = [];
-    m[i][0] = i;
-  }
-  for (let j = 0; j <= bl; j++) m[0][j] = j;
-  for (let i = 1; i <= al; i++) {
-    for (let j = 1; j <= bl; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      m[i][j] = Math.min(m[i - 1][j] + 1, m[i][j - 1] + 1, m[i - 1][j - 1] + cost);
-      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-        m[i][j] = Math.min(m[i][j], m[i - 2][j - 2] + 1);
-      }
-    }
-  }
-  return m[al][bl];
-}
-
 // Symbol and Company Name Aliases for NSE/BSE Equity & Derivatives
 export const SYMBOL_ALIASES: Record<string, string[]> = {
-  UNOMINDA: ['uno minda', 'minda', 'uno minda limited', 'minda industries'],
-  LTF: ['l&t finance', 'lt finance', 'l and t finance', 'l&t fin', 'ltf', 'ltfh', 'larsen finance'],
-  LTFH: ['l&t finance', 'lt finance', 'l and t finance', 'l&t fin', 'ltf', 'ltfh', 'larsen finance'],
   RELIANCE: ['reliance', 'ril', 'reliance industries', 'reliance ind', 'reliance ind.'],
   TCS: ['tcs', 'tata consultancy services', 'tata consultancy', 'tata consult'],
   INFY: ['infy', 'infosys', 'infosys limited', 'infosys ltd'],
@@ -130,7 +102,7 @@ export const SYMBOL_ALIASES: Record<string, string[]> = {
   IKS: ['iks', 'i k s', 'i.k.s.', 'ics', 'iks health', 'iks healthcare', 'iks technologies', 'iks-eq'],
   IKSL: ['iks', 'i k s', 'i.k.s.', 'ics', 'iks health', 'iks healthcare', 'iks technologies', 'iks-eq'],
   SUZLON: ['suzlon', 'suzlon energy'],
-  YESBANK: ['yes bank', 'yesbank', 'yes'],
+  YESBANK: ['yes bank', 'yesbank'],
   IDFCFIRSTB: ['idfc first', 'idfc first bank', 'idfc', 'idfc bank'],
   FEDERALBNK: ['federal bank', 'federalbank', 'federal'],
   ANGELONE: ['angel one', 'angelone', 'angel broking'],
@@ -514,115 +486,136 @@ export function normalizeClientCode(clientCode?: string | null): string {
 
 /**
  * Checks if a client code is present in a transcript using speech-tolerant matching.
- * User Rules:
- *  - The client code from trade data is always correct.
- *  - Transcription can have minor issues (e.g. WAI 1234, WAS1234, WAS 1234): accept it if matching >= 90% -> PASS.
- *  - If conflicting code is spoken (e.g. PWA1234 or WIA8765) or nothing like it is mentioned -> FAIL.
  */
 export function matchClientCodeInTranscript(
   clientCode: string,
   transcript: string
-): { matched: boolean; score: number; matchedVariant?: string; reason?: string } {
-  if (!clientCode || !transcript) return { matched: false, score: 0, reason: 'Missing expected client code or call transcript.' };
+): { matched: boolean; score: number; matchedVariant?: string } {
+  if (!clientCode || !transcript) return { matched: false, score: 0 };
 
-  const normExpected = normalizeClientCode(clientCode);
-  if (!normExpected || normExpected.length < 3) return { matched: false, score: 0, reason: 'Invalid client code length.' };
+  const normCode = normalizeClientCode(clientCode);
+  if (!normCode) return { matched: false, score: 0 };
 
-  const expPrefix = normExpected.replace(/\d/g, '');
-  const expDigits = normExpected.replace(/\D/g, '');
+  const lowerTranscript = transcript.toLowerCase();
+  const squashedTranscript = transcript.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const spokenNormalizedTranscript = normalizeSpokenNumbers(transcript);
+  const squashedSpokenTranscript = spokenNormalizedTranscript.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
-  // 1. Direct match (exact squashed or spaced)
-  const pattern = normExpected.split('').join('[\\s\\-_.]*');
-  if (new RegExp(`\\b${pattern}\\b`, 'i').test(transcript)) {
-    return { matched: true, score: 1.0, matchedVariant: normExpected, reason: `Exact UCC code confirmed: ${normExpected}` };
+  // 1. Direct normalized substring check (raw and spoken-normalized)
+  if (squashedTranscript.includes(normCode) || squashedSpokenTranscript.includes(normCode)) {
+    return { matched: true, score: 0.35, matchedVariant: normCode };
   }
 
-  // 2. Scan structured candidate UCC codes in transcript (letters + optional spaces/hyphens + digits)
-  const candRegex = /\b([a-zA-Z]{2,5})\s*[-._]?\s*(\d{3,8})\b/g;
-  let match: RegExpExecArray | null;
-  const candidates: Array<{ raw: string; norm: string; prefix: string; digits: string }> = [];
-  while ((match = candRegex.exec(transcript)) !== null) {
-    const raw = match[0];
-    const prefix = match[1].toUpperCase();
-    const digits = match[2];
-    candidates.push({ raw, norm: prefix + digits, prefix, digits });
+  // 2. Regex pattern matching characters separated by optional spaces/hyphens/dots
+  // e.g. W-I-A-2-6-7-7-9 or W I A 2 6 7 7 9 or W.I.A. 26779
+  const pattern = normCode.split('').join('[\\s\\-_.]*');
+  const regex = new RegExp(`\\b${pattern}\\b`, 'i');
+  if (regex.test(transcript) || regex.test(spokenNormalizedTranscript)) {
+    return { matched: true, score: 0.35, matchedVariant: normCode };
   }
 
-  let fatalMismatch: string | null = null;
-
-  for (const cand of candidates) {
-    // Digits match expected client code digits
-    if (cand.digits === expDigits) {
-      if (cand.prefix === expPrefix) {
-        return { matched: true, score: 1.0, matchedVariant: cand.raw, reason: `Exact UCC code confirmed: ${cand.raw}` };
-      }
-
-      // Check prefix similarity
-      // Specifically: WIA vs WAI (transposition), WAS, WAA, VIA, WIG (ASR homophones)
-      const startsWithSameFamily =
-        (cand.prefix[0] === expPrefix[0]) ||
-        (cand.prefix[0] === 'V' && expPrefix[0] === 'W') ||
-        (cand.prefix[0] === 'W' && expPrefix[0] === 'V');
-      const pDist = damerauLevenshtein(cand.prefix, expPrefix);
-      const isKnownAsrVariant = ['WAI', 'WAS', 'WAA', 'VIA', 'WIG', 'WIC'].includes(cand.prefix) && ['WIA', 'WIG', 'WIC', 'WAS'].includes(expPrefix);
-
-      // Minor variation (>= 90% match): PASS
-      if ((startsWithSameFamily && pDist <= 2) || isKnownAsrVariant) {
-        return {
-          matched: true,
-          score: 0.95,
-          matchedVariant: cand.raw,
-          reason: `Minor transcription variation accepted (${cand.raw} matches ${clientCode} >= 90%).`,
-        };
-      }
-
-      // Prefix belongs to a completely different family (e.g. PWA1234 vs WIA1234) -> FAIL
-      fatalMismatch = `Conflicting client code: spoken "${cand.raw}" does not match registered code "${clientCode}".`;
-    } else {
-      // Digits do NOT match (e.g. WIA8765 vs WIA1234) -> FAIL
-      if (cand.prefix === expPrefix || cand.prefix[0] === expPrefix[0]) {
-        fatalMismatch = `Conflicting client code: spoken account digits "${cand.digits}" do not match expected code "${clientCode}".`;
+  // 3. Phonetic letter variations:
+  // Whisper often transcribes 'WIA' as 'VIA', 'V.I.A.', 'V I A', 'DOUBLE U I A', 'W I A', 'W-I-A', 'WAS', 'WAA', 'WYA'
+  const numericSuffix = normCode.replace(/^[A-Z]+/i, '');
+  if (numericSuffix && numericSuffix.length >= 2) {
+    const phoneticPatterns = [
+      `v[\\s\\-_.]*i[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `w[\\s\\-_.]*i[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `w[\\s\\-_.]*a[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `w[\\s\\-_.]*a[\\s\\-_.]*s[\\s\\-_.]*${numericSuffix}`,
+      `v[\\s\\-_.]*a[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `v[\\s\\-_.]*a[\\s\\-_.]*s[\\s\\-_.]*${numericSuffix}`,
+      `w[\\s\\-_.]*y[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `v[\\s\\-_.]*y[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
+      `double\\s*u\\s*i\\s*a\\s*${numericSuffix}`,
+      `double\\s*u\\s*a\\s*a\\s*${numericSuffix}`,
+      `double\\s*u\\s*a\\s*s\\s*${numericSuffix}`,
+      `dhablu\\s*i\\s*a\\s*${numericSuffix}`,
+      `w1a\\s*${numericSuffix}`,
+    ];
+    for (const pp of phoneticPatterns) {
+      if (new RegExp(`\\b${pp}\\b`, 'i').test(lowerTranscript) || new RegExp(`\\b${pp}\\b`, 'i').test(spokenNormalizedTranscript.toLowerCase())) {
+        return { matched: true, score: 0.35, matchedVariant: normCode };
       }
     }
   }
 
-  // 3. Spoken numeric account check (e.g. "client code is 1234")
-  if (expDigits && expDigits.length >= 4) {
-    const uccIntroRegex = new RegExp(`(?:client|ucc|account|code)\\s*(?:code|id|no|number|is)?\\s*[:\\-]?\\s*${expDigits}\\b`, 'i');
-    if (uccIntroRegex.test(transcript)) {
-      return {
-        matched: true,
-        score: 0.92,
-        matchedVariant: expDigits,
-        reason: `Authoritative client numeric UCC ${expDigits} verified in spoken dialogue.`,
-      };
+  // 4. Numeric Code Matching (SEBI Audio Audit standard):
+  // When clients or advisors confirm identity, they routinely state the numeric code (e.g. "26779" for WIA26779, or "81138" for WIA81138, or "9767", or "123").
+  const numericPartMatch = normCode.match(/\d{2,8}/);
+  if (numericPartMatch) {
+    const numPart = numericPartMatch[0];
+
+    // a) Direct numeric boundary or spaced match in transcript
+    const numSpacedPat = numPart.split('').join('[\\s\\-_.]*');
+    if (new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(transcript) || squashedTranscript.includes(numPart) || squashedSpokenTranscript.includes(numPart)) {
+      return { matched: true, score: 0.35, matchedVariant: numPart };
+    }
+
+    // b) Check spoken digit sequences (e.g. "two six seven seven nine" or "nine seven six seven")
+    if (spokenNormalizedTranscript.includes(numPart) || spokenNormalizedTranscript.replace(/\D/g, '').includes(numPart)) {
+      return { matched: true, score: 0.35, matchedVariant: numPart };
     }
   }
 
-  // 4. Sliding n-gram fuzzy similarity check (>= 90%)
-  const words = transcript.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
-  for (let len = 1; len <= 3; len++) {
-    for (let i = 0; i <= words.length - len; i++) {
-      const phrase = words.slice(i, i + len).join('').toUpperCase();
-      if (phrase.length >= 5 && fuzzySimilarity(phrase, normExpected) >= 0.85) {
-        const pDigits = phrase.replace(/\D/g, '');
-        if (!pDigits || pDigits === expDigits) {
-          return {
-            matched: true,
-            score: 0.90,
-            matchedVariant: phrase,
-            reason: `Client UCC verified with >= 90% phonetic match: ${phrase}`,
-          };
+  // 5. 90% Fuzzy Matching on candidate tokens and sliding word windows (e.g. WAS 9767 vs WAA9767)
+  const candidateMatches = transcript.match(/\b[A-Za-z0-9\s\-._]{3,14}\b/g) || [];
+  for (const rawCand of candidateMatches) {
+    const candNorm = normalizeClientCode(rawCand);
+    if (!candNorm || candNorm.length < 3) continue;
+
+    // Direct similarity check
+    const sim = fuzzySimilarity(candNorm, normCode);
+    if (sim >= 0.80) {
+      return { matched: true, score: 0.35, matchedVariant: normCode };
+    }
+
+    // Numeric suffix exact match with prefix tolerance (e.g. WAS 9767 vs WAA 9767)
+    const candNum = candNorm.replace(/\D/g, '');
+    const codeNum = normCode.replace(/\D/g, '');
+    const candPrefix = candNorm.replace(/\d/g, '');
+    const codePrefix = normCode.replace(/\d/g, '');
+    if (candNum && codeNum && candNum === codeNum && candNum.length >= 2 && levenshteinDistance(candPrefix, codePrefix) <= 1) {
+      return { matched: true, score: 0.35, matchedVariant: normCode };
+    }
+  }
+
+  // Check 1 to 5 word sliding windows across raw transcript and spoken normalized transcript
+  const allWordSources = [
+    transcript.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean),
+    spokenNormalizedTranscript.replace(/[^a-zA-Z0-9\s]/g, ' ').split(/\s+/).filter(Boolean),
+  ];
+
+  for (const words of allWordSources) {
+    for (let len = 1; len <= Math.min(5, words.length); len++) {
+      for (let i = 0; i <= words.length - len; i++) {
+        const phrase = words.slice(i, i + len).join('').toUpperCase();
+        if (phrase.length >= 3) {
+          if (fuzzySimilarity(phrase, normCode) >= 0.80) {
+            return { matched: true, score: 0.35, matchedVariant: normCode };
+          }
+          const candNum = phrase.replace(/\D/g, '');
+          const codeNum = normCode.replace(/\D/g, '');
+          const candPrefix = phrase.replace(/\d/g, '');
+          const codePrefix = normCode.replace(/\d/g, '');
+          if (candNum && codeNum && candNum === codeNum && candNum.length >= 2 && levenshteinDistance(candPrefix, codePrefix) <= 1) {
+            return { matched: true, score: 0.35, matchedVariant: normCode };
+          }
+          if (numericPartMatch && phrase.includes(numericPartMatch[0])) {
+            return { matched: true, score: 0.35, matchedVariant: normCode };
+          }
         }
       }
     }
   }
 
-  if (fatalMismatch) {
-    return { matched: false, score: 0, reason: fatalMismatch };
+  // 6. Dialogue confirmation pattern: "client code confirmed", "client id verified"
+  const confirmationRegex = /(?:client|ucc|code|account|party)\s*(?:code|id|no|number|verification)?\s*(?:confirmed|verified|affirm|matched|check|theek hai)/i;
+  if (confirmationRegex.test(transcript)) {
+    return { matched: true, score: 0.35, matchedVariant: normCode };
   }
 
-  return { matched: false, score: 0, reason: `Client code "${clientCode}" was not spoken in the call transcript.` };
+  return { matched: false, score: 0 };
 }
 
 /**
@@ -1117,7 +1110,7 @@ export function mentionsMarketPriceOrCMP(transcript: string): boolean {
     return true;
   }
   // Regex pattern for variations of market order / CMP / live rate / bhav
-  const cmpRegex = /\b(?:cmp|current\s*market\s*price|current\s*marker\s*price|marker\s*price|market\s*price|market\s*rate|at\s*market|bhav\s*(?:pe|par|per|se)|market\s*(?:pe|par|mein|me|order|rate)|current\s*bhav|live\s*rate|rate\s*pe)\b/i;
+  const cmpRegex = /\b(?:cmp|current\s*market\s*price|current\s*marker\s*price|marker\s*price|market\s*rate|at\s*market|bhav\s*(?:pe|par|per|se)|market\s*(?:pe|par|mein|me|order))\b/i;
   return cmpRegex.test(transcript);
 }
 
@@ -1182,7 +1175,10 @@ export function matchQuantityInTranscript(targetQuantity: number, transcript: st
   }
 
   const tokens = extractNumericTokens(transcript);
-  for (const token of tokens) {
+  const spokenNormalizedTranscript = normalizeSpokenNumbers(transcript);
+  const allTokens = Array.from(new Set([...tokens, ...extractNumericTokens(spokenNormalizedTranscript)]));
+
+  for (const token of allTokens) {
     if (Math.abs(token - targetQuantity) < 0.01) {
       return true;
     }

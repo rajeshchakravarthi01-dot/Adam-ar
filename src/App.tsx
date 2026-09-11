@@ -126,7 +126,6 @@ export function App() {
         integrationsRes,
         diagRes,
         logsRes,
-        beeRes,
       ] = await Promise.allSettled([
         api.getStats(),
         api.getCalls(100),
@@ -140,7 +139,6 @@ export function App() {
         api.getIntegrations(),
         api.getDiagnostics(),
         api.getLogs(100),
-        api.getAdamBeeTickets(),
       ]);
 
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -155,9 +153,6 @@ export function App() {
       if (integrationsRes.status === 'fulfilled') setIntegrations(integrationsRes.value);
       if (diagRes.status === 'fulfilled') setDiagnostics(diagRes.value);
       if (logsRes.status === 'fulfilled' && Array.isArray(logsRes.value)) setLogs(logsRes.value);
-      if (beeRes && beeRes.status === 'fulfilled' && Array.isArray(beeRes.value) && beeRes.value.length > 0) {
-        setAdamBeeTickets(beeRes.value);
-      }
 
       // Verify before logging out on 401
       const firstRejected = [statsRes, callsRes, tradesRes].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
@@ -206,19 +201,8 @@ export function App() {
 
   const handleSaveApiKey = async (apiKey: string): Promise<boolean> => {
     try {
-      await api.saveIntegrations({ audit_api_key: apiKey, groq_key: apiKey });
-      const testRes = await api.testAuditEngine(apiKey);
-      await fetchAllData();
-      return Boolean(testRes.ok);
-    } catch {
-      return false;
-    }
-  };
-
-  const handleSaveSarvamKey = async (apiKey: string): Promise<boolean> => {
-    try {
-      await api.saveIntegrations({ sarvam_key: apiKey });
-      const testRes = await api.testSarvam(apiKey);
+      await api.saveIntegrations({ groq_key: apiKey });
+      const testRes = await api.testGroq();
       await fetchAllData();
       return Boolean(testRes.ok);
     } catch {
@@ -332,7 +316,7 @@ export function App() {
   const handleSaveIntegrations = async (data: Record<string, string>) => {
     await api.saveIntegrations(data);
     await fetchAllData();
-    showToast('Sarvam AI, GPT-OSS, and Enterprise integrations saved.');
+    showToast('Integrations and Groq AI parameters saved.');
   };
 
   const handleTestGroq = async (key?: string): Promise<boolean> => {
@@ -341,30 +325,6 @@ export function App() {
       return Boolean(data.ok);
     } catch {
       return false;
-    }
-  };
-
-  const handleTestSarvam = async (key?: string): Promise<{ ok: boolean; message?: string; error?: string }> => {
-    try {
-      const data = await api.testSarvam(key);
-      if (data.ok) {
-        await fetchAllData();
-      }
-      return data;
-    } catch (err: unknown) {
-      return { ok: false, error: (err as Error).message };
-    }
-  };
-
-  const handleTestAudit = async (key?: string): Promise<{ ok: boolean; message?: string; error?: string }> => {
-    try {
-      const data = await api.testAuditEngine(key);
-      if (data.ok) {
-        await fetchAllData();
-      }
-      return data;
-    } catch (err: unknown) {
-      return { ok: false, error: (err as Error).message };
     }
   };
 
@@ -385,16 +345,13 @@ export function App() {
     showToast('AdamBee initiated: Harvesting active CRM & screen ticket elements...');
   };
 
-  const handleFinishBeeFlight = async (harvested: AdamBeeTicketRecord) => {
+  const handleFinishBeeFlight = (harvested: AdamBeeTicketRecord) => {
     setIsBeeFlying(false);
-    try {
-      const res = await api.captureAdamBeeTicket(harvested);
-      const saved = res.ticket || harvested;
-      setAdamBeeTickets((prev) => [saved, ...prev.filter((t) => t.id !== saved.id)]);
-      localStorage.setItem('adambee_tickets', JSON.stringify([saved, ...adamBeeTickets.filter((t) => t.id !== saved.id)]));
-    } catch {
-      setAdamBeeTickets((prev) => [harvested, ...prev]);
-    }
+    setAdamBeeTickets((prev) => {
+      const next = [harvested, ...prev];
+      localStorage.setItem('adambee_tickets', JSON.stringify(next));
+      return next;
+    });
     showToast(`AdamBee captured ticket #${harvested.ticketId} for UCC ${harvested.clientId || 'Client'}!`);
   };
 
@@ -523,7 +480,6 @@ export function App() {
           onOpenAuth={() => setIsAuthModalOpen(true)}
           onLogout={handleLogout}
           groqConfigured={Boolean(integrations?.groq_configured)}
-          sarvamConfigured={Boolean(integrations?.sarvam_configured)}
           onTriggerBee={handleTriggerBee}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen((prev) => !prev)}
@@ -540,9 +496,7 @@ export function App() {
             showToast(`Signed in as ${user.full_name || user.username}`);
           }}
           onSaveApiKey={handleSaveApiKey}
-          onSaveSarvamKey={handleSaveSarvamKey}
-          groqConfigured={Boolean(integrations?.groq_configured || integrations?.audit_configured)}
-          sarvamConfigured={Boolean(integrations?.sarvam_configured)}
+          groqConfigured={Boolean(integrations?.groq_configured)}
         />
 
         {/* Global Toast Notification */}
@@ -575,38 +529,18 @@ export function App() {
               <AdamBeeView
                 tickets={adamBeeTickets}
                 onTriggerBee={handleTriggerBee}
-                onRefresh={async () => {
-                  try {
-                    const fresh = await api.getAdamBeeTickets();
-                    if (Array.isArray(fresh)) {
-                      setAdamBeeTickets(fresh);
-                      showToast('Refreshed AdamBee tickets from database.');
-                    }
-                  } catch {
-                    showToast('Failed to refresh AdamBee tickets.', 'error');
-                  }
-                }}
-                onClearTickets={async () => {
-                  try {
-                    await api.clearAdamBeeTickets();
-                  } catch {
-                    // continue
-                  }
+                onClearTickets={() => {
                   setAdamBeeTickets([]);
                   localStorage.removeItem('adambee_tickets');
                   showToast('All harvested AdamBee tickets cleared.');
                 }}
-                onAddTicket={async (ticket) => {
-                  try {
-                    const res = await api.captureAdamBeeTicket(ticket);
-                    const saved = res.ticket || ticket;
-                    setAdamBeeTickets((prev) => [saved, ...prev.filter((t) => t.id !== saved.id)]);
-                    localStorage.setItem('adambee_tickets', JSON.stringify([saved, ...adamBeeTickets.filter((t) => t.id !== saved.id)]));
-                    showToast(`Ticket #${saved.ticketId} saved to compliance audit.`);
-                  } catch {
-                    setAdamBeeTickets((prev) => [ticket, ...prev]);
-                    showToast(`Ticket #${ticket.ticketId} saved locally.`);
-                  }
+                onAddTicket={(ticket) => {
+                  setAdamBeeTickets((prev) => {
+                    const next = [ticket, ...prev];
+                    localStorage.setItem('adambee_tickets', JSON.stringify(next));
+                    return next;
+                  });
+                  showToast(`Ticket #${ticket.ticketId} saved.`);
                 }}
               />
             )}
@@ -715,8 +649,6 @@ export function App() {
                 integrations={integrations}
                 onSaveIntegrations={handleSaveIntegrations}
                 onTestGroq={handleTestGroq}
-                onTestSarvam={handleTestSarvam}
-                onTestAudit={handleTestAudit}
                 isLoading={isLoading}
               />
             )}

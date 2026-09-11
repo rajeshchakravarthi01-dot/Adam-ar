@@ -27,13 +27,11 @@ const QUANTITY_PATTERNS = [
   /\b(?:quantity|qty|shares?|volume)\s*(?:is|of|:)?\s*\d+\b/gi,
 ];
 
-// Known broker prefixes for client identification (aligned with server matching module)
-const KNOWN_CLIENT_PREFIXES = ['WIA', 'WIS', 'FI', 'FND', 'FUNDS', 'CL', 'UCC', 'ZER', 'ANG', 'UP', 'MOT', 'KOT'];
-const PRICE_EXCLUSIONS = ['at', 'to', 'touches', 'touch', 'level', 'levels', 'points', 'cmp', 'target', 'nifty', 'rate', 'bhav', 'pe', '@', 'high', 'low', 'close', 'open'];
-
-// Client Code verbal expressions (strict prefix/keyword matching to prevent "is 3023" false-positives)
-const CLIENT_KEYWORD_PATTERN = /\b(?:client\s*(?:id|code|ucc|account|number)|ucc|party\s*code)\s*(?:is|:|-)?\s*([a-zA-Z0-9\-_]{3,12})\b/gi;
-const BROKER_PREFIX_PATTERN = new RegExp(`\\b(${KNOWN_CLIENT_PREFIXES.join('|')})[\\s\\-_.]*([0-9]{3,7})\\b`, 'gi');
+// Client Code verbal expressions
+const CLIENT_PATTERNS = [
+  /\b(?:client\s*(?:id|code|ucc|account|number)?|ucc|account|party\s*code)\s*(?:is|:|-)?\s*([a-zA-Z0-9\-_]{3,12})\b/gi,
+  /\b([a-zA-Z]{1,5}\s*(?:-|\s)?\s*\d{3,8})\b/gi,
+];
 
 interface HighlightSpan {
   start: number;
@@ -77,33 +75,16 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
     }
   }
 
-  // General client patterns in transcript (keyword-anchored or broker-prefix with price check)
-  CLIENT_KEYWORD_PATTERN.lastIndex = 0;
-  let km: RegExpExecArray | null;
-  while ((km = CLIENT_KEYWORD_PATTERN.exec(transcript)) !== null) {
-    spans.push({
-      start: km.index,
-      end: km.index + km[0].length,
-      type: 'client',
-      text: km[0],
-      label: 'Client ID',
-    });
-  }
-
-  BROKER_PREFIX_PATTERN.lastIndex = 0;
-  let bm: RegExpExecArray | null;
-  while ((bm = BROKER_PREFIX_PATTERN.exec(transcript)) !== null) {
-    const precedingText = transcript.slice(Math.max(0, bm.index - 20), bm.index).trim().toLowerCase();
-    const lastWord = precedingText.split(/\s+/).pop() || '';
-    const isPriceContext = PRICE_EXCLUSIONS.includes(lastWord) ||
-      /\b(?:at|to|touches|touch|level|levels|points|cmp|target|nifty|rate|bhav|pe|@|high|low)$/i.test(precedingText);
-
-    if (!isPriceContext) {
+  // General client patterns in transcript
+  for (const p of CLIENT_PATTERNS) {
+    p.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = p.exec(transcript)) !== null) {
       spans.push({
-        start: bm.index,
-        end: bm.index + bm[0].length,
+        start: m.index,
+        end: m.index + m[0].length,
         type: 'client',
-        text: bm[0],
+        text: m[0],
         label: 'Client ID',
       });
     }

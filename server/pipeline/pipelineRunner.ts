@@ -47,8 +47,7 @@ let rateLimitPauseUntil = 0;
 export async function runFullPipelineForCall(
   db: DatabaseSync,
   callId: number,
-  groqApiKey?: string,
-  sarvamApiKey?: string
+  groqApiKey?: string
 ): Promise<{ success: boolean; stage: string; details: any }> {
   const call = db.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord | undefined;
   if (!call) {
@@ -66,12 +65,12 @@ export async function runFullPipelineForCall(
     const identityResult = stage2ResolveIdentity(db, callId);
 
     // ---------------------------------------------------------
-    // STAGE 3: TRANSCRIPTION (Independent Hearing Engine: Sarvam AI / Whisper)
+    // STAGE 3: TRANSCRIPTION (Independent Whisper Hearing)
     // ---------------------------------------------------------
     let currentCall = db.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord;
     if (currentCall.transcript_status !== 'VALID' || !currentCall.transcript) {
       console.log(`[Pipeline] Call #${callId} -> Stage 3: Transcription`);
-      await stage3TranscribeCall(db, callId, groqApiKey, sarvamApiKey);
+      await stage3TranscribeCall(db, callId, groqApiKey);
     }
 
     // ---------------------------------------------------------
@@ -227,8 +226,7 @@ export async function runFullPipelineForCall(
  */
 export async function stepAutonomousPipelineWorker(
   db: DatabaseSync,
-  getGroqKey: () => string | undefined,
-  getSarvamKey?: () => string | undefined
+  getGroqKey: () => string | undefined
 ): Promise<boolean> {
   lastHeartbeatTime = new Date().toISOString();
 
@@ -264,15 +262,14 @@ export async function stepAutonomousPipelineWorker(
   }
 
   const groqKey = getGroqKey();
-  const sarvamKey = getSarvamKey ? getSarvamKey() : undefined;
-  if ((!groqKey || !groqKey.trim()) && (!sarvamKey || !sarvamKey.trim())) {
-    // Neither API key entered yet -> Worker waits gracefully in standby
+  if (!groqKey || !groqKey.trim()) {
+    // API key not entered yet -> Worker waits gracefully in standby
     return false;
   }
 
   activeProcessingCallId = nextCall.id;
   try {
-    await runFullPipelineForCall(db, nextCall.id, groqKey, sarvamKey);
+    await runFullPipelineForCall(db, nextCall.id, groqKey);
     return true;
   } catch (err: any) {
     // Check if error was a 429 rate limit
@@ -291,8 +288,7 @@ export async function stepAutonomousPipelineWorker(
  */
 export function start24x7WorkerSupervisor(
   db: DatabaseSync,
-  getGroqKey: () => string | undefined,
-  getSarvamKey?: () => string | undefined
+  getGroqKey: () => string | undefined
 ): void {
   if (isHeartbeatRunning) return;
   isHeartbeatRunning = true;
@@ -303,7 +299,7 @@ export function start24x7WorkerSupervisor(
     if (isWorkerLoopActive) return;
     isWorkerLoopActive = true;
     try {
-      await stepAutonomousPipelineWorker(db, getGroqKey, getSarvamKey);
+      await stepAutonomousPipelineWorker(db, getGroqKey);
     } catch (err: any) {
       console.error('[Autonomous Supervisor Error]:', err.message);
     } finally {

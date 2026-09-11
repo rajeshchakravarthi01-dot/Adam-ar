@@ -88,7 +88,7 @@ export const MailView: React.FC<MailViewProps> = ({
   const [showEmailJsConfig, setShowEmailJsConfig] = useState<boolean>(false);
 
   // Live SMTP Diagnostic State
-  const [testEmail, setTestEmail] = useState<string>('');
+  const [testEmail, setTestEmail] = useState<string>('ashutosh.kumar@fundsindia.com');
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [smtpResult, setSmtpResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -824,7 +824,7 @@ export const MailView: React.FC<MailViewProps> = ({
               type="email"
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
-              placeholder="e.g. compliance@yourdomain.com"
+              placeholder="e.g. ashutosh.kumar@fundsindia.com"
               className="w-full text-xs px-3 py-2 border border-neutral-300 rounded-lg focus:border-amber-400 focus:outline-none font-mono"
             />
           </div>
@@ -838,10 +838,7 @@ export const MailView: React.FC<MailViewProps> = ({
                 setSmtpResult(null);
                 try {
                   const res = await api.testSmtpConnection();
-                  setSmtpResult({
-                    ok: res.ok,
-                    message: res.message || res.error || (res.ok ? 'Connection verified' : 'Connection failed'),
-                  });
+                  setSmtpResult(res);
                 } catch (err: unknown) {
                   setSmtpResult({ ok: false, message: `Handshake error: ${(err as Error).message}` });
                 } finally {

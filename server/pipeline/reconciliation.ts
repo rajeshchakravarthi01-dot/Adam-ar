@@ -148,7 +148,6 @@ export function stage9PublishAudit(
         registered_number = ?,
         trade_date = ?,
         call_date = ?,
-        audit_date = ?,
         score = ?,
         is_fatal = ?,
         fatal_reasons = ?,
@@ -170,7 +169,6 @@ export function stage9PublishAudit(
       resolvedRegisteredPhone,
       resolvedDate,
       resolvedCallDate,
-      now.slice(0, 10),
       scoreResult.score,
       scoreResult.is_fatal ? 1 : 0,
       scoreResult.fatal_reasons.join('; '),
@@ -186,7 +184,7 @@ export function stage9PublishAudit(
     const res = db.prepare(`
       INSERT INTO scorecards (
         audit_id, call_id, caller_name, team, client, trade_phone,
-        calling_number, registered_number, trade_date, call_date, audit_date,
+        calling_number, registered_number, trade_date, call_date,
         score, is_fatal, fatal_reasons,
         q1_status, q1_evidence,
         q2_status, q2_evidence,
@@ -196,7 +194,7 @@ export function stage9PublishAudit(
         audit_comment, created_at, updated_at
       ) VALUES (
         ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?,
         ?, ?,
@@ -216,7 +214,6 @@ export function stage9PublishAudit(
       resolvedRegisteredPhone,
       resolvedDate,
       resolvedCallDate,
-      now.slice(0, 10),
       scoreResult.score,
       scoreResult.is_fatal ? 1 : 0,
       scoreResult.fatal_reasons.join('; '),

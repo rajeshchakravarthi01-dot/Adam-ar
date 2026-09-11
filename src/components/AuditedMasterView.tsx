@@ -65,43 +65,6 @@ interface RowEditState {
 type SortField = 'id' | 'caller_name' | 'client' | 'trade_date' | 'audit_date' | 'team' | 'phone' | 'score';
 type SortOrder = 'asc' | 'desc';
 
-/**
- * Returns today's present date formatted as YYYY-MM-DD
- */
-export const getPresentDateIso = (): string => {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-/**
- * Normalizes any date string (ISO, DD-MM-YYYY, timestamp) to YYYY-MM-DD.
- * If missing, invalid, or empty, defaults to the present date as per regulatory audit requirement.
- */
-export const normalizeToIsoDate = (val?: string | null): string => {
-  if (!val) return getPresentDateIso();
-  const s = String(val).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
-  const ddmmyyyy = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
-  if (ddmmyyyy) {
-    const day = ddmmyyyy[1].padStart(2, '0');
-    const month = ddmmyyyy[2].padStart(2, '0');
-    const year = ddmmyyyy[3];
-    return `${year}-${month}-${day}`;
-  }
-  const parsed = new Date(s);
-  if (!isNaN(parsed.getTime())) {
-    const year = parsed.getFullYear();
-    const month = String(parsed.getMonth() + 1).padStart(2, '0');
-    const day = String(parsed.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }
-  return getPresentDateIso();
-};
-
 export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
   scorecards = [],
   onUpdateScorecard,
@@ -149,10 +112,10 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
   const [newRecord, setNewRecord] = useState({
     caller_name: '',
     client: '',
-    trade_date: getPresentDateIso(),
+    trade_date: new Date().toISOString().slice(0, 10),
     team: '',
     phone: '',
-    audit_date: getPresentDateIso(),
+    audit_date: new Date().toISOString().slice(0, 10),
     q1_status: 'PASS',
     q2_status: 'PASS',
     q3_status: 'PASS',
@@ -170,7 +133,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
         trade_date: '',
         team: '',
         phone: '',
-        audit_date: getPresentDateIso(),
+        audit_date: '',
         q1_status: 'PASS',
         q2_status: 'PASS',
         q3_status: 'PASS',
@@ -198,16 +161,13 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       return '';
     })();
 
-    const resolvedAuditDate = normalizeToIsoDate(sc.audit_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : getPresentDateIso()));
-    const resolvedTradeDate = normalizeToIsoDate(sc.trade_date || sc.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : getPresentDateIso()));
-
     return {
       caller_name: String(sc.caller_name || ''),
       client: resolvedClient,
-      trade_date: resolvedTradeDate,
+      trade_date: String(sc.trade_date || ''),
       team: String(sc.team || ''),
       phone: String(sc.calling_number || sc.trade_phone || sc.registered_number || ''),
-      audit_date: resolvedAuditDate,
+      audit_date: String(sc.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : '')),
       q1_status: sc.q1_status || 'PASS',
       q2_status: sc.q2_status || 'PASS',
       q3_status: sc.q3_status || 'PASS',
@@ -945,7 +905,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                       <td className="py-2 px-3">
                         <input
                           type="date"
-                          value={normalizeToIsoDate(state.trade_date)}
+                          value={state.trade_date}
                           onChange={(e) => handleCellChange(sc, 'trade_date', e.target.value)}
                           className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-[11px] text-neutral-800 focus:outline-hidden"
                         />
@@ -975,7 +935,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                       <td className="py-2 px-3">
                         <input
                           type="date"
-                          value={normalizeToIsoDate(state.audit_date)}
+                          value={state.audit_date}
                           onChange={(e) => handleCellChange(sc, 'audit_date', e.target.value)}
                           className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-[11px] text-neutral-800 focus:outline-hidden"
                         />

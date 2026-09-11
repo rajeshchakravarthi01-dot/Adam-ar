@@ -4,7 +4,7 @@
 
 import nodemailer from 'nodemailer';
 import type { ScorecardRecord } from '../src/types';
-import { DEFAULT_SENDER_EMAIL, FATAL_CC_EMAIL, findAdvisorEntry } from './fundsindia-directory';
+import { DEFAULT_SENDER_EMAIL, FATAL_CC_EMAIL } from './fundsindia-directory';
 
 export interface SmtpConfig {
   host?: string;
@@ -36,68 +36,6 @@ export interface EmailDispatchResult {
   recipient: string;
   cc?: string;
   smtpResponse?: string;
-  attempts?: number;
-}
-
-/**
- * Single centralized helper to determine email routing for compliance scorecards.
- * Follows Sambath S regulatory rule: ONLY include FATAL_CC_EMAIL when all scorecards in the dispatch are FATAL!
- */
-export function determineComplianceRouting(options: {
-  scorecards: ScorecardRecord[];
-  advisorName?: string;
-  overrideTo?: string | null;
-  overrideCc?: string | null;
-  fatalCcEmail?: string | null;
-  defaultSender?: string | null;
-}): {
-  to: string;
-  cc: string;
-  isFatalAlone: boolean;
-  fatalCcIncluded: boolean;
-  from: string;
-} {
-  const { scorecards, advisorName, overrideTo, overrideCc } = options;
-  const fatalCcTarget = (options.fatalCcEmail || FATAL_CC_EMAIL || '').trim().toLowerCase();
-
-  const isFatalCard = (s: ScorecardRecord) =>
-    Boolean(s.is_fatal) || s.score === 0 || s.q1_status === 'FAIL' || s.q2_status === 'FAIL' || s.q5_status === 'FAIL';
-
-  const isFatalAlone = scorecards.length > 0 && scorecards.every(isFatalCard);
-
-  const entry = findAdvisorEntry(undefined, advisorName);
-  let to = overrideTo?.trim() || entry?.to_email || '';
-  if (!to && advisorName) {
-    to = `${advisorName.toLowerCase().replace(/[^a-z0-9]/g, '.')}@fundsindia.com`;
-  }
-
-  const ccSet = new Set<string>();
-  if (overrideCc && overrideCc.trim()) {
-    overrideCc
-      .split(/[,;]/)
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean)
-      .forEach((e) => ccSet.add(e));
-  } else if (entry && entry.cc_emails.length > 0) {
-    entry.cc_emails.forEach((e) => ccSet.add(e.trim().toLowerCase()));
-  }
-
-  if (isFatalAlone && fatalCcTarget) {
-    ccSet.add(fatalCcTarget);
-  } else if (fatalCcTarget) {
-    ccSet.delete(fatalCcTarget);
-  }
-
-  const finalCc = Array.from(ccSet).join(', ');
-  const from = options.defaultSender || DEFAULT_SENDER_EMAIL;
-
-  return {
-    to,
-    cc: finalCc,
-    isFatalAlone,
-    fatalCcIncluded: isFatalAlone && Boolean(fatalCcTarget),
-    from,
-  };
 }
 
 /**
@@ -105,15 +43,15 @@ export function determineComplianceRouting(options: {
  * If credentials are missing, throws a descriptive error so the user knows to configure them.
  */
 export function createMailTransporter(config?: SmtpConfig) {
-  const host = config?.host || process.env.SMTP_HOST;
+  const host = config?.host || process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = config?.port || (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587);
-  const user = config?.user || process.env.SMTP_USER;
-  const pass = config?.pass || process.env.SMTP_PASS;
+  const user = config?.user || process.env.SMTP_USER || 'ashutosh.kumar@fundsindia.com';
+  const pass = config?.pass || process.env.SMTP_PASS || 'xvfobfmkgyjgnpeo';
   const secure = config?.secure !== undefined ? config.secure : port === 465;
 
   if (!host || !user || !pass) {
     throw new Error(
-      'SMTP Server credentials not configured. Please configure your SMTP Host, Port, Username, and Password in the Mail Settings tab or set SMTP_USER and SMTP_PASS environment variables.'
+      'SMTP Server not configured. Please configure your SMTP Host, Port, Username, and Password in the Mail Settings tab to send real emails to inboxes.'
     );
   }
 
@@ -123,7 +61,7 @@ export function createMailTransporter(config?: SmtpConfig) {
       service: 'gmail',
       auth: {
         user,
-        pass,
+        pass, // Gmail 16-character App Password
       },
       tls: {
         rejectUnauthorized: false,
@@ -143,46 +81,6 @@ export function createMailTransporter(config?: SmtpConfig) {
       rejectUnauthorized: false,
     },
   });
-}
-
-/**
- * Sends an email using Nodemailer with automatic retry and exponential backoff
- * for transient network and SMTP errors (e.g. timeouts, resets, 4xx responses).
- */
-export async function sendMailWithRetry(
-  transporter: nodemailer.Transporter,
-  mailOptions: nodemailer.SendMailOptions,
-  maxAttempts = 3,
-  initialDelayMs = 1000
-): Promise<{ info: any; attempts: number }> {
-  let lastError: Error | null = null;
-  let delay = initialDelayMs;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      const info = await transporter.sendMail(mailOptions);
-      return { info, attempts: attempt };
-    } catch (err: any) {
-      lastError = err;
-      const errMsg = err.message || '';
-      const errCode = err.code || '';
-      const responseCode = err.responseCode || 0;
-
-      // Permanent failures that should fail immediately without retry
-      const isAuthError = errCode === 'EAUTH' || responseCode === 535 || errMsg.includes('Invalid login') || errMsg.includes('Username and Password not accepted');
-      const isSyntaxError = responseCode === 501 || responseCode === 553 || errMsg.includes('No recipients defined');
-      if (isAuthError || isSyntaxError) {
-        throw new Error(`SMTP Fatal Error (Non-retryable): ${errMsg}`);
-      }
-
-      if (attempt < maxAttempts) {
-        await new Promise((resolve) => setTimeout(resolve, delay));
-        delay *= 2; // Exponential backoff: 1s, 2s, 4s...
-      }
-    }
-  }
-
-  throw new Error(`SMTP Dispatch failed after ${maxAttempts} attempts: ${lastError?.message || 'Unknown network error'}`);
 }
 
 /**
@@ -344,32 +242,44 @@ export function renderScorecardEmailHtml(scorecards: ScorecardRecord[], advisorN
 
 /**
  * Dispatches an email containing one or multiple compliance scorecards using Nodemailer.
- * Dispatches REAL email across the internet to real inboxes with retry and exponential backoff.
+ * Dispatches REAL email across the internet to real inboxes.
  */
 export async function sendScorecardEmail(options: EmailDispatchOptions): Promise<EmailDispatchResult> {
-  const { to: rawTo, cc: rawCc, bcc, from: rawFrom, fromName, subject, scorecards, advisorName, smtpConfig } = options;
+  const { to, cc, bcc, from, fromName, subject, scorecards, advisorName, smtpConfig } = options;
 
-  // Use centralized compliance routing helper
-  const routing = determineComplianceRouting({
-    scorecards,
-    advisorName,
-    overrideTo: rawTo,
-    overrideCc: rawCc,
-    defaultSender: rawFrom || smtpConfig?.from || smtpConfig?.user,
-  });
-
-  const finalTo = routing.to;
-  const finalCcString = routing.cc;
-
-  if (!finalTo || !finalTo.includes('@')) {
+  if (!to || !to.includes('@')) {
     return {
       success: false,
       status: 'failed',
-      errorMessage: `Invalid recipient email address: "${finalTo}"`,
-      recipient: finalTo || 'undefined',
-      cc: finalCcString,
+      errorMessage: `Invalid recipient email address: "${to}"`,
+      recipient: to || 'undefined',
     };
   }
+
+  // Detect whether any scorecard in this batch is marked FATAL
+  // "keep sambath.s@fundsindia.com only when i will send only fatals scorecards"
+  // "no need sambath.s@fundsindia.com while sending 5 marks and 4 marks also when i send all scorecard"
+  const isFatalScorecard = (s: ScorecardRecord) =>
+    Boolean(s.is_fatal) || s.score === 0 || s.q1_status === 'FAIL' || s.q2_status === 'FAIL' || s.q5_status === 'FAIL';
+
+  const isFatalAlone = scorecards.length > 0 && scorecards.every(isFatalScorecard);
+
+  const ccSet = new Set<string>();
+  if (cc && cc.trim()) {
+    cc.split(/[,;]/)
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach((e) => ccSet.add(e));
+  }
+
+  // Only add Sambath S when sending fatals alone/only fatals
+  if (isFatalAlone) {
+    ccSet.add(FATAL_CC_EMAIL.toLowerCase());
+  } else {
+    ccSet.delete(FATAL_CC_EMAIL.toLowerCase());
+  }
+
+  const finalCcString = Array.from(ccSet).join(', ');
 
   let transporter;
   try {
@@ -379,19 +289,19 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
       success: false,
       status: 'failed',
       errorMessage: (err as Error).message,
-      recipient: finalTo,
+      recipient: to,
       cc: finalCcString,
     };
   }
 
-  const senderAddress = routing.from || DEFAULT_SENDER_EMAIL;
+  const senderAddress = from || smtpConfig?.from || smtpConfig?.user || DEFAULT_SENDER_EMAIL;
   const senderDisplayName = fromName || smtpConfig?.fromName || 'ADAM-AR Compliance';
   const htmlContent = renderScorecardEmailHtml(scorecards, advisorName);
 
   try {
-    const { info, attempts } = await sendMailWithRetry(transporter, {
+    const info = await transporter.sendMail({
       from: `"${senderDisplayName}" <${senderAddress}>`,
-      to: finalTo,
+      to,
       cc: finalCcString || undefined,
       bcc: bcc || undefined,
       subject,
@@ -402,10 +312,9 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
       success: true,
       status: 'sent',
       messageId: info.messageId,
-      recipient: finalTo,
+      recipient: to,
       cc: finalCcString,
       smtpResponse: info.response,
-      attempts,
     };
   } catch (error: unknown) {
     const err = error as Error;
@@ -413,7 +322,7 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
       success: false,
       status: 'failed',
       errorMessage: err.message || 'Unknown email dispatch error',
-      recipient: finalTo,
+      recipient: to,
       cc: finalCcString,
     };
   }
@@ -559,7 +468,7 @@ export async function CALL_MAIL_CONFIRMATION(options: TradeConfirmationOptions):
   try {
     const transporter = createMailTransporter(options.smtpConfig);
     const from = options.smtpConfig?.from || options.smtpConfig?.user || DEFAULT_SENDER_EMAIL;
-    const { info } = await sendMailWithRetry(transporter, {
+    const info = await transporter.sendMail({
       from: `"ADAM-AR Compliance" <${from}>`,
       to: recipient,
       cc: FATAL_CC_EMAIL,

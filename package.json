@@ -11,7 +11,7 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
-    "test": "tsx tests/golden-audit-suite.ts",
+    "test": "tsx tests/golden-audit-suite.ts && tsx tests/pipeline-accuracy-suite.ts",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit"
   },

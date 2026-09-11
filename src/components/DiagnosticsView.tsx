@@ -122,8 +122,8 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ diagnostics, i
 
           <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-1.5 leading-relaxed">
             <div className="font-bold text-neutral-900 mb-1">Authentication &amp; User Accounts</div>
-            <div>• <b>Enterprise Auth:</b> Role-based access control with secure salt &amp; scrypt hashing.</div>
-            <div>• <b>Admin Account:</b> Default administrator account managed via environment variables.</div>
+            <div>• <b>Separate Login/Signup:</b> Dedicated registration with salt &amp; scrypt hashing.</div>
+            <div>• <b>Default Admin:</b> <span className="font-mono">admin</span> / <span className="font-mono">AuditEQ@Production2026</span>.</div>
             <div>• <b>Multiple Users:</b> Create separate auditor/compliance accounts anytime.</div>
           </div>
         </div>

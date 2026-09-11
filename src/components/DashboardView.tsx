@@ -383,25 +383,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       className="p-2.5 bg-neutral-50 hover:bg-neutral-100/80 border border-neutral-200 rounded-xl text-xs flex items-center justify-between gap-3 transition-colors"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
                           <span className="px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-800 text-[10px] font-mono uppercase font-bold">
-                            {job.job_type.replace('_', ' ')}
-                          </span>
-                          <span className="font-semibold text-neutral-900 text-[11px]">
-                            {job.entity_name || `#${job.entity_id}`}
+                            {job.job_type} #{job.entity_id}
                           </span>
                           <span className="text-[10px] text-neutral-500">
                             Attempts: {job.attempts}/{job.max_attempts}
                           </span>
                         </div>
-                        <div className="text-[11px] text-rose-600 truncate mt-0.5" title={job.last_error || job.original_error || 'Execution failure'}>
+                        <div className="text-[11px] text-rose-600 truncate mt-1" title={job.last_error || job.original_error || 'Execution failure'}>
                           {job.last_error || job.original_error || 'Execution failure'}
                         </div>
-                        {job.action_hint && (
-                          <div className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 mt-1 inline-block">
-                            💡 {job.action_hint}
-                          </div>
-                        )}
                       </div>
                       <button
                         onClick={() => handleRetrySingle(job.id)}

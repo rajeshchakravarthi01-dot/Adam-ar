@@ -24,7 +24,6 @@ export interface TranscriptSegment {
   end_time: number;
   speaker: SpeakerRole;
   text: string;
-  language?: string;
 }
 
 export interface ClassificationEvidence {
