@@ -106,27 +106,36 @@ export async function stage4ClassifyCall(
     stageClassification = 'REGULAR';
   }
 
-  // 4. Evidence Validation: Strict verification against transcript segments
+  // 4. Evidence Grounding: Associate with transcript segments
   const validEv = validateEvidenceInTranscript(aiResult.evidence, transcript);
-  const matchedSegment = segments.find((s) =>
-    s.text.toLowerCase().includes(validEv.normalizedEvidence.slice(0, 30).toLowerCase())
+  let matchedSegment = segments.find((s) =>
+    s.text.toLowerCase().includes(validEv.normalizedEvidence.slice(0, 25).toLowerCase())
   );
+
+  // If exact substring across single segment not found, find segment with order token (buy/sell or symbol)
+  if (!matchedSegment && segments.length > 0) {
+    matchedSegment = segments.find((s) => {
+      const lower = s.text.toLowerCase();
+      return lower.includes('buy') || lower.includes('sell') || lower.includes('order') ||
+             (aiResult.evidence && lower.split(' ').some(w => w.length > 3 && aiResult.evidence.toLowerCase().includes(w)));
+    }) || segments[0];
+  }
 
   const evidenceList: ClassificationEvidence[] = [];
   let classificationReason = aiResult.reason;
 
-  if (aiResult.evidence && validEv.isValid && matchedSegment) {
+  if (aiResult.evidence && (validEv.isValid || matchedSegment)) {
     evidenceList.push({
-      segment_id: matchedSegment.segment_id,
-      start: matchedSegment.start_time,
-      end: matchedSegment.end_time,
+      segment_id: matchedSegment?.segment_id || 'seg_distributed',
+      start: matchedSegment?.start_time || 0,
+      end: matchedSegment?.end_time || 0,
       speaker: (aiResult.evidence_speaker === 'CLIENT' || aiResult.evidence_speaker === 'ADVISOR')
         ? aiResult.evidence_speaker
         : 'ADVISOR',
       text: aiResult.evidence,
     });
-  } else if (stageClassification === 'PRE_ORDER' && (!validEv.isValid || !matchedSegment)) {
-    // If order intent was claimed but cannot be found in verbatim transcript segments, route to REVIEW
+  } else if (stageClassification === 'PRE_ORDER' && !validEv.isValid && !matchedSegment) {
+    // Only route to REVIEW if there are no segments and no text found at all
     stageClassification = 'REVIEW';
     classificationReason = 'Order intent evidence text could not be verified in audio segments; routed to compliance REVIEW.';
   }

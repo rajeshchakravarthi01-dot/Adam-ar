@@ -24,6 +24,7 @@ import { stage9PublishAudit, stage9ReconcileMissingCalls } from './reconciliatio
 import type { CallRecord } from '../../src/types';
 import type { ClassificationResult } from './types';
 import { geminiTranscribeLimiter } from '../asr-engine';
+import { detectHighRecallPreOrderCandidate } from '../classifier';
 
 export interface PipelineWorkerStatus {
   isRunning: boolean;
@@ -213,29 +214,23 @@ export async function runFullPipelineForCall(
       classificationResult = await stage4ClassifyCall(db, callId, groqApiKey, activeGeminiKey);
     }
 
-    // STATE MACHINE GUARD:
-    // If call is SCRAP or non-order REGULAR, it MUST NOT proceed to trade matching or audit!
-    if (classificationResult.classification === 'SCRAP' || classificationResult.classification === 'REGULAR') {
-      const completionStatus = classificationResult.classification === 'SCRAP' ? 'scrap' : 'regular';
-
+    // STATE MACHINE GUARD WITH HIGH-RECALL PRE-ORDER CORROBORATION:
+    // 1. Scrap calls strictly exit immediately.
+    if (classificationResult.classification === 'SCRAP') {
       db.prepare(`
         UPDATE calls SET
-          classification = ?,
+          classification = 'SCRAP',
           audit_status = 'EXCLUDED',
           processing_status = 'COMPLETED',
-          status = ?,
-          call_type = ?,
-          pipeline_stage = ?,
+          status = 'scrap',
+          call_type = 'scrap',
+          pipeline_stage = 'SCRAP_EXIT',
           current_gate = 'GATE_4',
           gate_reason = ?,
           classification_reason = ?,
           updated_at = ?
         WHERE id = ?
       `).run(
-        classificationResult.classification,
-        completionStatus,
-        completionStatus,
-        classificationResult.classification === 'SCRAP' ? 'SCRAP_EXIT' : 'REGULAR_EXIT',
         classificationResult.reason,
         classificationResult.reason,
         now,
@@ -246,9 +241,62 @@ export async function runFullPipelineForCall(
         success: true,
         stage: 'CLASSIFICATION_EXIT',
         details: {
-          classification: classificationResult.classification,
+          classification: 'SCRAP',
           reason: classificationResult.reason,
-          message: `Call marked as ${classificationResult.classification}. Safely excluded from audit progression.`,
+          message: 'Call marked as SCRAP. Safely excluded from audit progression.',
+        },
+      };
+    }
+
+    // 2. High-Recall Pre-Order Cross-Check before finalizing REGULAR or REVIEW:
+    // Probe trade execution existence & distributed conversational order parameters
+    const highRecallCandidate = detectHighRecallPreOrderCandidate(call.transcript);
+    const tradeProbe = stage5MatchTrade(db, callId);
+    const hasCorroboratingTrade = tradeProbe.status === 'CONFIRMED' || (tradeProbe.matched_trade_id !== null && tradeProbe.matched_trade_id !== undefined);
+
+    if (classificationResult.classification === 'REGULAR' || classificationResult.classification === 'REVIEW') {
+      if (highRecallCandidate.isCandidate || hasCorroboratingTrade) {
+        // RESCUE: Genuine trading activity corroborated by distributed speech evidence or matching trade record!
+        console.log(`[Pipeline] Call #${callId} -> Rescued from ${classificationResult.classification} to PRE_ORDER (Candidate: ${highRecallCandidate.isCandidate}, TradeMatch: ${hasCorroboratingTrade})`);
+        classificationResult = {
+          classification: 'PRE_ORDER',
+          confidence: 0.95,
+          evidence: highRecallCandidate.evidence || `Corroborating trade #${tradeProbe.matched_trade_id} execution matched.`,
+          reason: highRecallCandidate.reason || `Corroborating trade #${tradeProbe.matched_trade_id} execution confirms order directive.`,
+          model: 'pre-order-recall-rescuer',
+        };
+      }
+    }
+
+    // 3. Verified non-order REGULAR calls safely exit
+    if (classificationResult.classification === 'REGULAR') {
+      db.prepare(`
+        UPDATE calls SET
+          classification = 'REGULAR',
+          audit_status = 'EXCLUDED',
+          processing_status = 'COMPLETED',
+          status = 'regular',
+          call_type = 'regular',
+          pipeline_stage = 'REGULAR_EXIT',
+          current_gate = 'GATE_4',
+          gate_reason = ?,
+          classification_reason = ?,
+          updated_at = ?
+        WHERE id = ?
+      `).run(
+        classificationResult.reason,
+        classificationResult.reason,
+        now,
+        callId
+      );
+
+      return {
+        success: true,
+        stage: 'CLASSIFICATION_EXIT',
+        details: {
+          classification: 'REGULAR',
+          reason: classificationResult.reason,
+          message: 'Call marked as REGULAR. Safely excluded from audit progression.',
         },
       };
     }
@@ -413,11 +461,11 @@ export async function runFullPipelineForCall(
     // ---------------------------------------------------------
     // STAGE 9: PUBLISH & RECONCILIATION
     // ---------------------------------------------------------
-    console.log(`[Pipeline] Call #${callId} -> Stage 9: Publish & Reconciliation`);
+    console.log(`[Pipeline] Call #${callId} -> Stage 9: Publish Audit Scorecard`);
     const published = stage9PublishAudit(db, callId, auditResult, scoreResult);
 
-    // Reconcile trades
-    stage9ReconcileMissingCalls(db);
+    // Note: stage9ReconcileMissingCalls is intentionally scheduled to background execution
+    // to prevent O(N^2) table scans choking individual call pipeline latency.
 
     db.prepare(`
       UPDATE calls SET

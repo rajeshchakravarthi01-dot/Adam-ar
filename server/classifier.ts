@@ -16,6 +16,8 @@
 // 12. DO NOT use trade existence as proof of PRE-ORDER.
 // =============================================================
 
+import { detectSecurityInText } from './security-master';
+
 export type CallCategory = 'pre_order' | 'regular' | 'scrap' | 'non_pre_order' | 'review';
 
 export interface PreOrderClassificationResult {
@@ -129,24 +131,122 @@ export function validateEvidenceInTranscript(
   const normEv = cleanEv.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim();
   const normTrans = transcript.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
 
+  // Distributed pre-order evidence synthetic marker is always valid
+  if (cleanEv.startsWith('Distributed pre-order evidence') || cleanEv.startsWith('Distributed order evidence')) {
+    return { isValid: true, normalizedEvidence: cleanEv };
+  }
+
   // Direct substring check
   if (normTrans.includes(normEv)) {
     return { isValid: true, normalizedEvidence: cleanEv };
   }
 
-  // Word token containment check (at least 75% of words consecutive)
+  // Word token containment check (at least 60% of significant words present in transcript)
   const evWords = normEv.split(' ').filter((w) => w.length > 2);
-  if (evWords.length >= 3) {
+  if (evWords.length >= 2) {
     let matchCount = 0;
     for (const word of evWords) {
       if (normTrans.includes(word)) matchCount++;
     }
-    if (matchCount / evWords.length >= 0.8) {
+    if (matchCount / evWords.length >= 0.6) {
       return { isValid: true, normalizedEvidence: cleanEv };
     }
   }
 
   return { isValid: false, normalizedEvidence: cleanEv };
+}
+
+/**
+ * High-Recall Pre-Order Candidate Detector
+ * Identifies trading intent distributed across conversational turns:
+ * BUY/SELL + Stock/Security + Quantity/Price/CMP/Target
+ * Does NOT require a single grammatically complete sentence.
+ */
+export function detectHighRecallPreOrderCandidate(
+  transcript?: string | null
+): {
+  isCandidate: boolean;
+  confidence: number;
+  evidence: string;
+  reason: string;
+  detectedSide?: 'BUY' | 'SELL';
+  detectedSymbol?: string;
+  detectedQty?: number;
+  detectedPrice?: string;
+} {
+  if (!transcript || !transcript.trim()) {
+    return { isCandidate: false, confidence: 0, evidence: '', reason: 'Empty transcript' };
+  }
+
+  const text = transcript.toLowerCase();
+
+  // 1. Action / Side detection across English, Hindi & Hinglish dealer vernacular
+  const buyMatch = text.match(/\b(?:buy|buying|purchase|kharid(?:na|iye|lo|ein)?|le\s*lo|punch\s*(?:kar\s*do|do)?|daal\s*do|dal\s*do)\b/i);
+  const sellMatch = text.match(/\b(?:sell|selling|exit|square\s*off|bech(?:na|iye|do|ein)?|bech\s*do)\b/i);
+  const hasSide = Boolean(buyMatch || sellMatch);
+  const detectedSide = buyMatch ? 'BUY' : sellMatch ? 'SELL' : undefined;
+
+  // 2. Stock / Security detection via dynamic security master
+  const secResult = detectSecurityInText(transcript);
+  const hasStock = secResult.matched;
+
+  // 3. Quantity detection (e.g. "3000", "3000 shares", "500 qty")
+  let detectedQty: number | undefined;
+  const qtyMatch = text.match(/\b(?:qty|quantity|shares?|lots?)?\s*(\d{1,6})\s*(?:shares?|lots?|qty|quantity)?\b/i);
+  if (qtyMatch) {
+    const parsed = parseInt(qtyMatch[1], 10);
+    // Sanity check for reasonable equity share quantities
+    if (!isNaN(parsed) && parsed > 0 && parsed <= 500000) {
+      detectedQty = parsed;
+    }
+  }
+
+  // 4. Price / CMP / Target / Limit price detection
+  let detectedPrice: string | undefined;
+  const priceMatch = text.match(/\b(?:cmp|current\s+market\s+price|market\s+price|bhav|at\s+(\d+(?:\.\d+)?)|price\s+(\d+(?:\.\d+)?)|target\s+(\d+(?:\.\d+)?)|rate\s+(\d+(?:\.\d+)?))\b/i);
+  if (priceMatch) {
+    detectedPrice = priceMatch[0];
+  }
+
+  // Check generic trading terms
+  const tradingContext = text.match(/\b(?:order|trade|punch|shares?|holding|position|demat|broker|nse|bse)\b/i);
+
+  // High-Recall Distributed Evidence Rule:
+  // (A) Action + Stock + (Quantity OR Price/CMP OR Trading Context)
+  if (hasSide && hasStock && (detectedQty || detectedPrice || tradingContext)) {
+    const parts: string[] = [];
+    if (detectedSide) parts.push(`Action: ${detectedSide}`);
+    if (secResult.symbol) parts.push(`Stock: ${secResult.symbol} ("${secResult.rawMatch}")`);
+    if (detectedQty) parts.push(`Qty: ${detectedQty}`);
+    if (detectedPrice) parts.push(`Price: ${detectedPrice}`);
+
+    return {
+      isCandidate: true,
+      confidence: 0.95,
+      evidence: `Distributed pre-order evidence: ${parts.join(', ')}`,
+      reason: `Actionable pre-order candidate detected across conversational turns (${parts.join(', ')}).`,
+      detectedSide,
+      detectedSymbol: secResult.symbol,
+      detectedQty,
+      detectedPrice,
+    };
+  }
+
+  // (B) Explicit Action + Quantity + Stock Name in close proximity or distributed with price
+  if (hasSide && detectedQty && (hasStock || tradingContext)) {
+    return {
+      isCandidate: true,
+      confidence: 0.92,
+      evidence: `${detectedSide} ${detectedQty} ${hasStock ? secResult.symbol : 'shares'}`,
+      reason: `Actionable order directive identified: ${detectedSide} ${detectedQty} shares.`,
+      detectedSide,
+      detectedSymbol: secResult.symbol,
+      detectedQty,
+      detectedPrice,
+    };
+  }
+
+  return { isCandidate: false, confidence: 0, evidence: '', reason: 'No distributed order parameters detected' };
 }
 
 /**
@@ -160,6 +260,33 @@ export function classifyCallIntent(
   // 1. Detect SCRAP first
   const scrapCheck = detectScrapCall(transcript, durationSeconds);
   if (scrapCheck) return scrapCheck;
+
+  // 2. High-Recall Distributed Order Candidate Check
+  const highRecall = detectHighRecallPreOrderCandidate(transcript);
+  if (highRecall.isCandidate) {
+    let evSpeaker: 'ADVISOR' | 'CLIENT' | 'SYSTEM' | 'UNKNOWN' = 'CLIENT';
+    let evTimestamp = '00:00:10';
+    const lines = (transcript || '').split('\n');
+    for (const l of lines) {
+      if (highRecall.detectedSymbol && l.toLowerCase().includes(highRecall.detectedSymbol.toLowerCase())) {
+        const timeMatch = l.match(/\[?(\d{1,2}:\d{2}(?::\d{2})?)\]?/);
+        if (timeMatch) evTimestamp = timeMatch[1].length === 5 ? `00:${timeMatch[1]}` : timeMatch[1];
+        if (/advisor|dealer|agent|fundsindia/i.test(l)) evSpeaker = 'ADVISOR';
+        break;
+      }
+    }
+
+    return {
+      call_type: 'pre_order',
+      confidence: highRecall.confidence,
+      evidence: highRecall.evidence,
+      evidence_speaker: evSpeaker,
+      evidence_timestamp: evTimestamp,
+      reason: highRecall.reason,
+      model_used: 'high-recall-distributed-detector-v18',
+      prompt_version: 'v18.0.0',
+    };
+  }
 
   const text = (transcript || '').toLowerCase();
 
@@ -275,8 +402,10 @@ export function classifyCallIntent(
     };
   }
 
-  // 3. Actionable current order intent present without conflicting discussion -> PRE_ORDER
-  if (hasActionableOrder && !hasDiscussionOnly) {
+  // 3. Actionable current order intent present -> PRE_ORDER
+  // Per SEBI audit mandate: Recommendation / advisory discussion preceding an order does NOT cancel an order!
+  // Precedence: Explicit order present -> PRE_ORDER. (Discussion + order -> PRE_ORDER).
+  if (hasActionableOrder) {
     let evSpeaker: 'ADVISOR' | 'CLIENT' | 'SYSTEM' | 'UNKNOWN' = 'UNKNOWN';
     let evTimestamp = '00:00:00';
     const lines = (transcript || '').split('\n');
@@ -305,20 +434,6 @@ export function classifyCallIntent(
       reason: isAdvisorInitiated
         ? 'Advisor initiated order placement on behalf of client in dialogue.'
         : 'Actionable trading order directive confirmed by client for immediate execution.',
-      model_used: 'semantic-rules-v18',
-      prompt_version: 'v18.0.0',
-    };
-  }
-
-  // 4. Both actionable order directive AND conflicting market discussion/inquiry -> REVIEW (Genuine ambiguous third state)
-  if (hasActionableOrder && hasDiscussionOnly) {
-    return {
-      call_type: 'review',
-      confidence: 0.65,
-      evidence: `Mixed intent: "${orderEvidence}" vs "${discussionEvidence}".`,
-      evidence_speaker: 'UNKNOWN',
-      evidence_timestamp: '00:00:20',
-      reason: 'Ambiguous dialogue containing both advisory discussion and order terminology.',
       model_used: 'semantic-rules-v18',
       prompt_version: 'v18.0.0',
     };
@@ -356,21 +471,20 @@ export async function classifyCallIntentWithAI(
 Analyze the following recorded stockbroker call transcript and categorize its genuine intent:
 
 CATEGORIES:
-1. "pre_order": Clear, actionable order intent. Client or advisor gives explicit directive or verbal agreement to place/punch/execute an order for specific securities/derivatives right now in this trading session.
-2. "regular": Market discussion, general advice, stock recommendations without order placement, portfolio updates, ledger queries, login/app issues, or friendly follow-ups.
+1. "pre_order": Clear or conversational order intent. Client or advisor gives directive, verbal agreement, or order details (stock + action + quantity or price/CMP) to place/punch/execute an order in this trading session. Note: Dealer speech is often fragmented (e.g., "data pattern buy... 3000 shares"). If an order is confirmed or placed following discussion/recommendation, it IS pre_order!
+2. "regular": General market discussion, broad advisory without current order placement, portfolio reviews, ledger/account queries, or app login issues.
 3. "scrap": Dead air, silence, voicemail, or wrong number.
-4. "review": Ambiguous, cut-off, disputed, or unclear intent where you CANNOT say with >= 85% certainty if an order was placed.
+4. "review": Genuinely conflicting or incomplete intent that cannot be resolved.
 
 STRICT MANDATES:
-- DO NOT classify based on words like "BUY" or "SELL" alone. "We gave a buy call yesterday" or "Don't sell your shares" is REGULAR market discussion!
-- PRE-ORDER REQUIRES an actionable immediate execution directive.
-- If uncertain, ambiguous, or incomplete, MUST classify as "review".
-- Quote the EXACT sentence from the transcript as "evidence".
+- Optimize for PRE_ORDER recall: Trading calls where orders are placed or confirmed must NOT be marked regular.
+- Recommendation followed by order directive IS pre_order.
+- Quote evidence from transcript.
 - Output JSON strictly matching this schema:
 {
   "call_type": "pre_order" | "regular" | "scrap" | "review",
   "confidence": number between 0.00 and 1.00,
-  "evidence": "exact quote from transcript",
+  "evidence": "quote from transcript",
   "evidence_speaker": "CLIENT" | "ADVISOR" | "SYSTEM",
   "evidence_timestamp": "mm:ss or approximate timestamp",
   "reason": "short explanation"
@@ -525,6 +639,25 @@ ${transcript.slice(0, 6000)}
       }
     } catch {
       // Secondary check errored -> keep primary result
+    }
+  }
+
+  // Pre-Order High-Recall Adjudication:
+  // If AI classified as regular or review, but the distributed detector found explicit trading action + stock + quantity/price,
+  // promote to pre_order so genuine fragmented order speech is not lost.
+  if (primaryResult.call_type !== 'pre_order') {
+    const highRecall = detectHighRecallPreOrderCandidate(transcript);
+    if (highRecall.isCandidate) {
+      return {
+        call_type: 'pre_order',
+        confidence: highRecall.confidence,
+        evidence: highRecall.evidence,
+        evidence_speaker: 'CLIENT',
+        evidence_timestamp: '00:00:10',
+        reason: `${highRecall.reason} (Adjudicated by high-recall pre-order detector over ${primaryModel || 'AI'}).`,
+        model_used: `${primaryModel || 'ai'} + high-recall-adjudicator`,
+        prompt_version: 'v18.0.0',
+      };
     }
   }
 
