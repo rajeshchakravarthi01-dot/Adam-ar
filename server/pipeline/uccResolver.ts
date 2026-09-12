@@ -19,6 +19,29 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { normalizeSpokenNumbers, levenshteinDistance } from '../normalizer';
 
+export const INVALID_UCC_WORDS = new Set([
+  'OKAY', 'OK', 'YES', 'NO', 'BUY', 'SELL', 'CALL', 'PUT', 'DONE', 'FINE', 
+  'SURE', 'TRUE', 'FALSE', 'NULL', 'NONE', 'TEST', 'CODE', 'USER', 'PASS', 
+  'FAIL', 'HAAN', 'NAHI', 'THEEK', 'BOLO', 'ACCOUNT', 'CLIENT', 'DEALER', 
+  'ADVISOR', 'MARKET', 'SHARES', 'SHARE', 'ORDER', 'RATE', 'PRICE', 'QUANTITY',
+  'LIMIT', 'CMP', 'NUMBER', 'PARTY'
+]);
+
+export function isValidUcc(candidate?: string | null): boolean {
+  if (!candidate) return false;
+  const squashed = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (squashed.length < 3 || squashed.length > 16) return false;
+  if (INVALID_UCC_WORDS.has(squashed)) return false;
+  // If candidate is purely alphabetic, it must not be a dictionary word
+  // Indian UCCs are either numeric (4-10 digits) or alphanumeric with letters and digits (e.g. WIA12345)
+  if (/^\d{4,10}$/.test(squashed)) return true;
+  if (/^[A-Z]{1,5}\d{2,8}$/.test(squashed)) return true;
+  const hasDigit = /\d/.test(squashed);
+  const hasLetter = /[A-Z]/.test(squashed);
+  if (hasDigit && hasLetter && squashed.length >= 4) return true;
+  return false;
+}
+
 export interface UccResolutionResult {
   status: 'RESOLVED' | 'AMBIGUOUS' | 'UNRESOLVED';
   resolvedUcc: string | null;
@@ -108,7 +131,7 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
       const rawText = match[0];
       const cleanCandidate = match[1] || match[0];
       const squashed = cleanCandidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (squashed.length >= 4) {
+      if (squashed.length >= 4 && isValidUcc(squashed)) {
         candidates.push({ rawText, cleanCandidate: squashed });
       }
     }
@@ -119,7 +142,7 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
   if (directUccMatch) {
     for (const m of directUccMatch) {
       const squashed = m.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (squashed.length >= 4 && !candidates.some((c) => c.cleanCandidate === squashed)) {
+      if (squashed.length >= 4 && isValidUcc(squashed) && !candidates.some((c) => c.cleanCandidate === squashed)) {
         candidates.push({ rawText: m, cleanCandidate: squashed });
       }
     }
@@ -144,6 +167,17 @@ export function resolveUccWithAuthoritativeData(
   expectedUcc?: string | null,
   callerPhone?: string | null
 ): UccResolutionResult {
+  if (!isValidUcc(candidateText)) {
+    return {
+      status: 'UNRESOLVED',
+      resolvedUcc: null,
+      rawSpokenUcc: candidateText,
+      confidence: 0,
+      matchingCandidates: [],
+      notes: `Spoken candidate "${candidateText}" is not a valid UCC format (contains invalid terms or structure).`,
+    };
+  }
+
   // Get all authoritative distinct UCCs from database
   let authoritativeUccs: string[] = [];
   try {

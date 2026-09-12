@@ -38,7 +38,8 @@ export interface PipelineWorkerStatus {
 
 let isWorkerLoopActive = false;
 let isHeartbeatRunning = false;
-let activeProcessingCallId: number | null = null;
+const activeProcessingCallIds = new Set<number>();
+const MAX_CONCURRENT_PIPELINE_WORKERS = 3;
 let lastHeartbeatTime = new Date().toISOString();
 let totalProcessedCount = 0;
 let rateLimitPauseUntil = 0;
@@ -566,11 +567,19 @@ export async function stepAutonomousPipelineWorker(
     `).run(nowIso);
   }
 
+  // Check concurrency limit
+  if (activeProcessingCallIds.size >= MAX_CONCURRENT_PIPELINE_WORKERS) {
+    return false;
+  }
+
+  const activeIdsList = activeProcessingCallIds.size > 0 ? Array.from(activeProcessingCallIds).join(',') : '0';
+
   // 2. Candidate Selection with Smart Prioritization:
   // Priority A: Scrap calls (< 6s) - Requires zero ASR/AI calls, runs immediately
   let nextCall = db.prepare(`
     SELECT id FROM calls
-    WHERE (processing_status = 'IDLE' OR status = 'retry_pending')
+    WHERE id NOT IN (${activeIdsList})
+      AND (processing_status = 'IDLE' OR status = 'retry_pending')
       AND status NOT IN ('audited', 'scrap', 'regular', 'review')
       AND duration_seconds > 0 AND duration_seconds < 6
     ORDER BY id ASC
@@ -582,7 +591,8 @@ export async function stepAutonomousPipelineWorker(
   if (!nextCall) {
     nextCall = db.prepare(`
       SELECT id FROM calls
-      WHERE (processing_status = 'IDLE' OR processing_status IS NULL OR status = 'retry_pending' OR status = 'transcribed' OR status = 'imported')
+      WHERE id NOT IN (${activeIdsList})
+        AND (processing_status = 'IDLE' OR processing_status IS NULL OR status = 'retry_pending' OR status = 'transcribed' OR status = 'imported')
         AND status NOT IN ('audited', 'scrap', 'regular', 'review', 'blocked', 'rejected')
         AND (pipeline_stage IS NULL OR pipeline_stage NOT IN ('COMPLETED', 'SCRAP_EXIT', 'REGULAR_EXIT', 'REVIEW_PENDING', 'AUDIT_GATE_BLOCKED'))
         AND transcript_status = 'VALID'
@@ -598,7 +608,8 @@ export async function stepAutonomousPipelineWorker(
   if (!nextCall && !isAsrRateLimited) {
     nextCall = db.prepare(`
       SELECT id FROM calls
-      WHERE (processing_status = 'IDLE' OR processing_status IS NULL OR status = 'retry_pending' OR status = 'imported' OR status = 'pending')
+      WHERE id NOT IN (${activeIdsList})
+        AND (processing_status = 'IDLE' OR processing_status IS NULL OR status = 'retry_pending' OR status = 'imported' OR status = 'pending')
         AND status NOT IN ('audited', 'scrap', 'regular', 'review', 'blocked', 'rejected')
         AND (pipeline_stage IS NULL OR pipeline_stage NOT IN ('COMPLETED', 'SCRAP_EXIT', 'REGULAR_EXIT', 'REVIEW_PENDING', 'AUDIT_GATE_BLOCKED'))
         AND (audit_status != 'AUDITED' OR audit_status IS NULL)
@@ -650,9 +661,10 @@ export async function stepAutonomousPipelineWorker(
     return false;
   }
 
-  activeProcessingCallId = nextCall.id;
+  activeProcessingCallIds.add(nextCall.id);
   try {
     await runFullPipelineForCall(db, nextCall.id, groqKey, geminiKey);
+    totalProcessedCount++;
     return true;
   } catch (err: any) {
     if (err.message && (err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED'))) {
@@ -665,12 +677,12 @@ export async function stepAutonomousPipelineWorker(
     // Returning true lets the supervisor continue processing subsequent pending calls.
     return true;
   } finally {
-    activeProcessingCallId = null;
+    activeProcessingCallIds.delete(nextCall.id);
   }
 }
 
 /**
- * Starts the continuous 24/7 supervisor timer
+ * Starts the continuous 24/7 supervisor timer with concurrent worker dispatch
  */
 export function start24x7WorkerSupervisor(
   db: DatabaseSync,
@@ -680,26 +692,22 @@ export function start24x7WorkerSupervisor(
   if (isHeartbeatRunning) return;
   isHeartbeatRunning = true;
 
-  console.log('[AuditEQ] 24/7 Autonomous Pipeline Supervisor initialized with Gemini 3.5 Transcribe protection.');
+  console.log('[AuditEQ] 24/7 Autonomous Pipeline Supervisor initialized with Gemini 3.5 Transcribe protection & multi-worker concurrency.');
   ensureCallColumns(db);
 
   setInterval(async () => {
-    if (isWorkerLoopActive) return;
-    isWorkerLoopActive = true;
+    lastHeartbeatTime = new Date().toISOString();
     try {
-      // Drain work in batches of up to 15 calls per supervisor tick
-      let hasWork = true;
-      let iterations = 0;
-      while (hasWork && iterations < 15) {
-        hasWork = await stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey);
-        iterations++;
+      const needed = MAX_CONCURRENT_PIPELINE_WORKERS - activeProcessingCallIds.size;
+      for (let i = 0; i < needed; i++) {
+        stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey).catch((err: any) => {
+          console.error('[Autonomous Worker Async Error]:', err?.message);
+        });
       }
     } catch (err: any) {
       console.error('[Autonomous Supervisor Error]:', err.message);
-    } finally {
-      isWorkerLoopActive = false;
     }
-  }, 2000);
+  }, 1000);
 }
 
 /**
@@ -731,8 +739,8 @@ export function getPipelineWorkerStatus(
     statusMessage = `Gemini 3.5 rate-limit cooldown active (${remaining}s remaining). Resuming automatically.`;
   } else if (Date.now() < rateLimitPauseUntil) {
     statusMessage = 'Rate limit backoff active (resuming automatically in seconds)';
-  } else if (activeProcessingCallId) {
-    statusMessage = `Processing Call #${activeProcessingCallId} through 9-stage pipeline`;
+  } else if (activeProcessingCallIds.size > 0) {
+    statusMessage = `Concurrently processing ${activeProcessingCallIds.size} call(s) (Calls: #${Array.from(activeProcessingCallIds).join(', #')}) through 9-stage pipeline`;
   } else if (queueDepth > 0) {
     statusMessage = `Queue has ${queueDepth} calls waiting for processing`;
   } else {
@@ -754,7 +762,7 @@ export function getPipelineWorkerStatus(
 
   return {
     isRunning: isHeartbeatRunning,
-    activeWorkers: activeProcessingCallId ? 1 : 0,
+    activeWorkers: activeProcessingCallIds.size,
     totalProcessedToday: processedToday,
     lastActiveTime: lastHeartbeatTime,
     hasGroqKey: hasGroq,

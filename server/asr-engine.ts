@@ -31,8 +31,9 @@ export interface AsrResult {
  */
 class GeminiTranscribeRateLimiter {
   private queue: Array<() => Promise<void>> = [];
-  private isProcessing = false;
-  private minIntervalMs = 2000;
+  private activeCount = 0;
+  private maxConcurrent = 5;
+  private minIntervalMs = 200;
   private lastCallTime = 0;
   public rateLimitUntil = 0;
 
@@ -44,14 +45,23 @@ class GeminiTranscribeRateLimiter {
     return Math.max(0, Math.ceil((this.rateLimitUntil - Date.now()) / 1000));
   }
 
-  async enqueue<T>(task: () => Promise<T>): Promise<T> {
+  async enqueue<T>(task: () => Promise<T>, timeoutMs = 60000): Promise<T> {
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
+        let timer: NodeJS.Timeout | undefined;
         try {
-          const result = await this.executeWithRetry(task);
+          const timeoutPromise = new Promise<never>((_, rej) => {
+            timer = setTimeout(() => rej(new Error('ASR_TIMEOUT: Transcription exceeded timeout limit.')), timeoutMs);
+          });
+          const result = await Promise.race([
+            this.executeWithRetry(task),
+            timeoutPromise,
+          ]);
           resolve(result);
         } catch (err) {
           reject(err);
+        } finally {
+          if (timer) clearTimeout(timer);
         }
       });
       this.processQueue();
@@ -84,7 +94,7 @@ class GeminiTranscribeRateLimiter {
           msg.includes('rate limit');
 
         if (isQuotaOrRateLimit && attempt < maxRetries) {
-          const backoffSec = attempt * 15;
+          const backoffSec = attempt * 10;
           console.warn(`[Gemini 3.5 Transcribe 429] Quota/rate limit encountered. Backing off for ${backoffSec}s (attempt ${attempt}/${maxRetries})...`);
           this.rateLimitUntil = Date.now() + (backoffSec * 1000);
           await new Promise((r) => setTimeout(r, backoffSec * 1000));
@@ -97,19 +107,22 @@ class GeminiTranscribeRateLimiter {
   }
 
   private async processQueue() {
-    if (this.isProcessing || this.queue.length === 0) return;
-    this.isProcessing = true;
-    while (this.queue.length > 0) {
+    while (this.activeCount < this.maxConcurrent && this.queue.length > 0) {
       const nextTask = this.queue.shift();
       if (nextTask) {
-        try {
-          await nextTask();
-        } catch (e) {
-          console.error('[Gemini RateLimiter Task Error]:', e);
-        }
+        this.activeCount++;
+        (async () => {
+          try {
+            await nextTask();
+          } catch (e) {
+            console.error('[Gemini RateLimiter Task Error]:', e);
+          } finally {
+            this.activeCount--;
+            this.processQueue();
+          }
+        })();
       }
     }
-    this.isProcessing = false;
   }
 }
 

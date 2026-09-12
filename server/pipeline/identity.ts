@@ -18,6 +18,7 @@ import { FUNDSINDIA_ADVISOR_DIRECTORY } from '../fundsindia-directory';
 import {
   extractSpokenUccCandidates,
   resolveUccWithAuthoritativeData,
+  isValidUcc,
 } from './uccResolver';
 import type { ResolvedIdentity, IdentityStatus, IdentitySource } from './types';
 import type { CallRecord, TradeRecord } from '../../src/types';
@@ -49,6 +50,9 @@ export function stage2ResolveIdentity(
 
   // 2. Extract Client Code / UCC from Metadata, Filename, or Transcript via ASR Resolver
   let rawClientCode = call.client || call.client_code || '';
+  if (rawClientCode && !isValidUcc(rawClientCode)) {
+    rawClientCode = '';
+  }
   if (!rawClientCode && (call.original_filename || call.recording_name)) {
     const fn = call.original_filename || call.recording_name;
     const uccMatch = fn.match(/\b([A-Z]{2,4}[0-9]{3,7})\b/i);

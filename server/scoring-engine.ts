@@ -66,14 +66,14 @@ export function calculateAuthoritativeScore(
   let q1Status: ComplianceStatus = 'REVIEW';
   let q2Status: ComplianceStatus = 'REVIEW';
   let q3Status: ComplianceStatus = 'REVIEW';
-  // Q4 is Not Audited under the active SEBI rubric; strictly ALWAYS PASS (1 point granted, never held for review)
-  const q4Status: ComplianceStatus = 'PASS';
+  let q4Status: ComplianceStatus = 'REVIEW';
   let q5Status: ComplianceStatus = 'PASS';
 
   if (typeof q1Input === 'object' && q1Input !== null && 'q1' in q1Input) {
     q1Status = q1Input.q1?.status || 'REVIEW';
     q2Status = q1Input.q2?.status || 'REVIEW';
     q3Status = q1Input.q3?.status || 'REVIEW';
+    q4Status = q1Input.q4?.status || 'REVIEW';
     if (q1Input.q5) {
       q5Status = q1Input.q5.status || 'PASS';
     } else {
@@ -83,6 +83,7 @@ export function calculateAuthoritativeScore(
     q1Status = q1Input || 'REVIEW';
     q2Status = q2Arg || 'REVIEW';
     q3Status = q3Arg || 'REVIEW';
+    q4Status = q4Arg || 'REVIEW';
     q5Status = q5Arg || 'PASS';
   }
 
@@ -111,10 +112,14 @@ export function calculateAuthoritativeScore(
     review_reasons.push('Q5: Return guarantee statement requires compliance verification.');
   }
 
-  // Non-fatal review notes (Q3)
+  // Non-fatal review notes (Q3, Q4)
   // Q3 — Stock + price + quantity: Non-fatal, 1 point
   if (q3Status === 'REVIEW') {
     review_reasons.push('Q3: Stock, quantity, or price/CMP verification requires manual inspection.');
+  }
+  // Q4 — Customer acknowledgement: Non-fatal, 1 point
+  if (q4Status === 'REVIEW') {
+    review_reasons.push('Q4: Customer verbal acknowledgement requires manual inspection.');
   }
 
   const is_fatal = fatal_reasons.length > 0;
@@ -133,9 +138,10 @@ export function calculateAuthoritativeScore(
     disposition = 'NEEDS_REVIEW';
     audit_comment = `NEEDS REVIEW: Pre-order confirmation pending compliance verification (${review_reasons.join(' ')}). Compliance score held pending review.`;
   } else {
-    // Fully audited without review flags: base 5, deduct 1 if Q3 is not PASS
+    // Fully audited without review flags: base 5, deduct 1 if Q3 is not PASS, deduct 1 if Q4 is not PASS
     let currentScore = 5;
     if (q3Status !== 'PASS') currentScore -= 1;
+    if (q4Status !== 'PASS') currentScore -= 1;
 
     score = Math.max(0, currentScore);
 

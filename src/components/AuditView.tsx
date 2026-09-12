@@ -83,18 +83,20 @@ export const AuditView: React.FC<AuditViewProps> = ({
     return calls.map((call) => {
       const audit = auditByCallId.get(call.id);
       const dur = call.duration_seconds || 0;
-      const isScrap = dur > 0 && dur < 8;
-      const callType = isScrap ? 'scrap' : (call.call_type || (dur > 0 && dur < 8 ? 'scrap' : 'pre_order'));
+      const isScrap = call.classification === 'SCRAP' || call.status === 'scrap' || (dur > 0 && dur < 6);
+      const isRegular = call.classification === 'REGULAR' || call.status === 'regular' || call.call_type === 'regular' || call.call_type === 'non_pre_order';
 
       let computedStatus: 'pass' | 'fail' | 'not_audited' | 'scrap' | 'regular' = 'not_audited';
 
-      if (isScrap || callType === 'scrap') {
+      if (isScrap) {
         computedStatus = 'scrap';
-      } else if (callType === 'regular' || callType === 'non_pre_order') {
+      } else if (isRegular) {
         computedStatus = 'regular';
-      } else if (audit) {
-        const isFatal = audit.q1 === 'FAIL' || audit.q2 === 'FAIL' || audit.q5 === 'FAIL';
-        computedStatus = isFatal ? 'fail' : 'pass';
+      } else if (audit && (audit.status === 'audited' || audit.status === 'scored')) {
+        const isFatal = audit.is_fatal === 1 || audit.is_fatal === true || audit.score === 0 ||
+          audit.q1 === 'FAIL' || audit.q2 === 'FAIL' || audit.q5 === 'FAIL' ||
+          audit.compliance_disposition === 'FAIL' || audit.compliance_disposition === 'NON_COMPLIANT';
+        computedStatus = isFatal ? 'fail' : (audit.score != null && audit.score > 0 ? 'pass' : 'not_audited');
       } else {
         computedStatus = 'not_audited';
       }
@@ -201,7 +203,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
     }
   };
 
-  // Bulk audit selected calls
+  // Bulk audit selected calls concurrently via backend
   const handleBulkReAudit = async () => {
     const ids = Array.from(selectedCallIds);
     if (ids.length === 0) {
@@ -210,14 +212,28 @@ export const AuditView: React.FC<AuditViewProps> = ({
     }
     if (!confirm(`Re-audit ${ids.length} selected calls with compliance audit engine?`)) return;
 
-    for (const id of ids) {
-      try {
-        await onForceAudit(id);
-      } catch (err) {
-        console.error(`Re-audit failed for call #${id}:`, err);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch('/api/calls/bulk-audit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ call_ids: ids }),
+      });
+
+      const json = await res.json();
+      if (json.ok) {
+        alert(`Bulk audit complete: ${json.audited} audited successfully, ${json.blocked} blocked by compliance gates, ${json.failed} errors.`);
+        window.location.reload();
+      } else {
+        alert(`Bulk audit failed: ${json.error || 'Unknown error'}`);
       }
+    } catch (err: any) {
+      console.error('Bulk audit request error:', err);
+      alert(`Bulk audit error: ${err.message}`);
     }
-    alert(`Bulk audit initiated for ${ids.length} calls.`);
   };
 
   // Export to Excel (.xlsx)
@@ -250,7 +266,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
         'Q2 Evidence': audit?.q2_evidence || '',
         'Q3 Stock Price Qty': audit?.q3 || '—',
         'Q3 Evidence': audit?.q3_evidence || '',
-        'Q4 Cust Ack': audit?.q4 || (computedStatus === 'pass' ? 'PASS' : '—'),
+        'Q4 Cust Ack': audit?.q4 || '—',
         'Q4 Evidence': audit?.q4_evidence || '',
         'Q5 No Return Comm': audit?.q5 || '—',
         'Q5 Evidence': audit?.q5_evidence || '',

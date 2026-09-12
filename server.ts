@@ -3718,6 +3718,72 @@ ${call.transcript || '(No speech transcript recorded)'}
     }
   });
 
+  apiRouter.post('/calls/bulk-audit', requireAuth, async (req: Request, res: Response) => {
+    const { call_ids } = req.body || {};
+    if (!Array.isArray(call_ids) || call_ids.length === 0) {
+      return res.status(400).json({ ok: false, error: 'call_ids must be a non-empty array of call IDs.' });
+    }
+
+    const uniqueIds = Array.from(new Set(call_ids.map(Number))).filter((id) => !isNaN(id) && id > 0);
+    const results: Array<{ call_id: number; success: boolean; status?: string; score?: number; error?: string }> = [];
+
+    // Bounded concurrent execution (5 concurrent workers)
+    const CONCURRENCY = 5;
+    let idx = 0;
+
+    const worker = async () => {
+      while (idx < uniqueIds.length) {
+        const callId = uniqueIds[idx++];
+        try {
+          const eligibility = isAuditEligible(sqlite, callId);
+          if (!eligibility.eligible) {
+            results.push({
+              call_id: callId,
+              success: false,
+              status: 'BLOCKED',
+              error: `GATE_BLOCKED: ${eligibility.gateCode} - ${eligibility.reason}`,
+            });
+            continue;
+          }
+
+          const auditResult = await stage7AuditCall(sqlite, callId, getGroqKey());
+          const scoreResult = stage8CalculateScore(auditResult);
+          stage9PublishAudit(sqlite, callId, auditResult, scoreResult);
+          results.push({
+            call_id: callId,
+            success: true,
+            status: scoreResult.is_fatal ? 'FAIL' : 'PASS',
+            score: scoreResult.score,
+          });
+        } catch (err: any) {
+          results.push({
+            call_id: callId,
+            success: false,
+            status: 'ERROR',
+            error: err.message,
+          });
+        }
+      }
+    };
+
+    const workers = Array.from({ length: Math.min(CONCURRENCY, uniqueIds.length) }, () => worker());
+    await Promise.all(workers);
+
+    const audited = results.filter((r) => r.success).length;
+    const blocked = results.filter((r) => r.status === 'BLOCKED').length;
+    const failed = results.filter((r) => !r.success && r.status !== 'BLOCKED').length;
+
+    addLog('info', 'BULK_AUDIT_COMPLETE', `Bulk audit completed for ${uniqueIds.length} calls: ${audited} audited, ${blocked} blocked, ${failed} failed.`);
+    return res.json({
+      ok: true,
+      total: uniqueIds.length,
+      audited,
+      blocked,
+      failed,
+      results,
+    });
+  });
+
   apiRouter.post('/calls/:id/pipeline-run', requireAuth, async (req: Request, res: Response) => {
     const callId = parseInt(req.params.id, 10);
     try {
@@ -6510,134 +6576,150 @@ ${call.transcript || '(No speech transcript recorded)'}
 
         totalFetched += records.length;
 
+        // Process new records concurrently with bounded download pool (up to 5 parallel downloads)
+        const newRecords = [];
         for (const item of records) {
-          // T-05: Store call_id and uuid
           const rawCallId = item.call_id || item.id || item.uuid || `tata_${Date.now()}_${importedCount}`;
-          const rawUuid = item.uuid || item.call_id || '';
           const externalId = `tata_${rawCallId}`;
-
-          // T-12: Duplicate prevention
           const existing = sqlite.prepare('SELECT id FROM calls WHERE external_id = ? OR recording_name = ?').get(externalId, externalId);
-          if (existing) continue;
-
-          // T-04: Caller number mapping
-          const callerNumber = item.client_number || item.caller_id_num || item.caller_id || item.customer_number || item.cli || item.from || '';
-          // T-06: Agent mapping
-          const agentName = item.agent_name || item.agent || item.extension || item.advisor_name || '';
-
-          // T-07: Date & time mapping
-          let callDate = item.call_date || item.date || '';
-          let callTime = item.call_time || item.time || '';
-          if (!callDate && item.start_time) {
-            callDate = item.start_time.slice(0, 10);
-            callTime = item.start_time.slice(11, 19);
-          } else if (!callDate && item.datetime) {
-            callDate = item.datetime.slice(0, 10);
-            callTime = item.datetime.slice(11, 19);
+          if (!existing) {
+            newRecords.push(item);
           }
-          if (!callDate) callDate = now.slice(0, 10);
-          if (!callTime) callTime = now.slice(11, 19);
+        }
 
-          // T-08: Duration mapping
-          const duration = parseInt(item.call_duration || item.answered_seconds || item.duration || item.duration_seconds || '0', 10);
-          // T-09, T-26: Recording URL mapping & preservation
-          const recordingUrl = item.recording_url || item.recording || item.audio_url || '';
+        const DOWNLOAD_CONCURRENCY = 5;
+        for (let i = 0; i < newRecords.length; i += DOWNLOAD_CONCURRENCY) {
+          const batch = newRecords.slice(i, i + DOWNLOAD_CONCURRENCY);
+          await Promise.all(
+            batch.map(async (item) => {
+              // T-05: Store call_id and uuid
+              const rawCallId = item.call_id || item.id || item.uuid || `tata_${Date.now()}_${importedCount}`;
+              const externalId = `tata_${rawCallId}`;
 
-          // T-19 to T-25: Recording download, HTTP validation, audio validation, checksum
-          let storagePath = '';
-          let fileSha256 = '';
-          let isAudioValid = false;
-          let callStatus = 'uploaded';
+              // T-04: Caller number mapping
+              const callerNumber = item.client_number || item.caller_id_num || item.caller_id || item.customer_number || item.cli || item.from || '';
+              // T-06: Agent mapping
+              const agentName = item.agent_name || item.agent || item.extension || item.advisor_name || '';
 
-          if (recordingUrl) {
-            try {
-              const audioResp = await fetch(recordingUrl, {
-                headers: { Authorization: `Bearer ${apiKey}` },
-              });
-
-              if (audioResp.ok) {
-                const buffer = Buffer.from(await audioResp.arrayBuffer());
-                // Validate size (> 512 bytes) and non-HTML error payload
-                if (buffer.length >= 512 && !buffer.slice(0, 50).toString().includes('<html')) {
-                  fileSha256 = crypto.createHash('sha256').update(buffer).digest('hex');
-                  const fileName = `tata_${rawCallId}.mp3`;
-                  const filePath = path.join(UPLOADS_DIR, fileName);
-                  fs.writeFileSync(filePath, buffer);
-                  storagePath = filePath;
-                  isAudioValid = true;
-                } else {
-                  callStatus = 'AUDIO_FAILED';
-                  addLog('warning', 'TATA_AUDIO_INVALID', `Downloaded audio for Tata Call #${rawCallId} failed audio validation (size: ${buffer.length}B).`);
-                }
-              } else {
-                callStatus = 'AUDIO_FAILED';
-                addLog('warning', 'TATA_AUDIO_HTTP_FAIL', `HTTP ${audioResp.status} while downloading recording for Tata Call #${rawCallId}`);
+              // T-07: Date & time mapping
+              let callDate = item.call_date || item.date || '';
+              let callTime = item.call_time || item.time || '';
+              if (!callDate && item.start_time) {
+                callDate = item.start_time.slice(0, 10);
+                callTime = item.start_time.slice(11, 19);
+              } else if (!callDate && item.datetime) {
+                callDate = item.datetime.slice(0, 10);
+                callTime = item.datetime.slice(11, 19);
               }
-            } catch (audioErr) {
-              callStatus = 'AUDIO_FAILED';
-              addLog('warning', 'TATA_AUDIO_DOWNLOAD_WARN', `Could not download audio for Tata Call #${rawCallId}: ${(audioErr as Error).message}`);
-            }
-          }
+              if (!callDate) callDate = now.slice(0, 10);
+              if (!callTime) callTime = now.slice(11, 19);
 
-          const resDb = sqlite
-            .prepare(`
-              INSERT INTO calls (
-                external_id, recording_name, recording_url, storage_path, file_sha256,
-                caller_name, calling_number, registered_number, call_date, call_time,
-                duration_seconds, source, status, call_type, created_at, updated_at
-              ) VALUES (
-                ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?,
-                ?, 'tata', ?, 'unknown', ?, ?
-              )
-            `)
-            .run(
-              externalId,
-              externalId,
-              recordingUrl || null,
-              storagePath || null,
-              fileSha256 || null,
-              agentName || null,
-              callerNumber || null,
-              callerNumber || null,
-              callDate || null,
-              callTime || null,
-              duration || 0,
-              callStatus,
-              now,
-              now
-            );
+              // T-08: Duration mapping
+              const duration = parseInt(item.call_duration || item.answered_seconds || item.duration || item.duration_seconds || '0', 10);
+              // T-09, T-26: Recording URL mapping & preservation
+              const recordingUrl = item.recording_url || item.recording || item.audio_url || '';
 
-          const newCallId = Number(resDb.lastInsertRowid);
-          // If duration < 6, immediately resolve as SCRAP
-          if (duration > 0 && duration < 6) {
-            sqlite.prepare(`
-              UPDATE calls SET
-                status = 'scrap',
-                call_type = 'scrap',
-                classification = 'SCRAP',
-                audit_status = 'EXCLUDED',
-                processing_status = 'COMPLETED',
-                classification_reason = 'Call duration less than 6 seconds regulatory threshold.',
-                updated_at = ?
-              WHERE id = ?
-            `).run(now, newCallId);
-          } else if (isAudioValid) {
-            enqueueJob('transcribe', newCallId, `call:${newCallId}:transcribe`);
-          } else {
-            // Audio recording was missing or failed download
-            sqlite.prepare(`
-              UPDATE calls SET
-                status = 'review',
-                processing_status = 'FAILED',
-                transcript_status = 'FAILED',
-                audit_status = 'EXCLUDED',
-                failure_reason = 'Audio recording file missing or failed download from Tata Smartflo.',
-                updated_at = ?
-              WHERE id = ?
-            `).run(now, newCallId);
-          }
-          importedCount++;
+              // T-19 to T-25: Recording download with timeout, HTTP validation, audio validation, checksum
+              let storagePath = '';
+              let fileSha256 = '';
+              let isAudioValid = false;
+              let callStatus = 'uploaded';
+
+              if (recordingUrl) {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 15000);
+                try {
+                  const audioResp = await fetch(recordingUrl, {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                    signal: controller.signal,
+                  });
+
+                  if (audioResp.ok) {
+                    const buffer = Buffer.from(await audioResp.arrayBuffer());
+                    // Validate size (> 512 bytes) and non-HTML error payload
+                    if (buffer.length >= 512 && !buffer.slice(0, 50).toString().includes('<html')) {
+                      fileSha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+                      const fileName = `tata_${rawCallId}.mp3`;
+                      const filePath = path.join(UPLOADS_DIR, fileName);
+                      fs.writeFileSync(filePath, buffer);
+                      storagePath = filePath;
+                      isAudioValid = true;
+                    } else {
+                      callStatus = 'AUDIO_FAILED';
+                      addLog('warning', 'TATA_AUDIO_INVALID', `Downloaded audio for Tata Call #${rawCallId} failed audio validation (size: ${buffer.length}B).`);
+                    }
+                  } else {
+                    callStatus = 'AUDIO_FAILED';
+                    addLog('warning', 'TATA_AUDIO_HTTP_FAIL', `HTTP ${audioResp.status} while downloading recording for Tata Call #${rawCallId}`);
+                  }
+                } catch (audioErr) {
+                  callStatus = 'AUDIO_FAILED';
+                  addLog('warning', 'TATA_AUDIO_DOWNLOAD_WARN', `Could not download audio for Tata Call #${rawCallId}: ${(audioErr as Error).message}`);
+                } finally {
+                  clearTimeout(timeoutId);
+                }
+              }
+
+              const resDb = sqlite.prepare(`
+                INSERT INTO calls (
+                  external_id, recording_name, recording_url, storage_path, file_sha256,
+                  caller_name, calling_number, registered_number, call_date, call_time,
+                  duration_seconds, source, status, call_type, created_at, updated_at
+                ) VALUES (
+                  ?, ?, ?, ?, ?,
+                  ?, ?, ?, ?, ?,
+                  ?, 'tata', ?, 'unknown', ?, ?
+                )
+              `).run(
+                externalId,
+                externalId,
+                recordingUrl || null,
+                storagePath || null,
+                fileSha256 || null,
+                agentName || null,
+                callerNumber || null,
+                callerNumber || null,
+                callDate || null,
+                callTime || null,
+                duration,
+                callStatus,
+                now,
+                now
+              );
+
+              const newCallId = Number(resDb.lastInsertRowid);
+              // If duration < 6, immediately resolve as SCRAP
+              if (duration > 0 && duration < 6) {
+                sqlite.prepare(`
+                  UPDATE calls SET
+                    status = 'scrap',
+                    call_type = 'scrap',
+                    classification = 'SCRAP',
+                    audit_status = 'EXCLUDED',
+                    processing_status = 'COMPLETED',
+                    classification_reason = 'Call duration less than 6 seconds regulatory threshold.',
+                    updated_at = ?
+                  WHERE id = ?
+                `).run(now, newCallId);
+              } else if (isAudioValid) {
+                enqueueJob('transcribe', newCallId, `call:${newCallId}:transcribe`);
+              } else {
+                // Audio recording was missing or failed download
+                sqlite.prepare(`
+                  UPDATE calls SET
+                    status = 'review',
+                    processing_status = 'FAILED',
+                    transcript_status = 'FAILED',
+                    audit_status = 'EXCLUDED',
+                    failure_reason = 'Audio recording file missing or failed download from Tata Smartflo.',
+                    updated_at = ?
+                  WHERE id = ?
+                `).run(now, newCallId);
+              }
+
+              importedCount++;
+            })
+          );
         }
 
         // T-10: Pagination condition
@@ -6672,8 +6754,22 @@ ${call.transcript || '(No speech transcript recorded)'}
     }
   });
 
-  // T-13 to T-16: Tata Webhook ingestion with deduplication, replay protection, and duration classification
+  // T-13 to T-16: Tata Webhook ingestion with authentication, deduplication, replay protection, and duration classification
   const handleSmartfloWebhook = async (req: Request, res: Response) => {
+    // T-SEC: Webhook Authentication & Token Verification
+    const configuredSecret = getSettingValue('tata_webhook_secret') || process.env.TATA_WEBHOOK_SECRET || getTataKey();
+    if (configuredSecret && configuredSecret.trim()) {
+      const authHeader = (req.headers['authorization'] || '') as string;
+      const bearerToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+      const customToken = (req.headers['x-webhook-token'] || req.headers['x-smartflo-token'] || req.headers['x-api-key'] || req.query.token || '') as string;
+      const receivedToken = bearerToken || customToken;
+
+      if (!receivedToken || receivedToken !== configuredSecret.trim()) {
+        addLog('warning', 'WEBHOOK_AUTH_FAILED', 'Unauthorized Smartflo webhook attempt: invalid or missing security token.');
+        return res.status(401).json({ ok: false, error: 'Unauthorized: Invalid or missing webhook authentication token.' });
+      }
+    }
+
     const payload = req.body || {};
     const rawCallId = payload.call_id || payload.id || payload.uuid || payload.event_id || '';
     if (!rawCallId) {

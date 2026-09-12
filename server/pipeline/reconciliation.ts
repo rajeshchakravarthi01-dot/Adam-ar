@@ -91,11 +91,12 @@ export function stage9PublishAudit(
   const existingAudit = db.prepare('SELECT id FROM audits WHERE call_id = ?').get(callId) as { id: number } | undefined;
   let auditId: number;
 
-  const q1Status = auditResult.q1?.status || 'PASS';
-  const q2Status = auditResult.q2?.status || 'PASS';
-  const q3Status = auditResult.q3?.status || 'PASS';
-  const q4Status = auditResult.q4?.status || 'PASS';
-  const q5Status = auditResult.q5?.status || 'PASS';
+  // If any parameter status is missing or undefined, it MUST default to 'REVIEW' or 'FAIL', NEVER 'PASS'!
+  const q1Status = auditResult.q1?.status || 'REVIEW';
+  const q2Status = auditResult.q2?.status || 'REVIEW';
+  const q3Status = auditResult.q3?.status || 'REVIEW';
+  const q4Status = auditResult.q4?.status || 'REVIEW';
+  const q5Status = auditResult.q5?.status || 'REVIEW';
   const q5Flag = auditResult.q5?.flag || 'FATAL';
   const q5Evidence = auditResult.q5?.evidence || 'SEBI return guarantee prohibition compliant.';
   const q5Confidence = auditResult.q5?.confidence ?? 0.95;

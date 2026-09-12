@@ -16,11 +16,11 @@ import { calculateAuthoritativeScore } from '../scoring-engine';
 
 export function stage8CalculateScore(audit: StageAuditResult): StageScoreResult {
   const authScore = calculateAuthoritativeScore({
-    q1: { status: audit.q1.status },
-    q2: { status: audit.q2.status },
-    q3: { status: audit.q3.status },
-    q4: { status: 'PASS' },
-    q5: { status: audit.q5?.status || 'PASS' },
+    q1: { status: audit.q1?.status || 'REVIEW' },
+    q2: { status: audit.q2?.status || 'REVIEW' },
+    q3: { status: audit.q3?.status || 'REVIEW' },
+    q4: { status: audit.q4?.status || 'REVIEW' },
+    q5: { status: audit.q5?.status || 'REVIEW' },
   });
 
   return {

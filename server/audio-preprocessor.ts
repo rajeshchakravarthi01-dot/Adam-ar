@@ -42,7 +42,7 @@ export async function inspectAudioQuality(filePath: string): Promise<AudioQualit
       '-show_format',
       '-show_streams',
       filePath,
-    ]);
+    ], { timeout: 10000, maxBuffer: 10 * 1024 * 1024 });
 
     const info = JSON.parse(stdout);
     const audioStream = info.streams?.find((s: any) => s.codec_type === 'audio') || info.streams?.[0];
@@ -67,7 +67,7 @@ export async function inspectAudioQuality(filePath: string): Promise<AudioQualit
         '-af', 'volumedetect',
         '-f', 'null',
         '-',
-      ]);
+      ], { timeout: 10000, maxBuffer: 10 * 1024 * 1024 });
 
       const meanVolMatch = volumeStderr.match(/mean_volume:\s*(-?[\d.]+)\s*dB/);
       const maxVolMatch = volumeStderr.match(/max_volume:\s*(-?[\d.]+)\s*dB/);
@@ -136,7 +136,7 @@ export async function preprocessAudioForTranscription(filePath: string): Promise
       '-ac', '1',
       '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',
       normalizedPath,
-    ]);
+    ], { timeout: 25000, maxBuffer: 10 * 1024 * 1024 });
   } catch {
     // Fallback if loudnorm fails: simple resample
     try {
@@ -146,7 +146,7 @@ export async function preprocessAudioForTranscription(filePath: string): Promise
         '-ar', '16000',
         '-ac', '1',
         normalizedPath,
-      ]);
+      ], { timeout: 20000, maxBuffer: 10 * 1024 * 1024 });
     } catch {
       // If ffmpeg fails, use original path
       return {
@@ -175,7 +175,7 @@ export async function preprocessAudioForTranscription(filePath: string): Promise
         '-map_channel', '0.0.1',
         '-ar', '16000',
         ch1,
-      ]);
+      ], { timeout: 20000, maxBuffer: 10 * 1024 * 1024 });
 
       if (fs.existsSync(ch0)) channel0Path = ch0;
       if (fs.existsSync(ch1)) channel1Path = ch1;

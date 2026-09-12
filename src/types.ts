@@ -315,6 +315,7 @@ export interface AuditRecord {
   q5_end_ms?: number | null;
   q5_speaker?: string;
   score: number | null;
+  is_fatal?: boolean | number;
   audit_comment?: string;
   status: AuditStatus;
   transcript_hash?: string;

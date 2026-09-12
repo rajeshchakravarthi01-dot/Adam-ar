@@ -25,6 +25,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { AuditEligibilityResult } from './types';
 import type { CallRecord } from '../../src/types';
+import { isValidUcc } from './uccResolver';
 
 export function isAuditEligible(
   db: DatabaseSync,
@@ -56,24 +57,24 @@ export function isAuditEligible(
     };
   }
 
-  // Gate 2: Identity check
+  // Gate 2: Identity check (SEBI Mandate: Valid Client UCC is mandatory for compliance audit; phone-only is not enough)
   let identityStatus = (call.identity_status || '').toUpperCase();
-  const hasClientCode = Boolean((call.client_code && call.client_code.trim()) || (call.client && call.client.trim()));
-  const hasPhoneNumber = Boolean((call.phone_number && call.phone_number.trim()) || (call.calling_number && call.calling_number.trim()));
+  const rawCode = (call.client_code || call.client || '').trim();
+  const hasValidClientCode = Boolean(rawCode && isValidUcc(rawCode));
+
+  if (!hasValidClientCode) {
+    return {
+      eligible: false,
+      gateCode: 'IDENTITY_NOT_CONFIRMED',
+      reason: `Client identity unconfirmed: Valid client UCC is required before SEBI compliance audit. Found: "${rawCode || 'NONE'}".`,
+    };
+  }
 
   if (identityStatus !== 'CONFIRMED') {
-    if (hasClientCode || hasPhoneNumber) {
-      identityStatus = 'CONFIRMED';
-      try {
-        db.prepare("UPDATE calls SET identity_status = 'CONFIRMED' WHERE id = ?").run(call.id);
-      } catch {}
-    } else {
-      return {
-        eligible: false,
-        gateCode: 'IDENTITY_NOT_CONFIRMED',
-        reason: `Client identity status is "${identityStatus || 'PENDING'}". Client code or phone identifier is required before compliance audit.`,
-      };
-    }
+    identityStatus = 'CONFIRMED';
+    try {
+      db.prepare("UPDATE calls SET identity_status = 'CONFIRMED' WHERE id = ?").run(call.id);
+    } catch {}
   }
 
   // Gate 3: Transcript check

@@ -313,42 +313,40 @@ export function stage5MultiExecutionMatch(
   const clientUcc = normalizeClientCode(call.client_code || call.client);
   const callerPhone = normalizePhoneNumber(call.calling_number || call.phone_number || '');
 
-  // Fetch all trades in database
-  const allTrades = db.prepare('SELECT * FROM trades ORDER BY id ASC').all() as unknown as TradeRecord[];
-  if (allTrades.length === 0) {
+  // Optimized targeted SQL query using indexes instead of full table scan
+  let candidateTrades: TradeRecord[] = [];
+  try {
+    if (clientUcc && callerPhone) {
+      candidateTrades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE client = ? OR client_number = ? OR phone_number = ?
+        ORDER BY id ASC
+      `).all(clientUcc, clientUcc, callerPhone) as unknown as TradeRecord[];
+    } else if (clientUcc) {
+      candidateTrades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE client = ? OR client_number = ?
+        ORDER BY id ASC
+      `).all(clientUcc, clientUcc) as unknown as TradeRecord[];
+    } else if (callerPhone) {
+      candidateTrades = db.prepare(`
+        SELECT * FROM trades 
+        WHERE phone_number = ? OR client_number = ?
+        ORDER BY id ASC
+      `).all(callerPhone, callerPhone) as unknown as TradeRecord[];
+    } else {
+      candidateTrades = db.prepare(`
+        SELECT * FROM trades ORDER BY id DESC LIMIT 50
+      `).all() as unknown as TradeRecord[];
+    }
+  } catch {
+    candidateTrades = [];
+  }
+
+  if (candidateTrades.length === 0) {
     return {
       status: 'NO_MATCH',
       clientConfirmed: Boolean(clientUcc),
-      orders: extractedOrders.map((o) => ({
-        ...o,
-        executions: [],
-        totalExecutedQuantity: 0,
-        executionStatus: 'NO_MATCH',
-      })),
-      matched_trade_ids: [],
-      primary_trade_id: null,
-      confidence: 0,
-      margin: 0,
-      matching_factors: [],
-      reason: 'No executed trades available in system.',
-    };
-  }
-
-  // Filter trades by client UCC or registered phone number
-  const candidateTrades = allTrades.filter((t) => {
-    const tradeUcc = normalizeClientCode(t.client || (t as any).client_code || t.client_number);
-    const tradePhone = normalizePhoneNumber(t.phone_number || t.client_number || '');
-
-    if (clientUcc && tradeUcc && clientUcc === tradeUcc) return true;
-    if (callerPhone && tradePhone && callerPhone === tradePhone) return true;
-    return false;
-  });
-
-  if (candidateTrades.length === 0) {
-    // If no candidate trades match client UCC/phone
-    return {
-      status: 'NO_MATCH',
-      clientConfirmed: false,
       orders: extractedOrders.map((o) => ({
         ...o,
         executions: [],
@@ -436,6 +434,24 @@ export function stage5MultiExecutionMatch(
 
       if (call.call_date && trade.trade_date && call.call_date === trade.trade_date) {
         execConf += 0.10;
+      }
+
+      // Time correlation: if call_time and trade_time are both available
+      if (call.call_time && trade.trade_time) {
+        try {
+          const [ch, cm, cs] = call.call_time.split(':').map(Number);
+          const [th, tm, ts] = trade.trade_time.split(':').map(Number);
+          if (!isNaN(ch) && !isNaN(th)) {
+            const callSec = ch * 3600 + (cm || 0) * 60 + (cs || 0);
+            const tradeSec = th * 3600 + (tm || 0) * 60 + (ts || 0);
+            const diffSec = Math.abs(tradeSec - callSec);
+            if (diffSec <= 900) {
+              execConf += 0.15;
+            } else if (diffSec <= 3600) {
+              execConf += 0.05;
+            }
+          }
+        } catch {}
       }
       execConf = Math.min(1.0, Math.round(execConf * 100) / 100);
 
