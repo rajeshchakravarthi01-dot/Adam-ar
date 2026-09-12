@@ -65,6 +65,7 @@ import {
   type UnifiedAuditOutput,
   type AuditQuestionOutput,
 } from './server/scoring-engine';
+import { normalizeToIsoDate } from './server/normalizer';
 import { evaluateEvidenceCompliance, verifyAuditEligibility } from './server/audit-evaluator';
 import { transcribeAudioFile, transcribeAudioWithGemini35 } from './server/asr-engine';
 import { stage1ImportCalls, type UploadedFileInfo } from './server/pipeline/import';
@@ -677,6 +678,96 @@ function initSettings() {
   }
 }
 initSettings();
+
+// Authoritative 5-Point Rubric & ISO Date Normalization Migration
+function runAuthoritative5PointScorecardMigration(db: any) {
+  try {
+    // 1. Normalize trade dates in trades table
+    const trades = db.prepare('SELECT id, trade_date FROM trades').all() as Array<{ id: number; trade_date: string }>;
+    const updateTradeStmt = db.prepare('UPDATE trades SET trade_date = ? WHERE id = ?');
+    for (const t of trades) {
+      if (t.trade_date) {
+        const norm = normalizeToIsoDate(t.trade_date);
+        if (norm && norm !== t.trade_date) {
+          updateTradeStmt.run(norm, t.id);
+        }
+      }
+    }
+
+    // 2. Normalize call dates in calls table
+    const calls = db.prepare('SELECT id, call_date FROM calls').all() as Array<{ id: number; call_date: string }>;
+    const updateCallStmt = db.prepare('UPDATE calls SET call_date = ? WHERE id = ?');
+    for (const c of calls) {
+      if (c.call_date) {
+        const norm = normalizeToIsoDate(c.call_date);
+        if (norm && norm !== c.call_date) {
+          updateCallStmt.run(norm, c.id);
+        }
+      }
+    }
+
+    // 3. Migrate scorecards to authoritative 5-point rubric & normalize dates
+    const scorecards = db.prepare('SELECT * FROM scorecards').all() as any[];
+    const updateScorecardStmt = db.prepare(`
+      UPDATE scorecards SET
+        trade_date = ?,
+        call_date = ?,
+        q4_status = 'PASS',
+        score = ?,
+        is_fatal = ?,
+        fatal_reasons = ?,
+        audit_comment = ?
+      WHERE id = ?
+    `);
+
+    for (const sc of scorecards) {
+      const normTradeDate = normalizeToIsoDate(sc.trade_date) || normalizeToIsoDate(sc.call_date) || sc.trade_date || '';
+      const normCallDate = normalizeToIsoDate(sc.call_date) || normalizeToIsoDate(sc.trade_date) || sc.call_date || '';
+
+      const auth = calculateAuthoritativeScore({
+        q1: { status: sc.q1_status, evidence: sc.q1_evidence },
+        q2: { status: sc.q2_status, evidence: sc.q2_evidence },
+        q3: { status: sc.q3_status, evidence: sc.q3_evidence },
+        q4: { status: 'PASS', evidence: 'Default PASS — Parameter is not audited under the active SEBI rubric.' },
+        q5: { status: sc.q5_status, evidence: sc.q5_evidence },
+      });
+
+      const updatedComment = sc.audit_comment && !sc.audit_comment.includes('Score 0')
+        ? sc.audit_comment
+        : (auth.isFatal
+          ? `NON-COMPLIANT: ${auth.fatalReasons.join('; ')}`
+          : (auth.finalScore === 5
+            ? 'Pre Order Confirmation is as per the Regulatory Norm.'
+            : 'Pre Order Confirmation verified with minor trade remarks.'));
+
+      updateScorecardStmt.run(
+        normTradeDate,
+        normCallDate,
+        auth.finalScore,
+        auth.isFatal ? 1 : 0,
+        auth.fatalReasons.join('; '),
+        updatedComment,
+        sc.id
+      );
+
+      // Sync audits table if linked
+      if (sc.audit_id) {
+        try {
+          db.prepare(`
+            UPDATE audits SET
+              q4 = 'PASS',
+              score = ?,
+              updated_at = datetime('now')
+            WHERE id = ?
+          `).run(auth.finalScore, sc.audit_id);
+        } catch {}
+      }
+    }
+  } catch (err: any) {
+    console.error('[Migration] runAuthoritative5PointScorecardMigration error:', err?.message);
+  }
+}
+runAuthoritative5PointScorecardMigration(sqlite);
 
 // Seed initial administrator user safely and ensure authorized enterprise accounts
 function initAdminUser() {
@@ -1315,24 +1406,19 @@ function parseTradeRecordsFromFile(filePath: string): ParsedTradeRow[] {
         ''
     ).trim();
 
-    let tradeDate = String(
-      normMap['date'] ??
-        normMap['tradedate'] ??
-        normMap['orderdate'] ??
-        normMap['transdate'] ??
-        normMap['txndate'] ??
-        ''
-    ).trim();
-    const rawDateVal = normMap['date'] ?? normMap['tradedate'] ?? row['Date'];
-    if (rawDateVal && typeof rawDateVal === 'object' && rawDateVal instanceof Date) {
-      tradeDate = (rawDateVal as Date).toISOString().slice(0, 10);
-    } else if (tradeDate && tradeDate.includes('/')) {
-      const parts = tradeDate.split('/');
-      if (parts.length === 3) {
-        if (parts[2].length === 4) {
-          tradeDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        }
-      }
+    const rawDateVal = normMap['date'] ??
+      normMap['tradedate'] ??
+      normMap['orderdate'] ??
+      normMap['transdate'] ??
+      normMap['txndate'] ??
+      row['Date'] ??
+      row['Trade Date'] ??
+      row['TradeDate'] ??
+      '';
+    let tradeDate = normalizeToIsoDate(rawDateVal) || '';
+    if (!tradeDate) {
+      const dateStr = String(rawDateVal || '').trim();
+      tradeDate = normalizeToIsoDate(dateStr) || '';
     }
     if (!tradeDate) tradeDate = new Date().toISOString().slice(0, 10);
 
@@ -3673,7 +3759,11 @@ ${call.transcript || '(No speech transcript recorded)'}
   apiRouter.get('/trades', requireAuth, (req: Request, res: Response) => {
     const limit = parseInt(req.query.per_page as string, 10) || 100;
     const trades = sqlite.prepare('SELECT * FROM trades ORDER BY id DESC LIMIT ?').all(limit) as unknown as TradeRecord[];
-    return res.json(trades);
+    const normalized = trades.map((t) => ({
+      ...t,
+      trade_date: normalizeToIsoDate(t.trade_date) || t.trade_date,
+    }));
+    return res.json(normalized);
   });
 
   apiRouter.post('/imports/trades', requireAuth, upload.single('file') as any, (req: Request, res: Response) => {
@@ -4782,8 +4872,9 @@ ${call.transcript || '(No speech transcript recorded)'}
         }
       }
 
-      const resolvedCallDate = sc.call_date || call?.call_date || sc.trade_date || matchedTrade?.trade_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
-      const resolvedTradeDate = sc.trade_date || matchedTrade?.trade_date || sc.call_date || call?.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      const authoritativeTradeDate = normalizeToIsoDate(sc.trade_date) || normalizeToIsoDate(matchedTrade?.trade_date) || normalizeToIsoDate(sc.call_date) || normalizeToIsoDate(call?.call_date) || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      const authoritativeCallDate = normalizeToIsoDate(sc.call_date) || normalizeToIsoDate(call?.call_date) || normalizeToIsoDate(authoritativeTradeDate) || '';
+      const authoritativeAuditDate = normalizeToIsoDate(sc.created_at) || normalizeToIsoDate(sc.generated_at) || normalizeToIsoDate(call?.updated_at) || authoritativeCallDate;
       const resolvedCallingPhone = (sc.calling_number && sc.calling_number !== '—') ? sc.calling_number : (call?.calling_number || call?.phone_number || matchedTrade?.client_number || matchedTrade?.phone_number || '');
       const resolvedRegisteredPhone = (sc.registered_number && sc.registered_number !== '—') ? sc.registered_number : (call?.registered_number || matchedTrade?.client_number || matchedTrade?.phone_number || resolvedCallingPhone);
       const resolvedTradePhone = (sc.trade_phone && sc.trade_phone !== '—') ? sc.trade_phone : (matchedTrade?.client_number || matchedTrade?.phone_number || resolvedRegisteredPhone);
@@ -4798,8 +4889,10 @@ ${call.transcript || '(No speech transcript recorded)'}
         trade_phone: resolvedTradePhone,
         calling_number: resolvedCallingPhone,
         registered_number: resolvedRegisteredPhone,
-        trade_date: resolvedTradeDate,
-        call_date: resolvedCallDate,
+        trade_date: authoritativeTradeDate,
+        call_date: authoritativeCallDate,
+        audit_date: authoritativeAuditDate,
+        q4_status: 'PASS',
         transcript: call?.transcript || '',
         symbol: sc.symbol || matchedTrade?.symbol || '',
         price: sc.price || matchedTrade?.price || 0,
@@ -4845,10 +4938,11 @@ ${call.transcript || '(No speech transcript recorded)'}
 
       const newCaller = caller_name !== undefined ? String(caller_name).trim() : existing.caller_name;
       const newClient = client !== undefined ? String(client).trim() : existing.client;
-      const newTradeDate = trade_date !== undefined ? String(trade_date).trim() : existing.trade_date;
+      const newTradeDate = trade_date !== undefined ? (normalizeToIsoDate(trade_date) || String(trade_date).trim()) : (normalizeToIsoDate(existing.trade_date) || existing.trade_date);
       const newTeam = team !== undefined ? String(team).trim() : existing.team;
       const newPhone = (phone !== undefined || calling_number !== undefined) ? String(phone || calling_number).trim() : (existing.calling_number || existing.trade_phone || '');
-      const newCallDate = (audit_date !== undefined || call_date !== undefined) ? String(audit_date || call_date).trim() : existing.call_date;
+      const rawCallDate = audit_date !== undefined ? audit_date : call_date;
+      const newCallDate = rawCallDate !== undefined ? (normalizeToIsoDate(rawCallDate) || String(rawCallDate).trim()) : (normalizeToIsoDate(existing.call_date) || existing.call_date);
       const newDealer = dealer !== undefined ? String(dealer).trim() : (existing.dealer || '');
 
       let newQ1 = q1_status !== undefined ? String(q1_status).toUpperCase().trim() : existing.q1_status;
@@ -4857,13 +4951,15 @@ ${call.transcript || '(No speech transcript recorded)'}
       let newQ4 = 'PASS'; // User mandate: Q4 is always PASS
       let newQ5 = q5_status !== undefined ? String(q5_status).toUpperCase().trim() : existing.q5_status;
 
-      let isFatal = newQ1 === 'FAIL' || newQ2 === 'FAIL' || newQ5 === 'FAIL';
-      let calculatedScore = 5;
-      if (isFatal) {
-        calculatedScore = 0;
-      } else {
-        if (newQ3 !== 'PASS') calculatedScore -= 1;
-      }
+      const authResult = calculateAuthoritativeScore({
+        q1: { status: newQ1 as any },
+        q2: { status: newQ2 as any },
+        q3: { status: newQ3 as any },
+        q4: { status: 'PASS' },
+        q5: { status: newQ5 as any },
+      });
+      let isFatal = authResult.isFatal;
+      let calculatedScore = authResult.finalScore;
 
       let finalScore = calculatedScore;
       if (score !== undefined && score !== null && score !== '') {
@@ -4979,20 +5075,25 @@ ${call.transcript || '(No speech transcript recorded)'}
 
         const newCaller = data.caller_name !== undefined ? String(data.caller_name).trim() : existing.caller_name;
         const newClient = data.client !== undefined ? String(data.client).trim() : existing.client;
-        const newTradeDate = data.trade_date !== undefined ? String(data.trade_date).trim() : existing.trade_date;
+        const newTradeDate = data.trade_date !== undefined ? (normalizeToIsoDate(data.trade_date) || String(data.trade_date).trim()) : (normalizeToIsoDate(existing.trade_date) || existing.trade_date);
         const newTeam = data.team !== undefined ? String(data.team).trim() : existing.team;
         const newPhone = data.phone !== undefined ? String(data.phone).trim() : (existing.calling_number || existing.trade_phone || '');
-        const newCallDate = data.audit_date !== undefined ? String(data.audit_date).trim() : existing.call_date;
+        const newCallDate = data.audit_date !== undefined ? (normalizeToIsoDate(data.audit_date) || String(data.audit_date).trim()) : (normalizeToIsoDate(existing.call_date) || existing.call_date);
         const newQ1 = data.q1_status !== undefined ? String(data.q1_status).toUpperCase().trim() : existing.q1_status;
         const newQ2 = data.q2_status !== undefined ? String(data.q2_status).toUpperCase().trim() : existing.q2_status;
         const newQ3 = data.q3_status !== undefined ? String(data.q3_status).toUpperCase().trim() : existing.q3_status;
         const newQ4 = 'PASS';
         const newQ5 = data.q5_status !== undefined ? String(data.q5_status).toUpperCase().trim() : existing.q5_status;
 
-        const isFatal = newQ1 === 'FAIL' || newQ2 === 'FAIL' || newQ5 === 'FAIL';
-        let calcScore = 5;
-        if (isFatal) calcScore = 0;
-        else if (newQ3 !== 'PASS') calcScore -= 1;
+        const auth = calculateAuthoritativeScore({
+          q1: { status: newQ1 as any },
+          q2: { status: newQ2 as any },
+          q3: { status: newQ3 as any },
+          q4: { status: 'PASS' },
+          q5: { status: newQ5 as any },
+        });
+        const isFatal = auth.isFatal;
+        const calcScore = auth.finalScore;
 
         const finalScore = data.score !== undefined ? parseInt(String(data.score), 10) : calcScore;
         const comment = data.feedback || existing.audit_comment || (isFatal ? 'NON-COMPLIANT: Regulatory compliance violation.' : 'Pre Order Confirmation is as per the Regulatory Norm.');
@@ -5063,7 +5164,17 @@ ${call.transcript || '(No speech transcript recorded)'}
         feedback = '',
       } = req.body;
 
-      const isFatal = q1_status === 'FAIL' || q2_status === 'FAIL' || q5_status === 'FAIL' || score === 0;
+      const auth = calculateAuthoritativeScore({
+        q1: { status: q1_status as any },
+        q2: { status: q2_status as any },
+        q3: { status: q3_status as any },
+        q4: { status: 'PASS' },
+        q5: { status: q5_status as any },
+      });
+      const finalScore = score !== undefined && score !== null ? Number(score) : auth.finalScore;
+      const isFatal = finalScore === 0 || auth.isFatal;
+      const normTradeDate = normalizeToIsoDate(trade_date) || now.slice(0, 10);
+      const normAuditDate = normalizeToIsoDate(audit_date) || now.slice(0, 10);
 
       const resDb = sqlite.prepare(`
         INSERT INTO scorecards (
@@ -5078,15 +5189,15 @@ ${call.transcript || '(No speech transcript recorded)'}
           ?, ?, ?, ?, ?,
           ?, ?, ?,
           ?, 'Manual verification entry', ?, 'Manual verification entry', ?, 'Manual verification entry',
-          'PASS', 'Customer acknowledged', ?, 'Manual verification entry',
+          'PASS', 'Default PASS — Parameter is not audited under the active SEBI rubric.', ?, 'Manual verification entry',
           ?, ?, ?, ?
         )
       `).run(
         caller_name, caller_name, team, client,
-        phone, phone, phone, trade_date || now.slice(0, 10), audit_date || now.slice(0, 10),
-        score, isFatal ? 1 : 0, isFatal ? 'Fatal compliance condition' : '',
+        phone, phone, phone, normTradeDate, normAuditDate,
+        finalScore, isFatal ? 1 : 0, auth.fatalReasons.join('; ') || (isFatal ? 'Fatal compliance condition' : ''),
         q1_status, q2_status, q3_status, q5_status,
-        feedback || 'Pre Order Confirmation is as per the Regulatory Norm.', now, now, now
+        feedback || (isFatal ? 'NON-COMPLIANT: Regulatory compliance violation.' : 'Pre Order Confirmation is as per the Regulatory Norm.'), now, now, now
       );
 
       backupDatabase();

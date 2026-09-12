@@ -65,6 +65,36 @@ interface RowEditState {
 type SortField = 'id' | 'caller_name' | 'client' | 'trade_date' | 'audit_date' | 'team' | 'phone' | 'score';
 type SortOrder = 'asc' | 'desc';
 
+export function formatForDateInput(dateVal: any): string {
+  if (!dateVal) return '';
+  const s = String(dateVal).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const m1 = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (m1) {
+    const day = m1[1].padStart(2, '0');
+    const month = m1[2].padStart(2, '0');
+    const year = m1[3];
+    return `${year}-${month}-${day}`;
+  }
+  const m2 = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m2) {
+    const year = m2[1];
+    const month = m2[2].padStart(2, '0');
+    const day = m2[3].padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  const parsed = Date.parse(s);
+  if (!isNaN(parsed)) {
+    const d = new Date(parsed);
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+  return '';
+}
+
 export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
   scorecards = [],
   onUpdateScorecard,
@@ -161,13 +191,27 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       return '';
     })();
 
+    const resolvedTradeDate = formatForDateInput(
+      sc.trade_date ||
+      (sc.trades && sc.trades[0]?.trade_date) ||
+      sc.call_date ||
+      (sc.created_at ? String(sc.created_at).slice(0, 10) : '')
+    );
+
+    const resolvedAuditDate = formatForDateInput(
+      (sc as any).audit_date ||
+      sc.call_date ||
+      (sc.created_at ? String(sc.created_at).slice(0, 10) : '') ||
+      resolvedTradeDate
+    );
+
     return {
       caller_name: String(sc.caller_name || ''),
       client: resolvedClient,
-      trade_date: String(sc.trade_date || ''),
+      trade_date: resolvedTradeDate,
       team: String(sc.team || ''),
       phone: String(sc.calling_number || sc.trade_phone || sc.registered_number || ''),
-      audit_date: String(sc.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : '')),
+      audit_date: resolvedAuditDate,
       q1_status: sc.q1_status || 'PASS',
       q2_status: sc.q2_status || 'PASS',
       q3_status: sc.q3_status || 'PASS',
@@ -185,9 +229,14 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
     value: any
   ) => {
     const current = getRowState(sc);
+    let normalizedVal = value;
+    if (field === 'trade_date' || field === 'audit_date') {
+      normalizedVal = formatForDateInput(value) || value;
+    }
+
     const updated: RowEditState = {
       ...current,
-      [field]: value,
+      [field]: normalizedVal,
       is_dirty: true,
     };
 
@@ -319,20 +368,30 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const isFatal = newRecord.q1_status === 'FAIL' || newRecord.q2_status === 'FAIL' || newRecord.q5_status === 'FAIL';
+      const calculatedScore = isFatal ? 0 : (newRecord.q3_status === 'PASS' ? 5 : 4);
+      const recordPayload = {
+        ...newRecord,
+        trade_date: formatForDateInput(newRecord.trade_date) || newRecord.trade_date,
+        audit_date: formatForDateInput(newRecord.audit_date) || newRecord.audit_date,
+        q4_status: 'PASS',
+        score: calculatedScore,
+      };
+
       if (onCreateScorecard) {
-        await onCreateScorecard(newRecord);
+        await onCreateScorecard(recordPayload);
       } else {
-        await api.createScorecard(newRecord);
+        await api.createScorecard(recordPayload);
         if (onRefresh) await onRefresh();
       }
       setShowCreateModal(false);
       setNewRecord({
         caller_name: '',
         client: '',
-        trade_date: new Date().toISOString().slice(0, 10),
+        trade_date: formatForDateInput(new Date().toISOString().slice(0, 10)),
         team: '',
         phone: '',
-        audit_date: new Date().toISOString().slice(0, 10),
+        audit_date: formatForDateInput(new Date().toISOString().slice(0, 10)),
         q1_status: 'PASS',
         q2_status: 'PASS',
         q3_status: 'PASS',
@@ -453,12 +512,12 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       'Team',
       'Phone Number',
       'Audit Date',
-      'Q1 (Registered Phone)',
-      'Q2 (Client UCC)',
-      'Q3 (Stock/Qty/Price)',
-      'Q4 (Order Placement)',
-      'Q5 (No Guarantees)',
-      'Total Score',
+      'Q1 (CLI - Fatal)',
+      'Q2 (Client UCC - Fatal)',
+      'Q3 (Symbol/Qty/Price - 1 Pt)',
+      'Q4 (Customer Ack - Default PASS)',
+      'Q5 (No Return Guarantee - Fatal)',
+      'Total Score (Out of 5)',
       'Status',
       'Audit Remarks / Feedback',
     ];
@@ -818,19 +877,23 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q1: Registered Number / CLI match (Fatal)">
                   <div className="text-amber-400 font-bold">Q1 (CLI)</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">Fatal</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q2: Client UCC explicitly stated (Fatal)">
                   <div className="text-amber-400 font-bold">Q2 (UCC)</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">Fatal</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
-                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed">
+                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed (1 pt)">
                   <div className="text-amber-400 font-bold">Q3 (Symbol)</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">1 Pt</div>
+                  <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
                 </th>
-                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q5: No assured return promises (Fatal)">
+                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Not Audited - Always PASS)">
+                  <div className="text-amber-400 font-bold">Q4 (Ack)</div>
+                  <div className="text-[9px] text-emerald-400 font-bold normal-case">Default PASS</div>
+                </th>
+                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
                   <div className="text-amber-400 font-bold">Q5 (Ethics)</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">Fatal</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th
                   onClick={() => toggleSort('score')}
@@ -848,7 +911,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <tbody className="divide-y divide-neutral-200 text-neutral-800">
               {paginatedScorecards.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-neutral-400">
+                  <td colSpan={15} className="py-12 text-center text-neutral-400">
                     No matching audit records found. Try adjusting your search or filters.
                   </td>
                 </tr>
@@ -949,11 +1012,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
                             state.q1_status === 'PASS'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
                           }`}
                         >
                           <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="FAIL">FAIL (Fatal)</option>
                         </select>
                       </td>
 
@@ -965,11 +1028,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
                             state.q2_status === 'PASS'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
                           }`}
                         >
                           <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="FAIL">FAIL (Fatal)</option>
                         </select>
                       </td>
 
@@ -985,8 +1048,17 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           }`}
                         >
                           <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="FAIL">FAIL (-1)</option>
                         </select>
+                      </td>
+
+                      {/* Q4 (Customer Ack - Default PASS) */}
+                      <td className="py-2 px-2 text-center whitespace-nowrap" title="Not audited: Always PASS per regulatory rubric">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                          <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span>PASS</span>
+                          <span className="text-[9px] font-normal text-emerald-700">(Default)</span>
+                        </span>
                       </td>
 
                       {/* Q5 Select */}
@@ -997,11 +1069,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
                             state.q5_status === 'PASS'
                               ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
                           }`}
                         >
                           <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="FAIL">FAIL (Fatal)</option>
                         </select>
                       </td>
 
@@ -1189,8 +1261,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
               
               <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Q1: Registered Number / CLI Verification</span>
-                  <span className={`px-2 py-0.5 rounded-sm ${activeModalItem.q1_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span>Q1: Registered Number / CLI Verification</span>
+                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q1_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                     {activeModalItem.q1_status}
                   </span>
                 </div>
@@ -1199,8 +1274,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
               <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Q2: Client Identity &amp; UCC Verification</span>
-                  <span className={`px-2 py-0.5 rounded-sm ${activeModalItem.q2_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span>Q2: Client Identity &amp; UCC Spoken</span>
+                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q2_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                     {activeModalItem.q2_status}
                   </span>
                 </div>
@@ -1209,8 +1287,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
               <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Q3: Stock Symbol, Quantity &amp; Execution Price</span>
-                  <span className={`px-2 py-0.5 rounded-sm ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span>Q3: Stock Symbol, Quantity &amp; Execution Price</span>
+                    <span className="text-[10px] text-neutral-600 bg-neutral-100 px-1 py-0.5 rounded border border-neutral-200 font-semibold">1 PT</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
                     {activeModalItem.q3_status}
                   </span>
                 </div>
@@ -1219,8 +1300,24 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
               <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
-                  <span>Q5: Ethical Standards (No Guaranteed Profits)</span>
-                  <span className={`px-2 py-0.5 rounded-sm ${activeModalItem.q5_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span>Q4: Customer Order Acknowledgement</span>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 font-semibold">NOT AUDITED · ALWAYS PASS</span>
+                  </span>
+                  <span className="px-2 py-0.5 rounded-sm font-bold text-xs bg-emerald-100 text-emerald-800">
+                    PASS (Default)
+                  </span>
+                </div>
+                <p className="text-xs text-neutral-600">Standard regulatory rule: Parameter not actively evaluated in this rubric; automatically awarded PASS.</p>
+              </div>
+
+              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+                <div className="flex items-center justify-between text-xs font-bold">
+                  <span className="flex items-center gap-1.5">
+                    <span>Q5: Ethical Standards (No Return / Profit Guarantee)</span>
+                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q5_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
                     {activeModalItem.q5_status}
                   </span>
                 </div>
@@ -1359,49 +1456,55 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
               </div>
 
               {/* Status Selectors */}
-              <div className="grid grid-cols-4 gap-2 pt-2 border-t border-neutral-100">
+              <div className="grid grid-cols-5 gap-2 pt-2 border-t border-neutral-100">
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q1 (CLI)</label>
+                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q1 (CLI) <span className="text-rose-600 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q1_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q1_status: e.target.value })}
                     className="w-full py-1 text-xs border rounded-md"
                   >
                     <option value="PASS">PASS</option>
-                    <option value="FAIL">FAIL</option>
+                    <option value="FAIL">FAIL (Fatal)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q2 (UCC)</label>
+                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q2 (UCC) <span className="text-rose-600 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q2_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q2_status: e.target.value })}
                     className="w-full py-1 text-xs border rounded-md"
                   >
                     <option value="PASS">PASS</option>
-                    <option value="FAIL">FAIL</option>
+                    <option value="FAIL">FAIL (Fatal)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q3 (Stock)</label>
+                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q3 (Symbol) <span className="text-neutral-500 font-semibold">1 Pt</span></label>
                   <select
                     value={newRecord.q3_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q3_status: e.target.value })}
                     className="w-full py-1 text-xs border rounded-md"
                   >
                     <option value="PASS">PASS</option>
-                    <option value="FAIL">FAIL</option>
+                    <option value="FAIL">FAIL (-1)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q5 (Ethics)</label>
+                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q4 (Ack)</label>
+                  <div className="w-full py-1 px-1 text-[11px] border border-emerald-200 bg-emerald-50 text-emerald-800 rounded-md font-bold text-center">
+                    PASS <span className="text-[9px] font-normal block text-emerald-600">(Default)</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q5 (Ethics) <span className="text-rose-600 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q5_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q5_status: e.target.value })}
                     className="w-full py-1 text-xs border rounded-md"
                   >
                     <option value="PASS">PASS</option>
-                    <option value="FAIL">FAIL</option>
+                    <option value="FAIL">FAIL (Fatal)</option>
                   </select>
                 </div>
               </div>

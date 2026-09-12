@@ -1263,3 +1263,95 @@ export function matchQuantityInTranscript(targetQuantity: number, transcript: st
 
   return false;
 }
+
+/**
+ * Normalizes any date value (string, number, Date object) to a strictly valid HTML5 / ISO YYYY-MM-DD format.
+ * Returns empty string if the input is not a valid date (never silently defaults to today's date).
+ */
+export function normalizeToIsoDate(raw: any): string {
+  if (raw === null || raw === undefined) return '';
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (
+      !trimmed ||
+      trimmed === '—' ||
+      trimmed === '-' ||
+      trimmed.toLowerCase() === 'null' ||
+      trimmed.toLowerCase() === 'undefined' ||
+      trimmed.toLowerCase() === 'nan'
+    ) {
+      return '';
+    }
+    // Already valid ISO YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+      const [y, m, d] = trimmed.split('-').map(Number);
+      if (m >= 1 && m <= 12 && d >= 1 && d <= 31) return trimmed;
+    }
+    // Match ISO with time (e.g. 2024-04-24T... or 2024-04-24 10:30:00)
+    const isoPrefixMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoPrefixMatch) {
+      const [, y, m, d] = isoPrefixMatch;
+      const mNum = parseInt(m, 10);
+      const dNum = parseInt(d, 10);
+      if (mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+      }
+    }
+    // YYYY/MM/DD or YYYY.MM.DD
+    const ymdSlash = trimmed.match(/^(\d{4})[\/.](\d{1,2})[\/.](\d{1,2})/);
+    if (ymdSlash) {
+      const [, y, m, d] = ymdSlash;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    // DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+    const dmyMatch = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+    if (dmyMatch) {
+      const [, d, m, y] = dmyMatch;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    // DD-MM-YY or DD/MM/YY
+    const dmyShort = trimmed.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})$/);
+    if (dmyShort) {
+      const [, d, m, yy] = dmyShort;
+      const fullYear = `20${yy}`;
+      return `${fullYear}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    // Compact YYYYMMDD
+    const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (compact) {
+      const [, y, m, d] = compact;
+      return `${y}-${m}-${d}`;
+    }
+    // Try standard Date parsing for textual dates like "24-Apr-2024" or "April 24, 2024"
+    const parsedTimestamp = Date.parse(trimmed);
+    if (!isNaN(parsedTimestamp)) {
+      const dt = new Date(parsedTimestamp);
+      return dt.toISOString().slice(0, 10);
+    }
+    return '';
+  }
+  if (typeof raw === 'number') {
+    if (isNaN(raw) || raw <= 0) return '';
+    // Check if Excel serial date (e.g. 25569 = 1970-01-01)
+    if (raw > 25569 && raw < 80000) {
+      const dt = new Date(Math.round((raw - 25569) * 86400 * 1000));
+      if (!isNaN(dt.getTime())) {
+        return dt.toISOString().slice(0, 10);
+      }
+    }
+    // Check if epoch timestamp (ms or s)
+    if (raw > 1000000000000) {
+      const dt = new Date(raw);
+      if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+    } else if (raw > 1000000000) {
+      const dt = new Date(raw * 1000);
+      if (!isNaN(dt.getTime())) return dt.toISOString().slice(0, 10);
+    }
+    return '';
+  }
+  if (raw instanceof Date && !isNaN(raw.getTime())) {
+    return raw.toISOString().slice(0, 10);
+  }
+  return '';
+}
+

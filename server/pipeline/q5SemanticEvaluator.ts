@@ -172,9 +172,9 @@ export async function evaluateQ5SemanticAdvisorPromises(
           (s) => aiResult.quote && s.text.toLowerCase().includes(aiResult.quote.slice(0, 25).toLowerCase())
         );
         return {
-          status: 'REVIEW',
+          status: 'FAIL',
           flag: 'FATAL',
-          evidence: `Advisor verbal return or profit assurance detected: "${aiResult.quote}". Flagged for SEBI compliance review.`,
+          evidence: `Advisor verbal return or profit assurance detected: "${aiResult.quote}". Prohibited under SEBI regulatory norms.`,
           reason: aiResult.reason || 'Dialogue contains prohibited return or profit assurance statement by advisor.',
           confidence: aiResult.confidence || 0.95,
           speaker: 'ADVISOR',
@@ -257,10 +257,10 @@ export async function evaluateQ5SemanticAdvisorPromises(
   if (detectedPromise) {
     if (detectedPromise.speaker === 'ADVISOR') {
       return {
-        status: 'REVIEW',
+        status: 'FAIL',
         flag: 'FATAL',
-        evidence: `Advisor verbal return/profit assurance statement detected at ${detectedPromise.segment.start_time}s: "${detectedPromise.quote}". Flagged for compliance review.`,
-        reason: 'Dialogue contains potential return or profit assurance statement requiring compliance review.',
+        evidence: `Advisor verbal return/profit assurance statement detected at ${detectedPromise.segment.start_time}s: "${detectedPromise.quote}". Prohibited under SEBI regulatory norms.`,
+        reason: 'Dialogue contains prohibited return or profit assurance statement by advisor.',
         confidence: 0.92,
         speaker: 'ADVISOR',
         start_ms: Math.round(detectedPromise.segment.start_time * 1000),

@@ -3,16 +3,12 @@
 // Unified with Single Authoritative Scoring Engine (scoring-engine.ts)
 //
 // Scoring Rules (5 Max Points):
-// Q1 = 1 (Fatal if fail -> Score 0/5)
-// Q2 = 1 (Fatal if fail -> Score 0/5)
-// Q3 = 1 (Non-fatal, -1 deduction if fail)
-// Q4 = 1 (Evaluated customer verbal consent, -1 deduction if fail)
-// Q5 = 1 (Fatal if fail -> Score 0/5, Return Commitment Prohibition)
+// Q1 = Fatal if fail -> Score 0/5
+// Q2 = Fatal if fail -> Score 0/5
+// Q3 = Non-fatal, 1 point (-1 deduction if fail)
+// Q4 = Not audited. Always PASS.
+// Q5 = Fatal only when an actual guarantee is made -> Score 0/5
 // MAX = 5
-//
-// All PASS = 5/5
-// Q3 or Q4 non-pass = 4/5 or 3/5
-// Q1, Q2, or Q5 FAIL = 0/5 (FATAL)
 // =============================================================
 
 import type { StageAuditResult, StageScoreResult } from './types';
@@ -23,7 +19,7 @@ export function stage8CalculateScore(audit: StageAuditResult): StageScoreResult 
     q1: { status: audit.q1.status },
     q2: { status: audit.q2.status },
     q3: { status: audit.q3.status },
-    q4: { status: audit.q4?.status || 'FAIL' },
+    q4: { status: 'PASS' },
     q5: { status: audit.q5?.status || 'PASS' },
   });
 

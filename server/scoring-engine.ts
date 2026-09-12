@@ -3,6 +3,7 @@
 // =============================================================
 
 import type { CallRecord, TradeRecord, ScorecardRecord, AuditRecord } from '../src/types';
+import { normalizeToIsoDate } from './normalizer';
 
 export type ComplianceStatus = 'PASS' | 'FAIL' | 'REVIEW';
 
@@ -29,6 +30,7 @@ export interface ScoreCalculationResult {
   is_fatal: boolean;
   isFatal: boolean;
   fatal_reasons: string[];
+  fatalReasons: string[];
   review_reasons: string[];
   audit_comment: string;
   disposition: 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW';
@@ -48,7 +50,13 @@ export interface ScoreCalculationResult {
  * Max Score = 5/5
  */
 export function calculateAuthoritativeScore(
-  q1Input: ComplianceStatus | { q1?: { status?: ComplianceStatus }; q2?: { status?: ComplianceStatus }; q3?: { status?: ComplianceStatus }; q4?: { status?: ComplianceStatus }; q5?: { status?: ComplianceStatus } },
+  q1Input: ComplianceStatus | {
+    q1?: { status?: ComplianceStatus; evidence?: string; reason?: string };
+    q2?: { status?: ComplianceStatus; evidence?: string; reason?: string };
+    q3?: { status?: ComplianceStatus; evidence?: string; reason?: string };
+    q4?: { status?: ComplianceStatus; evidence?: string; reason?: string };
+    q5?: { status?: ComplianceStatus; evidence?: string; reason?: string };
+  },
   q2Arg?: ComplianceStatus,
   q3Arg?: ComplianceStatus,
   q4Arg?: ComplianceStatus,
@@ -58,16 +66,16 @@ export function calculateAuthoritativeScore(
   let q1Status: ComplianceStatus = 'REVIEW';
   let q2Status: ComplianceStatus = 'REVIEW';
   let q3Status: ComplianceStatus = 'REVIEW';
-  let q4Status: ComplianceStatus = 'REVIEW';
+  // Q4 is Not Audited under the active SEBI rubric; strictly ALWAYS PASS (1 point granted, never held for review)
+  const q4Status: ComplianceStatus = 'PASS';
   let q5Status: ComplianceStatus = 'PASS';
 
   if (typeof q1Input === 'object' && q1Input !== null && 'q1' in q1Input) {
     q1Status = q1Input.q1?.status || 'REVIEW';
     q2Status = q1Input.q2?.status || 'REVIEW';
     q3Status = q1Input.q3?.status || 'REVIEW';
-    q4Status = q1Input.q4?.status || 'REVIEW';
     if (q1Input.q5) {
-      q5Status = q1Input.q5.status || 'REVIEW';
+      q5Status = q1Input.q5.status || 'PASS';
     } else {
       q5Status = 'PASS';
     }
@@ -75,7 +83,6 @@ export function calculateAuthoritativeScore(
     q1Status = q1Input || 'REVIEW';
     q2Status = q2Arg || 'REVIEW';
     q3Status = q3Arg || 'REVIEW';
-    q4Status = q4Arg || 'REVIEW';
     q5Status = q5Arg || 'PASS';
   }
 
@@ -83,30 +90,31 @@ export function calculateAuthoritativeScore(
   const review_reasons: string[] = [];
 
   // 1. Evaluate Fatal Parameters (Q1, Q2, Q5)
+  // Q1 — Registered/authorised number: Fatal
   if (q1Status === 'FAIL') {
     fatal_reasons.push('Q1: Calling number does not match registered number and no valid authorization evidence provided.');
   } else if (q1Status === 'REVIEW') {
     review_reasons.push('Q1: Registered phone number missing or pending identity verification.');
   }
 
+  // Q2 — Client/UCC spoken before order: Fatal
   if (q2Status === 'FAIL') {
     fatal_reasons.push('Q2: Client code was not confirmed in the telephone dialogue prior to order execution.');
   } else if (q2Status === 'REVIEW') {
     review_reasons.push('Q2: Spoken client code requires manual verification against records.');
   }
 
+  // Q5 — Return/profit guarantee: Fatal only when an actual guarantee is made
   if (q5Status === 'FAIL') {
-    fatal_reasons.push('Q5: Advisor verbal return or profit guarantee prohibited under SEBI regulations.');
+    fatal_reasons.push('Q5: Prohibited verbal return or profit guarantee made by advisor.');
   } else if (q5Status === 'REVIEW') {
     review_reasons.push('Q5: Return guarantee statement requires compliance verification.');
   }
 
-  // Non-fatal review notes (Q3, Q4)
+  // Non-fatal review notes (Q3)
+  // Q3 — Stock + price + quantity: Non-fatal, 1 point
   if (q3Status === 'REVIEW') {
     review_reasons.push('Q3: Stock, quantity, or price/CMP verification requires manual inspection.');
-  }
-  if (q4Status === 'REVIEW') {
-    review_reasons.push('Q4: Customer acknowledgement requires compliance inspection.');
   }
 
   const is_fatal = fatal_reasons.length > 0;
@@ -125,10 +133,9 @@ export function calculateAuthoritativeScore(
     disposition = 'NEEDS_REVIEW';
     audit_comment = `NEEDS REVIEW: Pre-order confirmation pending compliance verification (${review_reasons.join(' ')}). Compliance score held pending review.`;
   } else {
-    // Fully audited without review flags: base 5, deduct 1 for non-pass in Q3 and Q4
+    // Fully audited without review flags: base 5, deduct 1 if Q3 is not PASS
     let currentScore = 5;
     if (q3Status !== 'PASS') currentScore -= 1;
-    if (q4Status !== 'PASS') currentScore -= 1;
 
     score = Math.max(0, currentScore);
 
@@ -147,6 +154,7 @@ export function calculateAuthoritativeScore(
     is_fatal,
     isFatal: is_fatal,
     fatal_reasons,
+    fatalReasons: fatal_reasons,
     review_reasons,
     audit_comment,
     disposition,
@@ -273,8 +281,8 @@ export function persistAuditAndScorecardSync(
     const callingNumber = call.calling_number || call.phone_number || '—';
     // Registered number comes from call metadata or the uploaded trade details sheet - never defaulted to calling_number
     const registeredNumber = call.registered_number || resolvedTrade?.client_number || resolvedTrade?.phone_number || '—';
-    const tradeDate = resolvedTrade?.trade_date || call.call_date || '—';
-    const callDate = call.call_date || '—';
+    const tradeDate = normalizeToIsoDate(resolvedTrade?.trade_date) || normalizeToIsoDate(call.call_date) || '';
+    const callDate = normalizeToIsoDate(call.call_date) || '';
     const resolvedTradeId = resolvedTrade?.id || null;
 
     // 3. Upsert Scorecard record (Q1-Q5, max 5/5)

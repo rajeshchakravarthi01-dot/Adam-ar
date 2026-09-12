@@ -534,19 +534,23 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                 <th className="py-3 px-3 min-w-[240px]">Mail Confirmation Ref / Proof</th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q1: Registered Number / Authorised (Fatal)">
                   <div className="text-amber-400 font-bold">Q1</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">CLI Match</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q2: Client UCC explicitly stated (Fatal)">
                   <div className="text-amber-400 font-bold">Q2</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">UCC</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
-                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed">
+                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed (1 Pt)">
                   <div className="text-amber-400 font-bold">Q3</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">Details</div>
+                  <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
                 </th>
-                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q5: No assured return promises (Fatal)">
+                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Not Audited - Always PASS)">
+                  <div className="text-amber-400 font-bold">Q4</div>
+                  <div className="text-[9px] text-emerald-400 font-bold normal-case">Default PASS</div>
+                </th>
+                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
                   <div className="text-amber-400 font-bold">Q5</div>
-                  <div className="text-[9px] text-neutral-400 normal-case">Ethics</div>
+                  <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th
                   onClick={() => toggleSort('score')}
@@ -567,7 +571,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
             <tbody className="divide-y divide-neutral-200 text-neutral-800">
               {filteredTrades.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-12 text-center text-neutral-400">
+                  <td colSpan={14} className="py-12 text-center text-neutral-400">
                     <Mail className="w-8 h-8 mx-auto text-neutral-300 mb-2" />
                     <div className="text-sm font-semibold text-neutral-600">No Missing Call Trades Found</div>
                     <div className="text-xs text-neutral-400 mt-0.5">
@@ -713,6 +717,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           <option value="PASS">PASS</option>
                           <option value="FAIL">FAIL</option>
                         </select>
+                      </td>
+
+                      {/* Q4 (Customer Ack - Default PASS) */}
+                      <td className="py-2 px-1 text-center whitespace-nowrap" title="Not audited: Always PASS per regulatory rubric">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                          <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                          <span>PASS</span>
+                        </span>
                       </td>
 
                       {/* Q5 Select */}

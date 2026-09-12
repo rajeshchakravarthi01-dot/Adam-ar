@@ -174,13 +174,13 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
             <td style="text-align: center;">${sc.q3_status === 'PASS' ? 'Yes' : 'No'}</td>
           </tr>
           <tr>
-            <td>4. Customer Acknowledge the same?<br/><small>Evidence: "${sc.q4_evidence || 'Customer affirmative acknowledgement confirmed.'}"</small></td>
+            <td>4. Customer Acknowledge the same? (Default PASS - Not Audited)<br/><small>Evidence: "${sc.q4_evidence || 'Regulatory norm: Parameter not audited. Automatically awarded PASS.'}"</small></td>
             <td style="text-align: center;">1</td>
             <td style="text-align: center;"></td>
             <td style="text-align: center;">Yes</td>
           </tr>
           <tr>
-            <td>5. Wasn't there any Return Commitment ?<br/><small>Evidence: "${sc.q5_evidence || ''}"</small></td>
+            <td>5. Wasn't there any Return Commitment ? (Fatal)<br/><small>Evidence: "${sc.q5_evidence || ''}"</small></td>
             <td style="text-align: center;">${sc.q5_status === 'PASS' ? '1' : '0'}</td>
             <td style="text-align: center;" class="fatal">FATAL</td>
             <td style="text-align: center;">${sc.q5_status === 'PASS' ? 'Yes' : 'No'}</td>
@@ -590,23 +590,25 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                         },
                         {
                           id: 'Q4',
-                          q: 'Customer Acknowledge the same?',
+                          q: 'Customer Acknowledge the same? (Default PASS - Not Audited)',
                           ans: 'PASS',
                           evidence: sc.q4_evidence && !/\b(?:no|cancel|stop|reject)\b/i.test(sc.q4_evidence)
                             ? sc.q4_evidence
-                            : 'Customer affirmative verbal acknowledgement confirmed.',
+                            : 'Regulatory rubric: Parameter not audited. Automatically awarded PASS.',
                           fatal: false,
                         },
                         {
                           id: 'Q5',
-                          q: "Wasn't there any Return Commitment ?",
+                          q: "Wasn't there any Return Commitment ? (Fatal)",
                           ans: sc.q5_status,
                           evidence: sc.q5_evidence,
                           fatal: true,
                         },
                       ];
 
-                      const calculatedScore = isFatal ? 0 : (isQ3ResolvedPass ? 5 : (sc.score !== null ? Math.max(sc.score, 4) : 5));
+                      const calculatedScore = isFatal 
+                        ? 0 
+                        : (typeof sc.score === 'number' ? sc.score : (isQ3ResolvedPass ? 5 : 4));
                       const displayStars = isFatal ? '*' : '*'.repeat(Math.max(1, Math.min(5, calculatedScore)));
 
                       return (

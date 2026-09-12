@@ -30,6 +30,7 @@ import {
   SYMBOL_ALIASES,
 } from '../normalizer';
 import { evaluateDeterministicQ1 } from '../q1-evaluator';
+import { evaluateQ5SemanticAdvisorPromises } from './q5SemanticEvaluator';
 import {
   extractSpokenUccCandidates,
   resolveUccWithAuthoritativeData,
@@ -332,43 +333,30 @@ export async function stage7AuditCall(
   }
 
   // -----------------------------------------------------------
-  // Q4: Customer Verbal Acknowledgement (Non-Fatal: -1 deduction if FAIL)
+  // Q4: Customer Verbal Acknowledgement (Not Audited per SEBI Rubric: Always PASS)
   // -----------------------------------------------------------
-  const ack = evaluateCustomerAcknowledgement(transcript);
-  let q4Result: AuditQuestionResult;
-  if (!ack.confirmed && ack.quote) {
-    q4Result = {
-      status: 'FAIL',
-      flag: 'NON_FATAL',
-      evidence: `Customer explicit negation/cancellation detected: "${ack.quote}"`,
-      reason: ack.reason || 'Customer rejected or cancelled order instruction.',
-      speaker: 'CLIENT',
-      confidence: ack.confidence || 0.95,
-      evidence_verified: true,
-    };
-  } else if (ack.confirmed && ack.quote) {
-    q4Result = {
-      status: 'PASS',
-      evidence: `Customer affirmative confirmation detected: "${ack.quote}"`,
-      reason: ack.reason || 'Customer acknowledged and affirmed pre-order instruction.',
-      speaker: 'CLIENT',
-      confidence: ack.confidence || 0.95,
-      evidence_verified: true,
-    };
-  } else {
-    q4Result = {
-      status: 'FAIL',
-      flag: 'NON_FATAL',
-      evidence: 'Missing customer verbal acknowledgement: Client did not explicitly confirm pre-order execution in dialogue.',
-      reason: 'Order verification note: Pre-order executed without client affirmative verbal confirmation in recorded dialogue.',
-      speaker: 'CLIENT',
-      confidence: 0.90,
-      evidence_verified: true,
-    };
-  }
+  const q4Result: AuditQuestionResult = {
+    status: 'PASS',
+    flag: 'NON_FATAL',
+    evidence: 'Default PASS — Parameter is not audited under the active SEBI rubric.',
+    reason: 'Customer acknowledgement is not audited under this rubric (Default PASS).',
+    speaker: 'CLIENT',
+    confidence: 1.0,
+    evidence_verified: true,
+  };
 
-  // Verify evidence quotes in transcript for Q1-Q4
-  const allQuestions = [q1Result, q2Result, q3Result, q4Result];
+  // -----------------------------------------------------------
+  // Q5: Return / Profit Guarantee Prohibition (Fatal only when an actual guarantee is made)
+  // -----------------------------------------------------------
+  const q5Result = await evaluateQ5SemanticAdvisorPromises(
+    transcript,
+    segments,
+    groqApiKey,
+    geminiKey
+  );
+
+  // Verify evidence quotes in transcript for Q1-Q5
+  const allQuestions = [q1Result, q2Result, q3Result, q4Result, q5Result];
   for (const q of allQuestions) {
     if (q.evidence && q.status === 'PASS') {
       const quoteMatch = q.evidence.match(/"([^"]{8,})"/);
@@ -391,6 +379,7 @@ export async function stage7AuditCall(
     q2: q2Result,
     q3: q3Result,
     q4: q4Result,
-    model: 'AuditEQ-v19-multi-order-verified',
+    q5: q5Result,
+    model: 'AuditEQ-v20-5pt-authoritative',
   };
 }

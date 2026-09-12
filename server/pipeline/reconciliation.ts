@@ -11,6 +11,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { StageAuditResult, StageScoreResult } from './types';
 import type { CallRecord, TradeRecord } from '../../src/types';
+import { normalizeToIsoDate } from '../normalizer';
 
 export interface MissingCallReconciliationSummary {
   total_trades: number;
@@ -175,8 +176,8 @@ export function stage9PublishAudit(
   const resolvedCallingPhone = call.calling_number || call.phone_number || trade?.client_number || '';
   const resolvedRegisteredPhone = call.registered_number || trade?.client_number || trade?.phone_number || '';
   const resolvedTradePhone = trade?.client_number || trade?.phone_number || resolvedRegisteredPhone || '';
-  const resolvedDate = trade?.trade_date || call.call_date || now.slice(0, 10);
-  const resolvedCallDate = call.call_date || trade?.trade_date || resolvedDate;
+  const resolvedDate = normalizeToIsoDate(trade?.trade_date) || normalizeToIsoDate(call.call_date) || '';
+  const resolvedCallDate = normalizeToIsoDate(call.call_date) || '';
 
   if (existingScorecard) {
     scorecardId = existingScorecard.id;
