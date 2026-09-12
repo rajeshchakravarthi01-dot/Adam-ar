@@ -11,6 +11,7 @@ import {
   matchPriceInTranscript,
   matchQuantityInTranscript,
   mentionsMarketPriceOrCMP,
+  detectBuySell,
 } from './normalizer';
 
 export interface ScoredCandidate {
@@ -29,6 +30,79 @@ export interface MatchDecision {
   reasons: string[];
 }
 
+function parseTimeToSeconds(timeStr?: string): number | null {
+  if (!timeStr) return null;
+  const match = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!match) return null;
+  const hours = parseInt(match[1], 10);
+  const minutes = parseInt(match[2], 10);
+  const seconds = match[3] ? parseInt(match[3], 10) : 0;
+  return hours * 3600 + minutes * 60 + seconds;
+}
+
+export function evaluateTimeCorrelation(
+  callTime?: string,
+  callDate?: string,
+  tradeTime?: string,
+  tradeDate?: string
+): {
+  isLogical: boolean;
+  deltaMinutes: number | null;
+  relation: 'TRADE_AFTER_CALL' | 'TRADE_DURING_CALL' | 'TRADE_BEFORE_CALL' | 'TRADE_MUCH_LATER' | 'DATE_MISMATCH' | 'UNKNOWN_TIMING';
+  reason: string;
+} {
+  if (callDate && tradeDate && callDate !== tradeDate) {
+    return {
+      isLogical: false,
+      deltaMinutes: null,
+      relation: 'DATE_MISMATCH',
+      reason: `Trade date (${tradeDate}) does not match call date (${callDate}).`,
+    };
+  }
+
+  const callSec = parseTimeToSeconds(callTime);
+  const tradeSec = parseTimeToSeconds(tradeTime);
+
+  if (callSec === null || tradeSec === null) {
+    return {
+      isLogical: true,
+      deltaMinutes: null,
+      relation: 'UNKNOWN_TIMING',
+      reason: 'Exact timestamp missing for fine-grained temporal check; verified by calendar date.',
+    };
+  }
+
+  const deltaSec = tradeSec - callSec;
+  const deltaMinutes = Math.round(deltaSec / 60);
+
+  // If trade happened > 1 minute BEFORE call started:
+  if (deltaSec < -60) {
+    return {
+      isLogical: false,
+      deltaMinutes,
+      relation: 'TRADE_BEFORE_CALL',
+      reason: `Trade was executed at ${tradeTime}, which is ${Math.abs(deltaMinutes)}m BEFORE the call started (${callTime}). Not a valid pre-order recording.`,
+    };
+  }
+
+  // If trade happened > 2 hours AFTER call:
+  if (deltaSec > 7200) {
+    return {
+      isLogical: false,
+      deltaMinutes,
+      relation: 'TRADE_MUCH_LATER',
+      reason: `Trade was executed at ${tradeTime}, which is ${deltaMinutes}m after the call (${callTime}). Exceeds 2-hour pre-order temporal window.`,
+    };
+  }
+
+  return {
+    isLogical: true,
+    deltaMinutes,
+    relation: deltaSec <= 120 ? 'TRADE_DURING_CALL' : 'TRADE_AFTER_CALL',
+    reason: `Trade executed ${deltaMinutes >= 0 ? `${deltaMinutes}m after` : 'during'} call (${callTime} -> ${tradeTime}).`,
+  };
+}
+
 /**
  * Executes multi-anchor candidate scoring across all available trades for a given call.
  */
@@ -40,26 +114,47 @@ export function scoreTradeCandidates(call: CallRecord, trades: TradeRecord[]): S
   const transcriptPhoneLast10 = normalizePhoneNumber(transcript.match(/(?:^|[^0-9])([6-9]\d{9})(?:[^0-9]|$)/)?.[1]);
   const effectiveCallPhone = callPhoneLast10 || transcriptPhoneLast10;
   const normCallClient = normalizeClientCode(call.client);
+  const spokenSide = detectBuySell(transcript);
   const candidates: ScoredCandidate[] = [];
 
   for (const trade of trades) {
+    // FATAL CONFLICT REJECTIONS (Items 4, 5, 10, 11, 141, 143, 144, 150)
+    // 1. Side conflict
+    if (spokenSide.side && trade.side) {
+      const normTradeSide = trade.side.toUpperCase().includes('BUY') ? 'BUY' : (trade.side.toUpperCase().includes('SELL') ? 'SELL' : null);
+      if (normTradeSide && spokenSide.side !== normTradeSide) {
+        continue; // Exclude candidate with opposite side
+      }
+    }
+
+    // 2. Client code conflict (if both specified and different)
+    const normTradeClient = normalizeClientCode(trade.client);
+    if (normTradeClient && normCallClient && normTradeClient !== normCallClient) {
+      continue; // Exclude candidate with different client
+    }
+
+    // 3. Time correlation check
+    const timeCorr = evaluateTimeCorrelation(call.call_time, call.call_date, trade.trade_time, trade.trade_date);
+    if (timeCorr.relation === 'TRADE_BEFORE_CALL' || timeCorr.relation === 'DATE_MISMATCH') {
+      continue; // Trade executed before call or on wrong date cannot be this pre-order
+    }
+
     let score = 0;
     const currentReasons: string[] = [];
     let isDirectClientOrPhoneMatch = false;
 
-    // Anchor 1: Phone Number (0.85 weight for exact 10-digit customer match)
-    // Compares trade's registered/client phone with call's calling/destination CLI or spoken phone
+    // Anchor 1: Phone Number (0.40 max identity weight for exact 10-digit customer match)
+    let identityScore = 0;
     const tradePhoneLast10 = normalizePhoneNumber(trade.client_number || trade.phone_number);
     if (tradePhoneLast10 && effectiveCallPhone && tradePhoneLast10 === effectiveCallPhone) {
-      score += 0.85;
+      identityScore = Math.max(identityScore, 0.40);
       isDirectClientOrPhoneMatch = true;
       currentReasons.push(`registered/calling phone 10-digit exact match (${effectiveCallPhone})`);
     }
 
-    // Anchor 2: Client Code (0.85 weight for metadata match, 0.65 for transcript confirmation)
-    const normTradeClient = normalizeClientCode(trade.client);
+    // Anchor 2: Client Code (0.40 max identity weight)
     if (normTradeClient && normCallClient && normTradeClient === normCallClient) {
-      score += 0.85;
+      identityScore = Math.max(identityScore, 0.40);
       isDirectClientOrPhoneMatch = true;
       currentReasons.push(`client code metadata exact match (${trade.client})`);
     } else if (normTradeClient && transcript) {
@@ -67,76 +162,81 @@ export function scoreTradeCandidates(call: CallRecord, trades: TradeRecord[]): S
       const hasNumericUcc = tradeNumeric.length >= 4 && transcript.includes(tradeNumeric);
       const clientMatch = matchClientCodeInTranscript(trade.client || '', transcript);
       if (clientMatch.matched || hasNumericUcc) {
-        score += 0.65;
+        identityScore = Math.max(identityScore, 0.35);
         isDirectClientOrPhoneMatch = true;
         currentReasons.push(`client code confirmed in transcript (${trade.client})`);
       }
     }
 
-    // Also check if trade phone number appears anywhere in the transcript
     if (!effectiveCallPhone && tradePhoneLast10 && transcript.includes(tradePhoneLast10)) {
-      score += 0.85;
+      identityScore = Math.max(identityScore, 0.40);
       isDirectClientOrPhoneMatch = true;
       currentReasons.push(`trade registered phone matched in transcript (${tradePhoneLast10})`);
     }
 
-    // Anchor 3: Trading Symbol & Alias (0.35 weight)
+    score += identityScore;
+
+    // Anchor 3: Trading Symbol & Alias (0.35 weight - REQUIRED for PRE_ORDER confirmation)
+    let symbolVerified = false;
     if (trade.symbol && transcript) {
       const baseSym = trade.symbol.replace(/-(?:EQ|BE|SM|BZ|BL|ST)$/i, '');
       const symMatch = matchSymbolInTranscript(trade.symbol, transcript);
       const baseSymMatch = !symMatch.matched && baseSym ? matchSymbolInTranscript(baseSym, transcript) : null;
       if (symMatch.matched || (baseSymMatch && baseSymMatch.matched)) {
         score += 0.35;
+        symbolVerified = true;
         const matchedName = symMatch.matched ? (symMatch.matchedAlias !== trade.symbol ? symMatch.matchedAlias : trade.symbol) : baseSym;
         currentReasons.push(`symbol (${trade.symbol} as "${matchedName}") verified in transcript`);
       } else if (baseSym && baseSym.length >= 3 && new RegExp(`\\b${baseSym}\\b`, 'i').test(transcript)) {
         score += 0.35;
+        symbolVerified = true;
         currentReasons.push(`symbol (${baseSym}) verified in transcript`);
       }
     }
 
-    // Anchor 4: Price & Quantity (0.30 total weight)
+    // Anchor 4: Price & Quantity (0.15 total weight)
     const isCmp = trade.price_display === 'CMP' || Boolean(trade.is_combined) || mentionsMarketPriceOrCMP(transcript);
     if (isCmp) {
-      score += 0.15;
+      score += 0.08;
       currentReasons.push('market price / CMP verified in transcript');
     } else if (trade.price && trade.price > 0 && transcript) {
       if (matchPriceInTranscript(trade.price, transcript) || transcript.includes(String(trade.price))) {
-        score += 0.15;
+        score += 0.08;
         currentReasons.push(`price (₹${trade.price}) tokenized match`);
       }
     }
     if (trade.quantity && trade.quantity > 0 && transcript) {
       if (matchQuantityInTranscript(trade.quantity, transcript) || transcript.includes(String(trade.quantity))) {
-        score += 0.15;
+        score += 0.07;
         currentReasons.push(`quantity (${trade.quantity}) tokenized match`);
       }
     }
 
-    // Anchor 5: Proximity / Date match (0.10 weight)
-    if (trade.trade_date && call.call_date && trade.trade_date === call.call_date) {
+    // Anchor 5: Proximity / Date & Time match (0.10 weight)
+    if (timeCorr.isLogical) {
       score += 0.10;
-      currentReasons.push(`same calendar date (${trade.trade_date})`);
+      currentReasons.push(timeCorr.reason);
     }
 
-    // Anchor 6: Advisor / Dealer / Team match (0.10 weight)
+    // Anchor 6: Advisor / Dealer / Team match (0.05 weight)
     if (trade.advisor_name && call.caller_name && (trade.advisor_name.toLowerCase().includes(call.caller_name.toLowerCase()) || call.caller_name.toLowerCase().includes(trade.advisor_name.toLowerCase()))) {
-      score += 0.10;
+      score += 0.03;
       currentReasons.push(`advisor match (${trade.advisor_name})`);
     }
     if (trade.dealer && call.dealer && trade.dealer.toLowerCase() === call.dealer.toLowerCase()) {
-      score += 0.05;
+      score += 0.02;
       currentReasons.push(`dealer match (${trade.dealer})`);
     }
     if (trade.team && call.team && trade.team.toLowerCase() === call.team.toLowerCase()) {
-      score += 0.05;
+      score += 0.02;
       currentReasons.push(`team match (${trade.team})`);
     }
 
     // Cap score at 1.0
     const finalScore = Math.min(1.0, Number(score.toFixed(2)));
 
-    if (finalScore >= 0.20 || isDirectClientOrPhoneMatch) {
+    // Candidates scored
+    if (finalScore >= 0.40) {
       candidates.push({
         trade,
         score: finalScore,
@@ -153,8 +253,9 @@ export function scoreTradeCandidates(call: CallRecord, trades: TradeRecord[]): S
 /**
  * Determines whether the highest scored trade is safely confirmable or requires human compliance review.
  * Automatic confirmation criteria:
- * - Phone number or client code exact match (>= 0.60 confidence)
- * - Sufficient separation or single best candidate
+ * - Symbol MUST be verified in transcript (Items 5, 10, 141)
+ * - Separation from competing candidate trades >= 0.15 (Items 6, 12, 149)
+ * - Overall confidence >= 0.65
  */
 export function evaluateMatchingDecision(candidates: ScoredCandidate[]): MatchDecision {
   if (candidates.length === 0) {
@@ -177,10 +278,15 @@ export function evaluateMatchingDecision(candidates: ScoredCandidate[]): MatchDe
   const scoreMargin = Number((confidence - secondConfidence).toFixed(2));
 
   // Automatic confirmation criteria:
-  // If multiple distinct trade candidates compete with narrow margin (scoreMargin < 0.15), flag for human review
+  // 1. Symbol MUST be verified in transcript for candidate trades scored by pipeline (Items 5, 10, 141)
+  const isFromScorer = best.reasons.some((r) => r.includes('exact match') || r.includes('tokenized match') || r.includes('phone') || r.includes('client code'));
+  const hasSymbolVerified = !isFromScorer || best.reasons.some((r) => r.includes('symbol ('));
+
+  // 2. Separation criteria: If competing candidates exist for different trades, require >= 0.15 margin
   const isDistinctCandidate = Boolean(second && best.trade.id !== second.trade.id);
   const isSeparationSafe = candidates.length === 1 || (!isDistinctCandidate && scoreMargin >= 0.05) || (scoreMargin >= 0.15);
-  const isConfirmed = confidence >= 0.50 && isSeparationSafe;
+
+  const isConfirmed = confidence >= 0.65 && isSeparationSafe && hasSymbolVerified;
 
   if (isConfirmed) {
     return {
@@ -192,9 +298,10 @@ export function evaluateMatchingDecision(candidates: ScoredCandidate[]): MatchDe
       scoreMargin,
       reasons: best.reasons,
     };
-  } else if (confidence >= 0.30) {
+  } else if (hasSymbolVerified && confidence >= 0.35) {
+    // Symbol is verified but margin or parameters require compliance review
     const reviewReasons = [...best.reasons];
-    if (confidence < 0.50) {
+    if (confidence < 0.65) {
       reviewReasons.push(`Confidence (${(confidence * 100).toFixed(0)}%) flagged for operational verification.`);
     }
     if (!isSeparationSafe) {
@@ -211,6 +318,7 @@ export function evaluateMatchingDecision(candidates: ScoredCandidate[]): MatchDe
       reasons: reviewReasons,
     };
   } else {
+    // Trade symbol does NOT match what was discussed -> Unmatched (Items 5, 141)
     return {
       matchStatus: 'unmatched',
       verificationStatus: 'unmatched',
@@ -218,7 +326,7 @@ export function evaluateMatchingDecision(candidates: ScoredCandidate[]): MatchDe
       confidence,
       secondConfidence,
       scoreMargin,
-      reasons: [`Top candidate score (${(confidence * 100).toFixed(0)}%) insufficient for correlation.`],
+      reasons: [`Candidate trade #${best.trade.id} (${best.trade.symbol}) does not match conversation order symbols.`],
     };
   }
 }

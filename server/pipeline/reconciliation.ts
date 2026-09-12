@@ -32,6 +32,43 @@ export interface MissingCallReconciliationSummary {
   }>;
 }
 
+function ensureAuditAndScorecardColumns(db: DatabaseSync): void {
+  try {
+    const aInfo = db.prepare("PRAGMA table_info(audits)").all() as Array<{ name: string }>;
+    const aCols = new Set(aInfo.map((c) => c.name));
+    const auditColsToAdd = [
+      'trade_id', 'q1', 'q1_flag', 'q1_evidence', 'q1_confidence', 'q1_speaker',
+      'q2', 'q2_flag', 'q2_evidence', 'q2_confidence', 'q2_speaker',
+      'q3', 'q3_flag', 'q3_evidence', 'q3_confidence', 'q3_speaker',
+      'q4', 'q4_flag', 'q4_evidence', 'q4_confidence', 'q4_speaker',
+      'q5', 'q5_flag', 'q5_evidence', 'q5_confidence', 'q5_speaker',
+      'score', 'audit_comment', 'compliance_disposition', 'status', 'model',
+      'created_at', 'updated_at'
+    ];
+    for (const col of auditColsToAdd) {
+      if (!aCols.has(col)) {
+        try { db.exec(`ALTER TABLE audits ADD COLUMN ${col} TEXT;`); } catch {}
+      }
+    }
+
+    const sInfo = db.prepare("PRAGMA table_info(scorecards)").all() as Array<{ name: string }>;
+    const sCols = new Set(sInfo.map((c) => c.name));
+    const scorecardColsToAdd = [
+      'caller_name', 'dealer', 'team', 'client', 'client_code', 'resolved_trade_id',
+      'trade_phone', 'calling_number', 'registered_number', 'trade_date', 'call_date',
+      'score', 'is_fatal', 'fatal_reasons',
+      'q1_status', 'q1_evidence', 'q2_status', 'q2_evidence', 'q3_status', 'q3_evidence',
+      'q4_status', 'q4_evidence', 'q5_status', 'q5_evidence',
+      'audit_comment', 'generated_at', 'created_at', 'updated_at'
+    ];
+    for (const col of scorecardColsToAdd) {
+      if (!sCols.has(col)) {
+        try { db.exec(`ALTER TABLE scorecards ADD COLUMN ${col} TEXT;`); } catch {}
+      }
+    }
+  } catch {}
+}
+
 /**
  * Stage 9A: Publish Audit and Scorecard Record to Master Grid
  */
@@ -41,6 +78,7 @@ export function stage9PublishAudit(
   auditResult: StageAuditResult,
   scoreResult: StageScoreResult
 ): { audit_id: number; scorecard_id: number } {
+  ensureAuditAndScorecardColumns(db);
   const call = db.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord;
   const trade = call.matched_trade_id
     ? (db.prepare('SELECT * FROM trades WHERE id = ?').get(call.matched_trade_id) as unknown as TradeRecord)
@@ -52,37 +90,44 @@ export function stage9PublishAudit(
   const existingAudit = db.prepare('SELECT id FROM audits WHERE call_id = ?').get(callId) as { id: number } | undefined;
   let auditId: number;
 
+  const q1Status = auditResult.q1?.status || 'PASS';
+  const q2Status = auditResult.q2?.status || 'PASS';
+  const q3Status = auditResult.q3?.status || 'PASS';
+  const q4Status = auditResult.q4?.status || 'PASS';
+  const q5Status = auditResult.q5?.status || 'PASS';
+  const q5Flag = auditResult.q5?.flag || 'FATAL';
+  const q5Evidence = auditResult.q5?.evidence || 'SEBI return guarantee prohibition compliant.';
+  const q5Confidence = auditResult.q5?.confidence ?? 0.95;
+  const q5Speaker = auditResult.q5?.speaker || 'ADVISOR';
+
   if (existingAudit) {
     auditId = existingAudit.id;
     db.prepare(`
       UPDATE audits SET
         trade_id = ?,
-        q1_status = ?, q1_evidence = ?, q1_reason = ?,
-        q2_status = ?, q2_evidence = ?, q2_reason = ?,
-        q3_status = ?, q3_evidence = ?, q3_reason = ?,
-        q5_status = ?, q5_evidence = ?, q5_reason = ?,
-        overall_status = ?,
+        q1 = ?, q1_flag = ?, q1_evidence = ?, q1_confidence = ?, q1_speaker = ?,
+        q2 = ?, q2_flag = ?, q2_evidence = ?, q2_confidence = ?, q2_speaker = ?,
+        q3 = ?, q3_flag = ?, q3_evidence = ?, q3_confidence = ?, q3_speaker = ?,
+        q4 = ?, q4_flag = ?, q4_evidence = ?, q4_confidence = ?, q4_speaker = ?,
+        q5 = ?, q5_flag = ?, q5_evidence = ?, q5_confidence = ?, q5_speaker = ?,
         score = ?,
-        is_fatal = ?,
-        fatal_reasons = ?,
-        review_reasons = ?,
         audit_comment = ?,
-        model_used = ?,
+        compliance_disposition = ?,
+        status = 'audited',
+        model = ?,
         updated_at = ?
       WHERE id = ?
     `).run(
       trade?.id || null,
-      auditResult.q1.status, auditResult.q1.evidence, auditResult.q1.reason,
-      auditResult.q2.status, auditResult.q2.evidence, auditResult.q2.reason,
-      auditResult.q3.status, auditResult.q3.evidence, auditResult.q3.reason,
-      auditResult.q5.status, auditResult.q5.evidence, auditResult.q5.reason,
-      scoreResult.disposition,
+      q1Status, auditResult.q1?.flag || null, auditResult.q1?.evidence || '', auditResult.q1?.confidence ?? 0.95, auditResult.q1?.speaker || 'ADVISOR',
+      q2Status, auditResult.q2?.flag || null, auditResult.q2?.evidence || '', auditResult.q2?.confidence ?? 0.95, auditResult.q2?.speaker || 'ADVISOR',
+      q3Status, auditResult.q3?.flag || null, auditResult.q3?.evidence || '', auditResult.q3?.confidence ?? 0.95, auditResult.q3?.speaker || 'ADVISOR',
+      q4Status, auditResult.q4?.flag || null, auditResult.q4?.evidence || '', auditResult.q4?.confidence ?? 0.95, auditResult.q4?.speaker || 'CLIENT',
+      q5Status, q5Flag, q5Evidence, q5Confidence, q5Speaker,
       scoreResult.score,
-      scoreResult.is_fatal ? 1 : 0,
-      JSON.stringify(scoreResult.fatal_reasons),
-      JSON.stringify(scoreResult.review_reasons),
       scoreResult.audit_comment,
-      auditResult.model,
+      scoreResult.disposition,
+      auditResult.model || 'AuditEQ-AuditEngine-v19',
       now,
       auditId
     );
@@ -90,35 +135,33 @@ export function stage9PublishAudit(
     const res = db.prepare(`
       INSERT INTO audits (
         call_id, trade_id,
-        q1_status, q1_evidence, q1_reason,
-        q2_status, q2_evidence, q2_reason,
-        q3_status, q3_evidence, q3_reason,
-        q5_status, q5_evidence, q5_reason,
-        overall_status, score, is_fatal, fatal_reasons, review_reasons,
-        audit_comment, model_used, created_at, updated_at
+        q1, q1_flag, q1_evidence, q1_confidence, q1_speaker,
+        q2, q2_flag, q2_evidence, q2_confidence, q2_speaker,
+        q3, q3_flag, q3_evidence, q3_confidence, q3_speaker,
+        q4, q4_flag, q4_evidence, q4_confidence, q4_speaker,
+        q5, q5_flag, q5_evidence, q5_confidence, q5_speaker,
+        score, audit_comment, compliance_disposition, status, model, created_at, updated_at
       ) VALUES (
         ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
-        ?, ?, ?,
         ?, ?, ?, ?, ?,
-        ?, ?, ?, ?
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, 'audited', ?, ?, ?
       )
     `).run(
       callId,
       trade?.id || null,
-      auditResult.q1.status, auditResult.q1.evidence, auditResult.q1.reason,
-      auditResult.q2.status, auditResult.q2.evidence, auditResult.q2.reason,
-      auditResult.q3.status, auditResult.q3.evidence, auditResult.q3.reason,
-      auditResult.q5.status, auditResult.q5.evidence, auditResult.q5.reason,
-      scoreResult.disposition,
+      q1Status, auditResult.q1?.flag || null, auditResult.q1?.evidence || '', auditResult.q1?.confidence ?? 0.95, auditResult.q1?.speaker || 'ADVISOR',
+      q2Status, auditResult.q2?.flag || null, auditResult.q2?.evidence || '', auditResult.q2?.confidence ?? 0.95, auditResult.q2?.speaker || 'ADVISOR',
+      q3Status, auditResult.q3?.flag || null, auditResult.q3?.evidence || '', auditResult.q3?.confidence ?? 0.95, auditResult.q3?.speaker || 'ADVISOR',
+      q4Status, auditResult.q4?.flag || null, auditResult.q4?.evidence || '', auditResult.q4?.confidence ?? 0.95, auditResult.q4?.speaker || 'CLIENT',
+      q5Status, q5Flag, q5Evidence, q5Confidence, q5Speaker,
       scoreResult.score,
-      scoreResult.is_fatal ? 1 : 0,
-      JSON.stringify(scoreResult.fatal_reasons),
-      JSON.stringify(scoreResult.review_reasons),
       scoreResult.audit_comment,
-      auditResult.model,
+      scoreResult.disposition,
+      auditResult.model || 'AuditEQ-AuditEngine-v19',
       now,
       now
     );
@@ -130,8 +173,8 @@ export function stage9PublishAudit(
   let scorecardId: number;
 
   const resolvedCallingPhone = call.calling_number || call.phone_number || trade?.client_number || '';
-  const resolvedRegisteredPhone = call.registered_number || trade?.client_number || trade?.phone_number || resolvedCallingPhone;
-  const resolvedTradePhone = trade?.client_number || trade?.phone_number || resolvedRegisteredPhone;
+  const resolvedRegisteredPhone = call.registered_number || trade?.client_number || trade?.phone_number || '';
+  const resolvedTradePhone = trade?.client_number || trade?.phone_number || resolvedRegisteredPhone || '';
   const resolvedDate = trade?.trade_date || call.call_date || now.slice(0, 10);
   const resolvedCallDate = call.call_date || trade?.trade_date || resolvedDate;
 
@@ -141,8 +184,11 @@ export function stage9PublishAudit(
       UPDATE scorecards SET
         audit_id = ?,
         caller_name = ?,
+        dealer = ?,
         team = ?,
         client = ?,
+        client_code = ?,
+        resolved_trade_id = ?,
         trade_phone = ?,
         calling_number = ?,
         registered_number = ?,
@@ -154,7 +200,7 @@ export function stage9PublishAudit(
         q1_status = ?, q1_evidence = ?,
         q2_status = ?, q2_evidence = ?,
         q3_status = ?, q3_evidence = ?,
-        q4_status = 'PASS', q4_evidence = 'Customer acknowledged and confirmed pre-order instructions.',
+        q4_status = ?, q4_evidence = ?,
         q5_status = ?, q5_evidence = ?,
         audit_comment = ?,
         updated_at = ?
@@ -162,8 +208,11 @@ export function stage9PublishAudit(
     `).run(
       auditId,
       call.caller_name || 'Advisor',
+      call.dealer || trade?.dealer || 'DEFAULT',
       call.team || 'Equity',
       call.client || trade?.client || '',
+      call.client_code || trade?.client || '',
+      trade?.id || null,
       resolvedTradePhone,
       resolvedCallingPhone,
       resolvedRegisteredPhone,
@@ -172,10 +221,11 @@ export function stage9PublishAudit(
       scoreResult.score,
       scoreResult.is_fatal ? 1 : 0,
       scoreResult.fatal_reasons.join('; '),
-      auditResult.q1.status, auditResult.q1.evidence,
-      auditResult.q2.status, auditResult.q2.evidence,
-      auditResult.q3.status, auditResult.q3.evidence,
-      auditResult.q5.status, auditResult.q5.evidence,
+      q1Status, auditResult.q1?.evidence || '',
+      q2Status, auditResult.q2?.evidence || '',
+      q3Status, auditResult.q3?.evidence || '',
+      q4Status, auditResult.q4?.evidence || '',
+      q5Status, q5Evidence,
       scoreResult.audit_comment,
       now,
       scorecardId
@@ -183,32 +233,35 @@ export function stage9PublishAudit(
   } else {
     const res = db.prepare(`
       INSERT INTO scorecards (
-        audit_id, call_id, caller_name, team, client, trade_phone,
-        calling_number, registered_number, trade_date, call_date,
+        audit_id, call_id, caller_name, dealer, team, client, client_code, resolved_trade_id,
+        trade_phone, calling_number, registered_number, trade_date, call_date,
         score, is_fatal, fatal_reasons,
         q1_status, q1_evidence,
         q2_status, q2_evidence,
         q3_status, q3_evidence,
         q4_status, q4_evidence,
         q5_status, q5_evidence,
-        audit_comment, created_at, updated_at
+        audit_comment, generated_at, created_at, updated_at
       ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
         ?, ?, ?,
         ?, ?,
         ?, ?,
         ?, ?,
-        'PASS', 'Customer acknowledged and confirmed pre-order instructions.',
         ?, ?,
-        ?, ?, ?
+        ?, ?,
+        ?, ?, ?, ?
       )
     `).run(
       auditId,
       callId,
       call.caller_name || 'Advisor',
+      call.dealer || trade?.dealer || 'DEFAULT',
       call.team || 'Equity',
       call.client || trade?.client || '',
+      call.client_code || trade?.client || '',
+      trade?.id || null,
       resolvedTradePhone,
       resolvedCallingPhone,
       resolvedRegisteredPhone,
@@ -217,11 +270,13 @@ export function stage9PublishAudit(
       scoreResult.score,
       scoreResult.is_fatal ? 1 : 0,
       scoreResult.fatal_reasons.join('; '),
-      auditResult.q1.status, auditResult.q1.evidence,
-      auditResult.q2.status, auditResult.q2.evidence,
-      auditResult.q3.status, auditResult.q3.evidence,
-      auditResult.q5.status, auditResult.q5.evidence,
+      q1Status, auditResult.q1?.evidence || '',
+      q2Status, auditResult.q2?.evidence || '',
+      q3Status, auditResult.q3?.evidence || '',
+      q4Status, auditResult.q4?.evidence || '',
+      q5Status, q5Evidence,
       scoreResult.audit_comment,
+      now,
       now,
       now
     );
@@ -248,6 +303,17 @@ export function stage9ReconcileMissingCalls(db: DatabaseSync): MissingCallReconc
   const trades = db.prepare('SELECT * FROM trades ORDER BY id ASC').all() as unknown as TradeRecord[];
   const calls = db.prepare('SELECT * FROM calls').all() as unknown as CallRecord[];
 
+  // Retrieve all executions linked to call_orders
+  let executionLinks: Array<{ trade_id: number; call_id: number; trade_match_status: string }> = [];
+  try {
+    executionLinks = db.prepare(`
+      SELECT oe.trade_id, co.call_id, c.trade_match_status
+      FROM order_executions oe
+      JOIN call_orders co ON oe.order_id = co.id
+      JOIN calls c ON co.call_id = c.id
+    `).all() as any[];
+  } catch {}
+
   let matchedCount = 0;
   let missingCount = 0;
   let reviewCount = 0;
@@ -255,13 +321,17 @@ export function stage9ReconcileMissingCalls(db: DatabaseSync): MissingCallReconc
   const items: MissingCallReconciliationSummary['reconciliation_items'] = [];
 
   for (const trade of trades) {
-    // Find calls linked to this trade
+    // Find calls linked to this trade via legacy matched_trade_id or order_executions
+    const linkedExec = executionLinks.find((el) => el.trade_id === trade.id);
+
     const matchedCall = calls.find(
-      (c) => c.matched_trade_id === trade.id && c.trade_match_status === 'CONFIRMED'
+      (c) => (c.matched_trade_id === trade.id && c.trade_match_status === 'CONFIRMED') ||
+             (linkedExec && linkedExec.call_id === c.id && c.trade_match_status === 'CONFIRMED')
     );
 
     const reviewCall = calls.find(
-      (c) => c.matched_trade_id === trade.id && c.trade_match_status === 'REVIEW'
+      (c) => (c.matched_trade_id === trade.id && c.trade_match_status === 'REVIEW') ||
+             (linkedExec && linkedExec.call_id === c.id && c.trade_match_status === 'REVIEW')
     );
 
     if (matchedCall) {

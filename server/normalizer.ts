@@ -541,20 +541,27 @@ export function matchClientCodeInTranscript(
   }
 
   // 4. Numeric Code Matching (SEBI Audio Audit standard):
-  // When clients or advisors confirm identity, they routinely state the numeric code (e.g. "26779" for WIA26779, or "81138" for WIA81138, or "9767", or "123").
-  const numericPartMatch = normCode.match(/\d{2,8}/);
+  // When clients or advisors confirm identity, they routinely state the numeric code (e.g. "account number 26779" for WIA26779, or "81138").
+  // P0 CRITICAL: Pure numbers without account context must NOT match UCC to prevent price/quantity collision!
+  const numericPartMatch = normCode.match(/\d{3,8}/);
   if (numericPartMatch) {
     const numPart = numericPartMatch[0];
 
-    // a) Direct numeric boundary or spaced match in transcript
+    // Check if the number appears with explicit account/code/client/identity context
     const numSpacedPat = numPart.split('').join('[\\s\\-_.]*');
-    if (new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(transcript) || squashedTranscript.includes(numPart) || squashedSpokenTranscript.includes(numPart)) {
+    const accountContextRegex = new RegExp(`\\b(?:account|code|ucc|client|id|a\\/c|number|no\\.?)\\s*(?:is|no|number|hai|hai\\s*na|tha)?\\s*[:\\-]?\\s*${numSpacedPat}\\b`, 'i');
+    const accountContextRegexSuffix = new RegExp(`\\b${numSpacedPat}\\s*(?:account|code|ucc|client|id|number)\\b`, 'i');
+
+    if (accountContextRegex.test(transcript) || accountContextRegexSuffix.test(transcript) ||
+        accountContextRegex.test(spokenNormalizedTranscript) || accountContextRegexSuffix.test(spokenNormalizedTranscript)) {
       return { matched: true, score: 0.35, matchedVariant: numPart };
     }
 
-    // b) Check spoken digit sequences (e.g. "two six seven seven nine" or "nine seven six seven")
-    if (spokenNormalizedTranscript.includes(numPart) || spokenNormalizedTranscript.replace(/\D/g, '').includes(numPart)) {
-      return { matched: true, score: 0.35, matchedVariant: numPart };
+    // Long numeric codes (>= 5 digits) with boundary protection
+    if (numPart.length >= 5) {
+      if (new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(transcript) || new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(spokenNormalizedTranscript)) {
+        return { matched: true, score: 0.35, matchedVariant: numPart };
+      }
     }
   }
 
@@ -564,9 +571,9 @@ export function matchClientCodeInTranscript(
     const candNorm = normalizeClientCode(rawCand);
     if (!candNorm || candNorm.length < 3) continue;
 
-    // Direct similarity check
+    // Direct similarity check (Enforcing strict 90% match threshold)
     const sim = fuzzySimilarity(candNorm, normCode);
-    if (sim >= 0.80) {
+    if (sim >= 0.90) {
       return { matched: true, score: 0.35, matchedVariant: normCode };
     }
 
@@ -575,7 +582,7 @@ export function matchClientCodeInTranscript(
     const codeNum = normCode.replace(/\D/g, '');
     const candPrefix = candNorm.replace(/\d/g, '');
     const codePrefix = normCode.replace(/\d/g, '');
-    if (candNum && codeNum && candNum === codeNum && candNum.length >= 2 && levenshteinDistance(candPrefix, codePrefix) <= 1) {
+    if (candNum && codeNum && candNum === codeNum && candNum.length >= 3 && levenshteinDistance(candPrefix, codePrefix) <= 1) {
       return { matched: true, score: 0.35, matchedVariant: normCode };
     }
   }
@@ -891,12 +898,32 @@ export function evaluateCustomerAcknowledgement(
 
   // If dialogue contains explicit customer/client turns, extract them first
   let evalText = transcript;
-  const clientLines = transcript
-    .split(/\n+/)
-    .filter((line) => /^\s*(?:client|customer|caller|speaker\s*2)\s*:/i.test(line));
+  // Extract explicit client turns even if single-line or multiple lines, supporting optional timestamps like [00:04]
+  const clientTurns: string[] = [];
+  const turnRegex = /(?:^|[\n\r]|(?<=[.?!;]\s*))\s*(?:\[[\d:.]+\]\s*)?(?:client|customer|caller|speaker\s*2)\s*:\s*([^]+?)(?=(?:[\n\r]|(?<=[.?!;]\s*))\s*(?:\[[\d:.]+\]\s*)?(?:advisor|agent|dealer|speaker\s*1)\s*:|$)/gi;
+  for (const m of transcript.matchAll(turnRegex)) {
+    if (m[1]?.trim()) {
+      clientTurns.push(m[1].trim());
+    }
+  }
 
-  if (clientLines.length > 0) {
-    evalText = clientLines.map((l) => l.replace(/^\s*(?:client|customer|caller|speaker\s*2)\s*:\s*/i, '')).join(' ');
+  if (clientTurns.length > 0) {
+    evalText = clientTurns.join(' ');
+  } else {
+    const clientLines = transcript
+      .split(/\n+/)
+      .filter((line) => /^\s*(?:\[[\d:.]+\]\s*)?(?:client|customer|caller|speaker\s*2)\s*:/i.test(line));
+    if (clientLines.length > 0) {
+      evalText = clientLines.map((l) => l.replace(/^\s*(?:\[[\d:.]+\]\s*)?(?:client|customer|caller|speaker\s*2)\s*:\s*/i, '')).join(' ');
+    } else if (/(?:\[[\d:.]+\]\s*)?(?:advisor|agent|dealer|speaker\s*1)\s*:/i.test(transcript)) {
+      // Transcript has advisor speaker tags but no customer turns found -> customer never spoke!
+      return {
+        confirmed: false,
+        quote: '',
+        reason: 'No customer turn detected in conversation (only advisor speech found).',
+        confidence: 0.90,
+      };
+    }
   }
 
   // Remove common advisor risk/guarantee disclaimers so "No return guarantee" doesn't falsely trigger customer rejection

@@ -105,12 +105,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* AI Engine Status Strip */}
+        {/* Automated Engine Status Strip */}
         {isOpen && (
           <div className="px-3.5 py-2 bg-black border-b border-neutral-800/80 flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 text-amber-400 font-semibold truncate">
               <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse shrink-0" />
-              <span className="truncate">Groq Whisper + GPT-OSS</span>
+              <span className="truncate">Speech &amp; Audit Engine</span>
             </div>
             <span className="text-[10px] text-neutral-400 font-mono shrink-0">Active</span>
           </div>

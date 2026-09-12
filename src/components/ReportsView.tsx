@@ -229,7 +229,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
           },
           {
             Classification: 'Scrap / Unusable Call',
-            Description: 'Duration < 8s, rings, automated IVR prompts, dead air',
+            Description: 'Duration < 6s, rings, automated IVR prompts, dead air',
             Call_Count: c.scrap,
             Pct_Distribution: `${c.scrapPct}%`,
             Avg_Duration: formatSeconds(c.avgDurationScrap),
@@ -407,7 +407,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
           ],
           [{ text: 'Pre-Order Order Calls' }, { text: `${cc.preOrder}` }, { text: `${cc.preOrderPct}%` }, { text: formatSeconds(cc.avgDurationPreOrder) }],
           [{ text: 'Regular Advisory Calls' }, { text: `${cc.regular}` }, { text: `${cc.regularPct}%` }, { text: formatSeconds(cc.avgDurationRegular) }],
-          [{ text: 'Scrap (<8s / IVR / Rings)' }, { text: `${cc.scrap}` }, { text: `${cc.scrapPct}%` }, { text: formatSeconds(cc.avgDurationScrap) }],
+          [{ text: 'Scrap (<6s / IVR / Rings)' }, { text: `${cc.scrap}` }, { text: `${cc.scrapPct}%` }, { text: formatSeconds(cc.avgDurationScrap) }],
         ];
         slide4.addTable(catRows, {
           x: 0.8,

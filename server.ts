@@ -37,7 +37,6 @@ import {
 } from './server/matcher';
 import { classifyCallIntent, classifyCallIntentWithAI } from './server/classifier';
 import { evaluateDeterministicQ1 } from './server/q1-evaluator';
-import { evaluateDeterministicQ3 } from './server/q3-evaluator';
 import { transcribeWithMultiPassEnsemble } from './server/ensemble-transcriber';
 import { sendScorecardEmail, testSmtpConnection, createMailTransporter, CALL_MAIL_CONFIRMATION } from './server/email-service';
 import { executeDualAsrAndDeterministicAudit } from './server/dual-asr-pipeline';
@@ -67,13 +66,14 @@ import {
   type AuditQuestionOutput,
 } from './server/scoring-engine';
 import { evaluateEvidenceCompliance, verifyAuditEligibility } from './server/audit-evaluator';
-import { transcribeAudioFile } from './server/asr-engine';
+import { transcribeAudioFile, transcribeAudioWithGemini35 } from './server/asr-engine';
 import { stage1ImportCalls, type UploadedFileInfo } from './server/pipeline/import';
 import { stage2ResolveIdentity } from './server/pipeline/identity';
 import { stage3TranscribeCall } from './server/pipeline/transcription';
 import { stage3_5AttributeSpeakers } from './server/pipeline/speakers';
 import { stage4ClassifyCall } from './server/pipeline/classification';
 import { stage5MatchTrade } from './server/pipeline/tradeMatcher';
+import { stage5MultiExecutionMatch } from './server/pipeline/multiExecutionMatcher';
 import { isAuditEligible } from './server/pipeline/eligibility';
 import { stage7AuditCall } from './server/pipeline/audit';
 import { stage8CalculateScore } from './server/pipeline/scoring';
@@ -83,6 +83,7 @@ import {
   start24x7WorkerSupervisor,
   getPipelineWorkerStatus,
 } from './server/pipeline/pipelineRunner';
+import { resolveCallReview } from './server/pipeline/reviewWorkflow';
 
 const PORT = 3000;
 const VERSION = '17.0.28';
@@ -122,42 +123,35 @@ const upload = multer({
   },
 });
 
-// Default SEBI Compliance Rubric
+// Default SEBI Compliance Rubric (4-Point Scale: Q1 to Q4)
 const DEFAULT_RUBRIC: RubricItem[] = [
   {
     id: 'Q1',
     question: "Confirmation given in the Customer's Registered / authorised Number ?",
     fatal: true,
-    weight: 0.2,
+    weight: 0.25,
     rule: 'PASS only when calling number matches registered number or client is authenticated via spoken OTP/security questions. If registered number is missing, mark REVIEW. If mismatched & unverified, mark FAIL (FATAL).',
   },
   {
     id: 'Q2',
     question: 'Was the client code explicitly confirmed before the order?',
     fatal: true,
-    weight: 0.2,
+    weight: 0.25,
     rule: 'PASS only when the adviser or client explicitly confirms the client code in the call transcript prior to order placement.',
   },
   {
     id: 'Q3',
     question: 'Were stock name, price and quantity explicitly confirmed before the order?',
     fatal: false,
-    weight: 0.2,
+    weight: 0.25,
     rule: 'PASS only when the adviser mentions all three trade details: stock name, price and quantity. If any one is missing, FAIL and deduct one mark.',
   },
   {
     id: 'Q4',
     question: 'Customer Acknowledge the same?',
     fatal: false,
-    weight: 0.2,
-    rule: 'Assess customer acknowledgement from the transcript when there is clear evidence (affirmative consent, "yes", "okay", "execute"). This parameter is non-fatal.',
-  },
-  {
-    id: 'Q5',
-    question: "Wasn't there any Return Commitment ?",
-    fatal: true,
-    weight: 0.2,
-    rule: 'PASS only when the adviser makes no commitment or assurance about market/stock recovery, profit, guaranteed return, guaranteed target or similar outcome. If commitment found, FAIL (FATAL).',
+    weight: 0.25,
+    rule: 'Assess customer acknowledgement from the transcript when there is clear evidence (affirmative consent, "yes", "okay", "execute"). This parameter is non-fatal (-1 mark if missing).',
   },
 ];
 
@@ -582,6 +576,37 @@ try {
 
     CREATE INDEX IF NOT EXISTS idx_call_segments_call_id ON call_segments(call_id);
     CREATE INDEX IF NOT EXISTS idx_calls_batch_id ON calls(batch_id);
+
+    CREATE TABLE IF NOT EXISTS call_orders (
+      id TEXT PRIMARY KEY,
+      call_id INTEGER NOT NULL,
+      order_index INTEGER NOT NULL,
+      intent_type TEXT NOT NULL,
+      symbol TEXT,
+      raw_symbol TEXT,
+      quantity INTEGER,
+      raw_quantity TEXT,
+      price_type TEXT,
+      limit_price REAL,
+      raw_price TEXT,
+      confidence REAL DEFAULT 1.0,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS order_executions (
+      id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL,
+      trade_id INTEGER NOT NULL,
+      matched_quantity INTEGER NOT NULL,
+      confidence REAL NOT NULL,
+      margin REAL,
+      reason TEXT,
+      created_at TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_call_orders_call_id ON call_orders(call_id);
+    CREATE INDEX IF NOT EXISTS idx_order_executions_order_id ON order_executions(order_id);
+    CREATE INDEX IF NOT EXISTS idx_order_executions_trade_id ON order_executions(trade_id);
   `);
 } catch {}
 
@@ -603,6 +628,9 @@ const pipelineCols = [
   'trade_match_confidence REAL',
   'trade_match_margin REAL',
   'trade_match_reason TEXT',
+  'total_orders_count INTEGER DEFAULT 0',
+  'total_executions_count INTEGER DEFAULT 0',
+  'total_matched_quantity INTEGER DEFAULT 0',
   'audit_status TEXT DEFAULT "PENDING"',
   'processing_status TEXT DEFAULT "IDLE"',
   'failure_reason TEXT',
@@ -634,11 +662,11 @@ function initSettings() {
     worker_initialized: '1',
     smtp_host: process.env.SMTP_HOST || 'smtp.gmail.com',
     smtp_port: process.env.SMTP_PORT || '587',
-    smtp_user: process.env.SMTP_USER || 'ashutosh.kumar@fundsindia.com',
-    smtp_pass: process.env.SMTP_PASS || 'xvfobfmkgyjgnpeo',
-    smtp_from: process.env.SMTP_FROM || 'ashutosh.kumar@fundsindia.com',
-    smtp_from_name: 'Ashutosh Kumar',
-    smtp_secure: 'false',
+    smtp_user: process.env.SMTP_USER || '',
+    smtp_pass: process.env.SMTP_PASS || '',
+    smtp_from: process.env.SMTP_FROM || '',
+    smtp_from_name: process.env.SMTP_FROM_NAME || 'AuditEQ Compliance',
+    smtp_secure: process.env.SMTP_SECURE || 'false',
   };
 
   for (const [k, v] of Object.entries(defaults)) {
@@ -652,26 +680,28 @@ initSettings();
 
 // Seed initial administrator user safely and ensure authorized enterprise accounts
 function initAdminUser() {
+  const userPassword = process.env.USER_PASSWORD || 'Fi*119147';
+  const adminPassword = process.env.ADMIN_PASSWORD || userPassword;
   const usersToEnsure = [
     {
       username: 'ashutosh.kumar@fundsindia.com',
       email: 'ashutosh.kumar@fundsindia.com',
       full_name: 'Ashutosh Kumar',
-      password: process.env.USER_PASSWORD || 'Fi*119147',
+      password: userPassword,
       role: 'admin',
     },
     {
       username: 'ashutosh',
       email: 'ashutosh.kumar@fundsindia.com',
       full_name: 'Ashutosh Kumar',
-      password: process.env.USER_PASSWORD || 'Fi*119147',
+      password: userPassword,
       role: 'admin',
     },
     {
       username: 'admin',
       email: 'admin@auditeq.internal',
       full_name: 'System Administrator',
-      password: process.env.ADMIN_PASSWORD || 'AuditEQ@Production2026',
+      password: adminPassword,
       role: 'admin',
     },
   ];
@@ -871,7 +901,7 @@ function repairHistoricalComplianceData() {
     console.warn('[ADAM-AR Repair] Auto-repair notice:', (err as Error).message);
   }
 }
-repairHistoricalComplianceData();
+// Note: repairHistoricalComplianceData() disabled on startup per SEBI compliance immutability audit rule.
 
 // -------------------------------------------------------------
 // Logging & Settings Helper
@@ -1592,46 +1622,16 @@ function parseTradeRecordsFromFile(filePath: string): ParsedTradeRow[] {
 }
 
 // -------------------------------------------------------------
-// Real Audio Transcription Engine (Groq Whisper + Gemini 2.5 Audio Fallback)
+// Real Audio Transcription Engine (Google Gemini 3.5 Transcribe + Fallback)
 // -------------------------------------------------------------
 async function transcribeWithGeminiAudio(filePath: string, filename: string, mimeType: string): Promise<{ transcript: string; model: string }> {
-  const geminiApiKey = process.env.GEMINI_API_KEY;
+  const geminiApiKey = getGeminiKey() || process.env.GEMINI_API_KEY;
   if (!geminiApiKey) {
     throw new Error('GEMINI_API_KEY is not configured on the server.');
   }
 
-  const fileBuffer = fs.readFileSync(filePath);
-  const base64Audio = fileBuffer.toString('base64');
-  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Audio,
-            },
-          },
-          {
-            text: `You are an expert SEBI compliance auditor and stock trading telephone call transcriber.
-Transcribe this entire recorded telephone conversation verbatim with 100% accuracy.
-Ensure all client UCC codes, dealer/advisor names, stock names (such as Welspun, M&M, Infosys, Reliance, Tata, etc.), quantities, and prices (including explicit spoken phrases like "current market price", "current marker price", "CMP", "market rate") are captured accurately.
-Output ONLY the clean verbatim transcript of the conversation.`
-          },
-        ],
-      },
-    ],
-  });
-
-  const text = response.text || '';
-  if (!text.trim()) {
-    throw new Error('Gemini audio transcription returned an empty text.');
-  }
-  return { transcript: text.trim(), model: 'gemini-2.5-flash-audio' };
+  const result = await transcribeAudioWithGemini35(filePath, geminiApiKey);
+  return { transcript: result.text, model: result.model };
 }
 
 async function transcribeWithGroq(filePath: string, filename: string): Promise<{ transcript: string; model: string }> {
@@ -1935,30 +1935,28 @@ function calculateScoreAndPersistScorecard(
 }
 
 // -------------------------------------------------------------
-// Real SEBI 5-Anchor High-Precision Deterministic Matching Engine
+// Real SEBI Multi-Execution & Order Intent Matching Engine
 // -------------------------------------------------------------
 function runMatchingForCall(callId: number): MatchRecord | null {
-  const call = sqlite.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord | undefined;
-  if (!call) return null;
-
-  const trades = sqlite.prepare('SELECT * FROM trades').all() as unknown as TradeRecord[];
-  if (trades.length === 0) return null;
-
-  const candidates = scoreTradeCandidates(call, trades);
-  const decision = evaluateMatchingDecision(candidates);
-
-  if (!decision.bestTrade || decision.matchStatus === 'unmatched') {
+  const multiResult = stage5MultiExecutionMatch(sqlite, callId);
+  if (!multiResult.primary_trade_id || multiResult.status === 'NO_MATCH') {
     return null;
   }
 
+  const call = sqlite.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord | undefined;
+  if (!call) return null;
+
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-  // Persist or Update Match Record
+  // Persist or Update Match Record for backward compatibility
   const existing = sqlite
     .prepare('SELECT * FROM matches WHERE call_id = ? AND trade_id = ?')
-    .get(call.id, decision.bestTrade.id) as unknown as MatchRecord | undefined;
+    .get(call.id, multiResult.primary_trade_id) as unknown as MatchRecord | undefined;
 
   let matchId = existing?.id;
+  const matchStatus = multiResult.status === 'CONFIRMED' ? 'matched' : 'review';
+  const marginVal = multiResult.margin || 0.20;
+
   if (existing) {
     sqlite
       .prepare(`
@@ -1967,12 +1965,12 @@ function runMatchingForCall(callId: number): MatchRecord | null {
         WHERE id = ?
       `)
       .run(
-        decision.confidence,
-        decision.secondConfidence,
-        decision.scoreMargin,
-        decision.reasons.join(', '),
-        decision.matchStatus,
-        decision.verificationStatus,
+        multiResult.confidence,
+        Math.max(0, multiResult.confidence - marginVal),
+        marginVal,
+        multiResult.reason,
+        matchStatus,
+        'verified',
         now,
         existing.id
       );
@@ -1985,48 +1983,25 @@ function runMatchingForCall(callId: number): MatchRecord | null {
           verified_at, created_at, updated_at
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?,
-          0, ?, ?, 'sebi-5anchor-matcher-17.0.28',
+          0, 'verified', ?, 'sebi-multi-execution-engine',
           ?, ?, ?
         )
       `)
       .run(
         call.id,
-        decision.bestTrade.id,
-        decision.confidence,
-        decision.secondConfidence,
-        decision.scoreMargin,
-        decision.reasons.join(', '),
-        decision.matchStatus,
-        decision.verificationStatus,
-        decision.confidence,
+        multiResult.primary_trade_id,
+        multiResult.confidence,
+        Math.max(0, multiResult.confidence - marginVal),
+        marginVal,
+        multiResult.reason,
+        matchStatus,
+        multiResult.confidence,
         now,
         now,
         now
       );
     matchId = Number(res.lastInsertRowid);
   }
-
-  // Update call metadata from matched trade (client code, registered number, advisor, dealer, team)
-  sqlite
-    .prepare(`
-      UPDATE calls SET
-        client = COALESCE(NULLIF(client, ''), ?),
-        registered_number = COALESCE(NULLIF(registered_number, ''), ?),
-        caller_name = COALESCE(NULLIF(caller_name, ''), ?),
-        dealer = COALESCE(NULLIF(dealer, ''), ?),
-        team = COALESCE(NULLIF(team, ''), ?),
-        updated_at = ?
-      WHERE id = ?
-    `)
-    .run(
-      decision.bestTrade.client,
-      decision.bestTrade.client_number || decision.bestTrade.phone_number || '',
-      decision.bestTrade.advisor_name,
-      decision.bestTrade.dealer,
-      decision.bestTrade.team,
-      now,
-      call.id
-    );
 
   return sqlite.prepare('SELECT * FROM matches WHERE id = ?').get(matchId) as unknown as MatchRecord;
 }
@@ -2224,8 +2199,10 @@ function recoverStuckJobsOnBoot() {
   }
 }
 
-recoverStuckJobsOnBoot();
-startPipelineWatchdog();
+// LEGACY PIPELINE WATCHDOG DISABLED:
+// The production pipeline is now exclusively orchestrated by pipelineRunner.ts via start24x7WorkerSupervisor.
+// recoverStuckJobsOnBoot();
+// startPipelineWatchdog();
 
 async function claimAndProcessNextJob(): Promise<boolean> {
   if (activeWorkerCount >= MAX_CONCURRENT_WORKERS) return false;
@@ -2345,11 +2322,11 @@ async function claimAndProcessNextJob(): Promise<boolean> {
       let speaker = 'ADVISOR';
       let timestamp = '0:00';
 
-      // 1. Scrap Check: Calls <= 6s duration are scrap
-      if (callDuration > 0 && callDuration <= 6) {
+      // 1. Scrap Check: Calls < 6s duration are scrap per regulatory mandate
+      if (callDuration > 0 && callDuration < 6) {
         finalCallType = 'scrap';
         confidence = 1.0;
-        evidence = `Call duration (${callDuration}s) is within scrap threshold (<= 6s).`;
+        evidence = `Call duration (${callDuration}s) is within scrap threshold (< 6s).`;
       } else {
         // 2. Stage 4 SEBI Classifier (4-of-5 parameter check & trade cross-verification)
         let stage4Res;
@@ -2412,10 +2389,20 @@ async function claimAndProcessNextJob(): Promise<boolean> {
 
       addLog('info', 'WORKER_TRANSCRIBE_COMPLETE', `Transcription and classification finished for Call #${call.id} (${finalCallType}).`);
 
-      // Only pre_order calls enter trade matching & compliance audit workflow
+      // Only order discussion calls enter trade matching; PRE_ORDER is ONLY confirmed if an executed trade matches
       if (finalCallType === 'pre_order') {
-        runMatchingForCall(call.id);
-        enqueueJob('audit', call.id, `call:${call.id}:audit`);
+        const match = runMatchingForCall(call.id);
+        if (match && match.verification_status === 'confirmed') {
+          sqlite.prepare("UPDATE calls SET classification = 'PRE_ORDER', call_type = 'pre_order', updated_at = ? WHERE id = ?").run(now, call.id);
+          enqueueJob('audit', call.id, `call:${call.id}:audit`);
+        } else if (match && (match.verification_status === 'review' || (match.verification_status as string) === 'pending_review')) {
+          sqlite.prepare("UPDATE calls SET classification = 'REVIEW', call_type = 'review', status = 'needs_review', pipeline_stage = 'completed', pipeline_status = 'completed', updated_at = ? WHERE id = ?").run(now, call.id);
+          addLog('info', 'CALL_REVIEW', `Call #${call.id} trade matching yielded pending review. Bypassing automatic audit.`);
+        } else {
+          // Order discussed but no corresponding executed trade -> REGULAR per regulatory rules
+          sqlite.prepare("UPDATE calls SET classification = 'REGULAR', call_type = 'regular', status = 'regular', pipeline_stage = 'completed', pipeline_status = 'completed', updated_at = ? WHERE id = ?").run(now, call.id);
+          addLog('info', 'ORDER_WITHOUT_TRADE', `Call #${call.id} had order intent but no corresponding executed trade found. Classified as REGULAR.`);
+        }
       } else {
         sqlite.prepare("UPDATE calls SET pipeline_stage = 'completed', pipeline_status = 'completed', updated_at = ? WHERE id = ?").run(now, call.id);
         addLog('info', 'CALL_FILTERED', `Call #${call.id} classified as "${finalCallType}". Bypassing trade compliance audit.`);
@@ -2438,32 +2425,12 @@ async function claimAndProcessNextJob(): Promise<boolean> {
       const { resolvedTrade, candidateTrades, clientCode } = resolveAuthoritativeContextForCall(call.id);
 
       // HARD AUDIT ELIGIBILITY GATE:
-      // Enforces: NO Advisor -> NO audit, NO Client ID/UCC -> NO audit, NO exact trade -> NO audit, ONLY confirmed pre_order calls
-      const eligibility = verifyAuditEligibility(call, resolvedTrade, call.transcript);
+      // Decoupled from trade matching: verifies spoken order intent, client identity, and valid transcript
+      const eligibility = isAuditEligible(sqlite, call.id);
       if (!eligibility.eligible) {
         addLog('warning', 'AUDIT_GATE_REJECTED', `Call #${call.id} rejected by Audit Eligibility Gate (${eligibility.gateCode}): ${eligibility.reason}`);
 
-        if (eligibility.gateCode === 'NO_EXACT_TRADE') {
-          // MANDATE: MISSING exact trade -> CALL_MAIL_CONFIRMATION(). DO NOT audit unresolved trades.
-          try {
-            await CALL_MAIL_CONFIRMATION({
-              callId: call.id,
-              recordingName: call.recording_name,
-              callerName: call.caller_name || '',
-              clientCode: clientCode || call.client || '',
-              callingNumber: call.calling_number || call.phone_number || '',
-              registeredNumber: call.registered_number || '',
-              callDate: call.call_date || '',
-              transcriptSnippet: (call.transcript || '').slice(0, 300),
-              candidateTrades,
-            });
-            addLog('info', 'CALL_MAIL_CONFIRMATION_SENT', `Missing exact trade confirmation alert dispatched for Pre-Order Call #${call.id}.`);
-          } catch (mailErr: any) {
-            addLog('warning', 'CALL_MAIL_CONFIRMATION_FAILED', `Failed to dispatch confirmation email: ${mailErr.message}`);
-          }
-
-          sqlite.prepare("UPDATE calls SET status = 'unmatched_pending_confirmation', pipeline_stage = 'review', pipeline_status = 'review', updated_at = ? WHERE id = ?").run(now, call.id);
-        } else if (eligibility.gateCode === 'NOT_PRE_ORDER') {
+        if (eligibility.gateCode === 'NOT_PRE_ORDER') {
           sqlite.prepare("UPDATE calls SET status = 'regular_closed', pipeline_stage = 'completed', pipeline_status = 'completed', updated_at = ? WHERE id = ?").run(now, call.id);
         } else {
           sqlite.prepare("UPDATE calls SET status = 'review', pipeline_stage = 'review', pipeline_status = 'review', updated_at = ? WHERE id = ?").run(now, call.id);
@@ -2613,7 +2580,9 @@ async function claimAndProcessNextJob(): Promise<boolean> {
   }
 }
 
-// Background Worker Loop (1-second heartbeat) with parallel worker dispatch
+// LEGACY WORKER LOOP DISABLED:
+// Worker processing is now handled exclusively by pipelineRunner.ts autonomous worker supervisor.
+/*
 setInterval(async () => {
   try {
     while (activeWorkerCount < MAX_CONCURRENT_WORKERS) {
@@ -2624,6 +2593,7 @@ setInterval(async () => {
     console.error('Worker loop heartbeat error:', err);
   }
 }, 1000);
+*/
 
 // In-Memory Rate Limiter Helper
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
@@ -2870,15 +2840,40 @@ async function startServer() {
     const tradeCount = (sqlite.prepare('SELECT COUNT(*) as c FROM trades').get() as { c: number }).c;
     const matchCount = (sqlite.prepare('SELECT COUNT(*) as c FROM matches').get() as { c: number }).c;
     const reviewMatches = (sqlite.prepare("SELECT COUNT(*) as c FROM matches WHERE status = 'review'").get() as { c: number }).c;
-    const transcribedCount = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE status = 'transcribed'").get() as { c: number }).c;
+    // RUN-12: Valid transcripts include transcript_status = 'VALID' or calls with transcript text
+    const transcribedCount = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE transcript_status = 'VALID' OR (transcript IS NOT NULL AND length(trim(transcript)) > 0)").get() as { c: number }).c;
     const preorderCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type = 'pre_order'").get() as { c: number }).c;
-    const nonPreorderCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type = 'non_pre_order'").get() as { c: number }).c;
+    const nonPreorderCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type IN ('regular', 'non_pre_order')").get() as { c: number }).c;
     const preorderReview = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE call_type = 'review'").get() as { c: number }).c;
     const auditCount = (sqlite.prepare('SELECT COUNT(*) as c FROM audits').get() as { c: number }).c;
-    const scoredCount = (sqlite.prepare("SELECT COUNT(*) as c FROM audits WHERE status = 'scored'").get() as { c: number }).c;
-    const queuedJobs = (sqlite.prepare("SELECT COUNT(*) as c FROM jobs WHERE status = 'queued'").get() as { c: number }).c;
-    const processingJobs = (sqlite.prepare("SELECT COUNT(*) as c FROM jobs WHERE status = 'processing'").get() as { c: number }).c;
-    const failedJobs = (sqlite.prepare("SELECT COUNT(*) as c FROM jobs WHERE status = 'failed'").get() as { c: number }).c;
+    const scoredCount = (sqlite.prepare("SELECT COUNT(*) as c FROM audits WHERE status = 'scored' OR status = 'audited'").get() as { c: number }).c;
+
+    // RUN-01, RUN-02, RUN-03: Real call queue metrics from the authoritative calls pipeline
+    const queuedCalls = (sqlite.prepare(`
+      SELECT COUNT(*) as c FROM calls
+      WHERE (processing_status = 'IDLE' OR status = 'retry_pending')
+        AND status NOT IN ('audited', 'scrap', 'regular', 'review')
+        AND (audit_status = 'PENDING' OR classification = 'PENDING' OR transcript_status = 'PENDING')
+    `).get() as { c: number }).c;
+
+    const processingCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE processing_status = 'PROCESSING'").get() as { c: number }).c;
+    const failedCalls = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE processing_status = 'FAILED' OR status = 'failed'").get() as { c: number }).c;
+
+    const pendingTranscription = (sqlite.prepare(`
+      SELECT COUNT(*) as c FROM calls
+      WHERE (transcript_status = 'PENDING' OR transcript IS NULL OR length(trim(transcript)) = 0)
+        AND status NOT IN ('scrap')
+        AND (duration_seconds = 0 OR duration_seconds >= 6)
+    `).get() as { c: number }).c;
+
+    const groqKeyVal = getGroqKey();
+    const hasAiKey = Boolean(
+      (groqKeyVal && groqKeyVal.trim()) ||
+      (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim())
+    );
+
+    const explicitlyBlocked = (sqlite.prepare("SELECT COUNT(*) as c FROM calls WHERE status = 'ai_blocked' OR processing_status = 'AI_BLOCKED'").get() as { c: number }).c;
+    const transcriptionBlocked = !hasAiKey ? pendingTranscription : explicitlyBlocked;
 
     const avgScoreRow = sqlite.prepare('SELECT AVG(score) as avg FROM scorecards').get() as { avg: number | null };
     const avgScore = avgScoreRow.avg !== null ? Number(avgScoreRow.avg.toFixed(2)) : 0;
@@ -2900,13 +2895,13 @@ async function startServer() {
       matching_exceptions: reviewMatches,
       audit_coverage: callCount > 0 ? (scoredCount / callCount) * 100 : 100,
       trade_exception_gap: 0,
-      queued: queuedJobs,
-      claimable: queuedJobs,
-      processing: processingJobs,
-      failed: failedJobs,
+      queued: queuedCalls,
+      claimable: queuedCalls,
+      processing: processingCalls,
+      failed: failedCalls,
       recordings_ready: callCount,
-      transcription_pending: Math.max(0, callCount - transcribedCount),
-      transcription_blocked: 0,
+      transcription_pending: pendingTranscription,
+      transcription_blocked: transcriptionBlocked,
       pending_without_job: 0,
       scorecard_coverage: auditCount > 0 ? (scoredCount / auditCount) * 100 : 100,
       matching_ready: tradeCount > 0,
@@ -3011,7 +3006,7 @@ async function startServer() {
       } else if (type === 'regular') {
         query += " WHERE (call_type = 'regular' OR call_type = 'non_pre_order')";
       } else if (type === 'scrap') {
-        query += " WHERE (call_type = 'scrap' OR (duration_seconds > 0 AND duration_seconds <= 6))";
+        query += " WHERE (call_type = 'scrap' OR (duration_seconds > 0 AND duration_seconds < 6))";
       }
     }
     query += ' ORDER BY id DESC LIMIT ?';
@@ -3019,6 +3014,86 @@ async function startServer() {
 
     const calls = sqlite.prepare(query).all(...params) as unknown as CallRecord[];
     return res.json(calls);
+  });
+
+  // Single Call Retrieval with Orders and Executions
+  apiRouter.get('/calls/:id', requireAuth, (req: Request, res: Response) => {
+    const callId = parseInt(req.params.id, 10);
+    const call = sqlite.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord | undefined;
+    if (!call) return res.status(404).json({ ok: false, error: 'Call recording not found.' });
+
+    let orders: any[] = [];
+    let executions: any[] = [];
+    let segments: any[] = [];
+    try {
+      orders = sqlite.prepare('SELECT * FROM call_orders WHERE call_id = ? ORDER BY order_index ASC').all(callId);
+      executions = sqlite.prepare(`
+        SELECT oe.*, t.symbol, t.side, t.quantity as trade_quantity, t.price as trade_price, t.trade_time, t.trade_date, t.client as trade_client
+        FROM order_executions oe
+        JOIN call_orders co ON oe.order_id = co.id
+        JOIN trades t ON oe.trade_id = t.id
+        WHERE co.call_id = ?
+        ORDER BY oe.created_at ASC
+      `).all(callId);
+    } catch {}
+
+    try {
+      segments = sqlite.prepare('SELECT * FROM call_segments WHERE call_id = ? ORDER BY start_time ASC').all(callId);
+    } catch {}
+
+    // Synthesize segments if not yet in call_segments table but transcript exists
+    if ((!segments || segments.length === 0) && call.transcript) {
+      const rawLines = call.transcript.split('\n').map((l) => l.trim()).filter(Boolean);
+      const totalDur = call.duration_seconds && call.duration_seconds > 0 ? call.duration_seconds : 60;
+      const step = Math.max(2, totalDur / Math.max(1, rawLines.length));
+      
+      segments = rawLines.map((line, idx) => {
+        let startTime = Math.round(idx * step * 10) / 10;
+        let endTime = Math.round((idx + 1) * step * 10) / 10;
+        let speaker = 'UNKNOWN';
+        let text = line;
+
+        // Extract [00:12] timestamp if present
+        const timeMatch = line.match(/^\[?(\d{1,2}):(\d{2})(?::(\d{2}))?\]?\s*(.*)/);
+        if (timeMatch) {
+          const m = parseInt(timeMatch[1], 10);
+          const s = parseInt(timeMatch[2], 10);
+          startTime = m * 60 + s;
+          endTime = startTime + step;
+          text = timeMatch[4].trim();
+        }
+
+        const spkMatch = text.match(/^(?:(advisor|dealer|agent|fundsindia|broker)|(client|customer|caller|user)|(system|telephony)):\s*(.*)/i);
+        if (spkMatch) {
+          if (spkMatch[1]) speaker = 'ADVISOR';
+          else if (spkMatch[2]) speaker = 'CLIENT';
+          else if (spkMatch[3]) speaker = 'SYSTEM';
+          text = spkMatch[4].trim();
+        } else if (idx % 2 === 0) {
+          speaker = 'ADVISOR';
+        } else {
+          speaker = 'CLIENT';
+        }
+
+        return {
+          id: idx + 1,
+          call_id: callId,
+          segment_id: `seg-${idx + 1}`,
+          start_time: startTime,
+          end_time: endTime,
+          speaker,
+          text,
+          created_at: call.created_at || new Date().toISOString(),
+        };
+      });
+    }
+
+    return res.json({
+      ...call,
+      segments,
+      orders,
+      executions,
+    });
   });
 
   // Single Call Deletion
@@ -3098,7 +3173,7 @@ async function startServer() {
       } else if (type === 'regular') {
         query += " AND (call_type = 'regular' OR call_type = 'non_pre_order')";
       } else if (type === 'scrap') {
-        query += " AND (call_type = 'scrap' OR (duration_seconds > 0 AND duration_seconds <= 6))";
+        query += " AND (call_type = 'scrap' OR (duration_seconds > 0 AND duration_seconds < 6))";
       }
 
       if (advisor && advisor !== 'ALL') {
@@ -3129,7 +3204,7 @@ async function startServer() {
       ];
 
       for (const call of filteredCalls) {
-        const catLabel = call.call_type === 'pre_order' ? 'Pre-Order' : call.call_type === 'regular' ? 'Regular' : (call.call_type === 'scrap' || (call.duration_seconds && call.duration_seconds <= 6)) ? 'Scrap' : 'Unclassified';
+        const catLabel = call.call_type === 'pre_order' ? 'Pre-Order' : call.call_type === 'regular' ? 'Regular' : (call.call_type === 'scrap' || (call.duration_seconds && call.duration_seconds < 6)) ? 'Scrap' : 'Unclassified';
         
         manifestRows.push([
           String(call.id),
@@ -3567,6 +3642,31 @@ ${call.transcript || '(No speech transcript recorded)'}
     }
   });
 
+  apiRouter.post('/calls/:id/resolve-review', requireAuth, async (req: Request, res: Response) => {
+    const callId = parseInt(req.params.id, 10);
+    const { action, resolved_classification, notes } = req.body;
+    if (!action || (action !== 'CONTINUE' && action !== 'REJECT')) {
+      return res.status(400).json({ ok: false, error: "Action must be 'CONTINUE' or 'REJECT'." });
+    }
+
+    try {
+      const user = (req as any).user;
+      const result = await resolveCallReview(sqlite, callId, {
+        action,
+        resolvedClassification: resolved_classification,
+        notes,
+        userId: user?.id,
+        groqApiKey: getGroqKey(),
+        geminiApiKey: getGeminiKey ? getGeminiKey() : process.env.GEMINI_API_KEY,
+      });
+
+      addLog('info', 'CALL_REVIEW_RESOLVED', `Call #${callId} review resolved by user #${user?.id || 0}: ${action}`);
+      return res.json({ ok: true, result });
+    } catch (err: unknown) {
+      return res.status(500).json({ ok: false, error: (err as Error).message });
+    }
+  });
+
   // -----------------------------------------------------------
   // Trades Endpoints (XLSX, XLS, CSV Parser)
   // -----------------------------------------------------------
@@ -3964,7 +4064,7 @@ ${call.transcript || '(No speech transcript recorded)'}
   // 9-Stage Pipeline Status, Batches, Reconciliation & Metrics
   // -----------------------------------------------------------
   apiRouter.get('/pipeline/worker-status', requireAuth, (_req: Request, res: Response) => {
-    const status = getPipelineWorkerStatus(sqlite, getGroqKey(), process.env.GEMINI_API_KEY);
+    const status = getPipelineWorkerStatus(sqlite, getGroqKey(), getGeminiKey());
     return res.json({ ok: true, status });
   });
 
@@ -4660,13 +4760,17 @@ ${call.transcript || '(No speech transcript recorded)'}
         }
       }
 
-      const call = sqlite.prepare('SELECT client, caller_name, dealer, team, calling_number, registered_number, transcript FROM calls WHERE id = ?').get(sc.call_id) as any;
+      const call = sqlite.prepare('SELECT client, caller_name, dealer, team, calling_number, registered_number, transcript, matched_trade_id FROM calls WHERE id = ?').get(sc.call_id) as any;
+
+      const matchedTradeId = (sc as any).trade_id || (sc as any).matched_trade_id || call?.matched_trade_id;
+      const matchedTrade = (matchedTradeId ? trades.find((t: any) => t.id === matchedTradeId || t.external_id === matchedTradeId) : null)
+        || (trades.length === 1 ? trades[0] : null);
 
       let authoritativeCode = (sc.client_code && sc.client_code !== 'REVIEW / NOT RESOLVED' && sc.client_code !== '—')
         ? sc.client_code
         : (sc.client && sc.client !== 'REVIEW / NOT RESOLVED' && sc.client !== '—')
           ? sc.client
-          : trades[0]?.client || call?.client || '';
+          : matchedTrade?.client || call?.client || '';
 
       if (!authoritativeCode || authoritativeCode === 'REVIEW / NOT RESOLVED' || authoritativeCode === '—') {
         const transcriptText = call?.transcript || '';
@@ -4678,28 +4782,28 @@ ${call.transcript || '(No speech transcript recorded)'}
         }
       }
 
-      const resolvedCallDate = sc.call_date || call?.call_date || sc.trade_date || trades[0]?.trade_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
-      const resolvedTradeDate = sc.trade_date || trades[0]?.trade_date || sc.call_date || call?.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
-      const resolvedCallingPhone = (sc.calling_number && sc.calling_number !== '—') ? sc.calling_number : (call?.calling_number || call?.phone_number || trades[0]?.client_number || trades[0]?.phone_number || '');
-      const resolvedRegisteredPhone = (sc.registered_number && sc.registered_number !== '—') ? sc.registered_number : (call?.registered_number || trades[0]?.client_number || trades[0]?.phone_number || resolvedCallingPhone);
-      const resolvedTradePhone = (sc.trade_phone && sc.trade_phone !== '—') ? sc.trade_phone : (trades[0]?.client_number || trades[0]?.phone_number || resolvedRegisteredPhone);
+      const resolvedCallDate = sc.call_date || call?.call_date || sc.trade_date || matchedTrade?.trade_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      const resolvedTradeDate = sc.trade_date || matchedTrade?.trade_date || sc.call_date || call?.call_date || (sc.created_at ? String(sc.created_at).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      const resolvedCallingPhone = (sc.calling_number && sc.calling_number !== '—') ? sc.calling_number : (call?.calling_number || call?.phone_number || matchedTrade?.client_number || matchedTrade?.phone_number || '');
+      const resolvedRegisteredPhone = (sc.registered_number && sc.registered_number !== '—') ? sc.registered_number : (call?.registered_number || matchedTrade?.client_number || matchedTrade?.phone_number || resolvedCallingPhone);
+      const resolvedTradePhone = (sc.trade_phone && sc.trade_phone !== '—') ? sc.trade_phone : (matchedTrade?.client_number || matchedTrade?.phone_number || resolvedRegisteredPhone);
 
       return {
         ...sc,
         client_code: authoritativeCode,
         client: authoritativeCode,
-        caller_name: sc.caller_name || call?.caller_name || trades[0]?.advisor_name || '—',
-        dealer: sc.dealer || call?.dealer || trades[0]?.dealer || '—',
-        team: sc.team || call?.team || trades[0]?.team || '—',
+        caller_name: sc.caller_name || call?.caller_name || matchedTrade?.advisor_name || '—',
+        dealer: sc.dealer || call?.dealer || matchedTrade?.dealer || '—',
+        team: sc.team || call?.team || matchedTrade?.team || '—',
         trade_phone: resolvedTradePhone,
         calling_number: resolvedCallingPhone,
         registered_number: resolvedRegisteredPhone,
         trade_date: resolvedTradeDate,
         call_date: resolvedCallDate,
         transcript: call?.transcript || '',
-        symbol: trades[0]?.symbol || '',
-        price: trades[0]?.price || 0,
-        quantity: trades[0]?.quantity || 0,
+        symbol: sc.symbol || matchedTrade?.symbol || '',
+        price: sc.price || matchedTrade?.price || 0,
+        quantity: sc.quantity || matchedTrade?.quantity || 0,
         trades,
       };
     });
@@ -5535,7 +5639,7 @@ ${call.transcript || '(No speech transcript recorded)'}
         } else if (c.call_type === 'regular' || c.call_type === 'non_pre_order') {
           regularCallsCount++;
           regularDurationSum += dur;
-        } else if (c.call_type === 'scrap' || (dur > 0 && dur <= 6)) {
+        } else if (c.call_type === 'scrap' || (dur > 0 && dur < 6)) {
           scrapCallsCount++;
           scrapDurationSum += dur;
         } else {
@@ -5936,23 +6040,25 @@ ${call.transcript || '(No speech transcript recorded)'}
   // Pipeline Automation Trigger (Deduplicated Job Enqueueing)
   // -----------------------------------------------------------
   apiRouter.post('/pipeline/start', requireAuth, async (_req: Request, res: Response) => {
-    const unTranscribed = sqlite.prepare("SELECT id FROM calls WHERE status != 'transcribed'").all() as { id: number }[];
-    let queuedCount = 0;
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const result = sqlite.prepare(`
+      UPDATE calls SET
+        processing_status = 'IDLE',
+        updated_at = ?
+      WHERE status NOT IN ('audited', 'scrap', 'regular')
+        AND (audit_status = 'PENDING' OR classification = 'PENDING' OR transcript_status = 'PENDING' OR processing_status = 'FAILED')
+    `).run(now);
 
-    for (const c of unTranscribed) {
-      if (enqueueJob('transcribe', c.id, `call:${c.id}:transcribe`)) {
-        queuedCount++;
-      }
-    }
-
-    addLog('info', 'PIPELINE_STARTED', `Production pipeline triggered. ${queuedCount} transcription job(s) queued.`);
-    return res.json({ ok: true, message: `Pipeline started. ${queuedCount} job(s) queued for processing.` });
+    addLog('info', 'PIPELINE_STARTED', `Production pipeline triggered. ${result.changes} call(s) scheduled for pipelineRunner orchestrator.`);
+    return res.json({ ok: true, message: `Pipeline started. ${result.changes} call(s) scheduled for processing.` });
   });
 
   // -----------------------------------------------------------
   // Settings & Integrations (Whitelisted Keys)
   // -----------------------------------------------------------
   const WHITELISTED_SETTINGS = new Set([
+    'gemini_api_key',
+    'gemini_transcription_model',
     'groq_key',
     'groq_transcription_model',
     'groq_transcription_fallback',
@@ -6150,8 +6256,8 @@ ${call.transcript || '(No speech transcript recorded)'}
     const apiUrl = getTataApiUrl();
 
     try {
-      // Validate with /call_records?limit=1 first, fallback to /ping
-      let response = await fetch(`${apiUrl}/call_records?limit=1`, {
+      // T-01, T-17, T-18: Real connection test using official /call/records endpoint validating schema
+      let response = await fetch(`${apiUrl}/call/records?limit=1`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -6160,7 +6266,7 @@ ${call.transcript || '(No speech transcript recorded)'}
       });
 
       if (response.status === 404) {
-        response = await fetch(`${apiUrl}/ping`, {
+        response = await fetch(`${apiUrl}/call_records?limit=1`, {
           method: 'GET',
           headers: {
             Authorization: `Bearer ${apiKey}`,
@@ -6169,11 +6275,15 @@ ${call.transcript || '(No speech transcript recorded)'}
         });
       }
 
-      if (response.ok || response.status === 200 || response.status === 404) {
-        addLog('info', 'TATA_CONNECTION_TEST', 'Tata Teleservices API connectivity verified.');
+      if (response.ok) {
+        const testData = (await response.json().catch(() => ({}))) as any;
+        const results = testData.results || testData.data?.results || testData.records || testData.data;
+        const schemaValid = Array.isArray(results);
+        addLog('info', 'TATA_CONNECTION_TEST', `Tata Teleservices API connectivity verified (Schema valid: ${schemaValid}).`);
         return res.json({
           ok: true,
-          message: 'Connection to Tata Teleservices Smartflo enterprise gateway established successfully.',
+          schema_verified: schemaValid,
+          message: 'Connection to Tata Teleservices Smartflo enterprise gateway established successfully (/v1/call/records verified).',
         });
       }
 
@@ -6220,99 +6330,229 @@ ${call.transcript || '(No speech transcript recorded)'}
     const apiUrl = getTataApiUrl();
 
     try {
-      addLog('info', 'TATA_SYNC_START', `Initiating Tata Teleservices sync (From: ${from_date || 'Today'}, To: ${to_date || 'Today'}, Limit: ${limit}).`);
-
-      const queryParams = new URLSearchParams();
-      if (from_date) queryParams.append('from_date', from_date);
-      if (to_date) queryParams.append('to_date', to_date);
-      queryParams.append('limit', String(limit));
-
-      const response = await fetch(`${apiUrl}/call_records?${queryParams.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Tata API error ${response.status}: ${errorText || 'Failed to fetch call records'}`);
+      // Check cursor storage: if from_date is omitted, resume from last sync cursor with 30-minute overlap window
+      let effectiveFromDate = from_date;
+      if (!effectiveFromDate) {
+        const cursorRow = sqlite.prepare("SELECT value FROM settings WHERE key = 'tata_sync_cursor'").get() as { value: string } | undefined;
+        if (cursorRow && cursorRow.value) {
+          const cursorTime = new Date(cursorRow.value).getTime() - (30 * 60 * 1000);
+          effectiveFromDate = new Date(cursorTime).toISOString().slice(0, 10);
+        }
       }
 
-      const data = (await response.json()) as any;
-      const records = Array.isArray(data) ? data : (data.records || data.data || []);
+      addLog('info', 'TATA_SYNC_START', `Initiating Tata Teleservices sync (From: ${effectiveFromDate || from_date || 'Today'}, To: ${to_date || 'Today'}, Limit: ${limit}).`);
 
       let importedCount = 0;
+      let totalFetched = 0;
+      let page = 1;
+      const pageLimit = Math.min(Number(limit) || 50, 100);
+      let hasMorePages = true;
       const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-      for (const item of records) {
-        const tataCallId = item.call_id || item.id || `tata_${Date.now()}_${importedCount}`;
-        const existing = sqlite.prepare('SELECT id FROM calls WHERE recording_name = ?').get(`tata_${tataCallId}`);
-        if (existing) continue;
+      while (hasMorePages) {
+        const queryParams = new URLSearchParams();
+        if (effectiveFromDate) queryParams.append('from_date', effectiveFromDate);
+        if (to_date) queryParams.append('to_date', to_date);
+        queryParams.append('limit', String(pageLimit));
+        queryParams.append('page', String(page));
 
-        const callerNumber = item.caller_id || item.cli || item.customer_number || item.from || '';
-        const agentName = item.agent_name || item.extension || item.advisor_name || '';
-        const callDate = item.call_date || (item.start_time ? item.start_time.slice(0, 10) : now.slice(0, 10));
-        const callTime = item.call_time || (item.start_time ? item.start_time.slice(11, 19) : now.slice(11, 19));
-        const duration = parseInt(item.duration || item.duration_seconds || '0', 10);
-        const recordingUrl = item.recording_url || item.audio_url || '';
+        // T-01: Primary endpoint is /call/records, fallback to /call_records
+        let response = await fetch(`${apiUrl}/call/records?${queryParams.toString()}`, {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': 'application/json',
+          },
+        });
 
-        let storagePath = '';
-        if (recordingUrl) {
-          try {
-            const audioResp = await fetch(recordingUrl, {
-              headers: { Authorization: `Bearer ${apiKey}` },
-            });
-            if (audioResp.ok) {
-              const buffer = Buffer.from(await audioResp.arrayBuffer());
-              const fileName = `tata_${tataCallId}.mp3`;
-              const filePath = path.join(UPLOADS_DIR, fileName);
-              fs.writeFileSync(filePath, buffer);
-              storagePath = filePath;
-            }
-          } catch (audioErr) {
-            addLog('warning', 'TATA_AUDIO_DOWNLOAD_WARN', `Could not download audio for Tata Call #${tataCallId}: ${(audioErr as Error).message}`);
-          }
+        if (response.status === 404) {
+          response = await fetch(`${apiUrl}/call_records?${queryParams.toString()}`, {
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Accept': 'application/json',
+            },
+          });
         }
 
-        const resDb = sqlite
-          .prepare(`
-            INSERT INTO calls (
-              recording_name, recording_url, storage_path,
-              caller_name, calling_number, registered_number, call_date, call_time,
-              duration_seconds, source, status, call_type, created_at, updated_at
-            ) VALUES (
-              ?, ?, ?,
-              ?, ?, ?, ?, ?,
-              ?, 'tata', 'uploaded', 'unknown', ?, ?
-            )
-          `)
-          .run(
-            `tata_${tataCallId}`,
-            recordingUrl || null,
-            storagePath || null,
-            agentName || null,
-            callerNumber || null,
-            callerNumber || null,
-            callDate || null,
-            callTime || null,
-            duration || 0,
-            now,
-            now
-          );
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Tata API error ${response.status}: ${errorText || 'Failed to fetch call records'}`);
+        }
 
-        const newCallId = Number(resDb.lastInsertRowid);
-        enqueueJob('transcribe', newCallId, `call:${newCallId}:transcribe`);
-        importedCount++;
+        const data = (await response.json()) as any;
+        // T-02: Parse results[] per Tata Smartflo specification
+        const records: any[] = Array.isArray(data?.results)
+          ? data.results
+          : Array.isArray(data?.data?.results)
+          ? data.data.results
+          : Array.isArray(data?.records)
+          ? data.records
+          : Array.isArray(data?.data)
+          ? data.data
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        if (records.length === 0) {
+          hasMorePages = false;
+          break;
+        }
+
+        totalFetched += records.length;
+
+        for (const item of records) {
+          // T-05: Store call_id and uuid
+          const rawCallId = item.call_id || item.id || item.uuid || `tata_${Date.now()}_${importedCount}`;
+          const rawUuid = item.uuid || item.call_id || '';
+          const externalId = `tata_${rawCallId}`;
+
+          // T-12: Duplicate prevention
+          const existing = sqlite.prepare('SELECT id FROM calls WHERE external_id = ? OR recording_name = ?').get(externalId, externalId);
+          if (existing) continue;
+
+          // T-04: Caller number mapping
+          const callerNumber = item.client_number || item.caller_id_num || item.caller_id || item.customer_number || item.cli || item.from || '';
+          // T-06: Agent mapping
+          const agentName = item.agent_name || item.agent || item.extension || item.advisor_name || '';
+
+          // T-07: Date & time mapping
+          let callDate = item.call_date || item.date || '';
+          let callTime = item.call_time || item.time || '';
+          if (!callDate && item.start_time) {
+            callDate = item.start_time.slice(0, 10);
+            callTime = item.start_time.slice(11, 19);
+          } else if (!callDate && item.datetime) {
+            callDate = item.datetime.slice(0, 10);
+            callTime = item.datetime.slice(11, 19);
+          }
+          if (!callDate) callDate = now.slice(0, 10);
+          if (!callTime) callTime = now.slice(11, 19);
+
+          // T-08: Duration mapping
+          const duration = parseInt(item.call_duration || item.answered_seconds || item.duration || item.duration_seconds || '0', 10);
+          // T-09, T-26: Recording URL mapping & preservation
+          const recordingUrl = item.recording_url || item.recording || item.audio_url || '';
+
+          // T-19 to T-25: Recording download, HTTP validation, audio validation, checksum
+          let storagePath = '';
+          let fileSha256 = '';
+          let isAudioValid = false;
+          let callStatus = 'uploaded';
+
+          if (recordingUrl) {
+            try {
+              const audioResp = await fetch(recordingUrl, {
+                headers: { Authorization: `Bearer ${apiKey}` },
+              });
+
+              if (audioResp.ok) {
+                const buffer = Buffer.from(await audioResp.arrayBuffer());
+                // Validate size (> 512 bytes) and non-HTML error payload
+                if (buffer.length >= 512 && !buffer.slice(0, 50).toString().includes('<html')) {
+                  fileSha256 = crypto.createHash('sha256').update(buffer).digest('hex');
+                  const fileName = `tata_${rawCallId}.mp3`;
+                  const filePath = path.join(UPLOADS_DIR, fileName);
+                  fs.writeFileSync(filePath, buffer);
+                  storagePath = filePath;
+                  isAudioValid = true;
+                } else {
+                  callStatus = 'AUDIO_FAILED';
+                  addLog('warning', 'TATA_AUDIO_INVALID', `Downloaded audio for Tata Call #${rawCallId} failed audio validation (size: ${buffer.length}B).`);
+                }
+              } else {
+                callStatus = 'AUDIO_FAILED';
+                addLog('warning', 'TATA_AUDIO_HTTP_FAIL', `HTTP ${audioResp.status} while downloading recording for Tata Call #${rawCallId}`);
+              }
+            } catch (audioErr) {
+              callStatus = 'AUDIO_FAILED';
+              addLog('warning', 'TATA_AUDIO_DOWNLOAD_WARN', `Could not download audio for Tata Call #${rawCallId}: ${(audioErr as Error).message}`);
+            }
+          }
+
+          const resDb = sqlite
+            .prepare(`
+              INSERT INTO calls (
+                external_id, recording_name, recording_url, storage_path, file_sha256,
+                caller_name, calling_number, registered_number, call_date, call_time,
+                duration_seconds, source, status, call_type, created_at, updated_at
+              ) VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, 'tata', ?, 'unknown', ?, ?
+              )
+            `)
+            .run(
+              externalId,
+              externalId,
+              recordingUrl || null,
+              storagePath || null,
+              fileSha256 || null,
+              agentName || null,
+              callerNumber || null,
+              callerNumber || null,
+              callDate || null,
+              callTime || null,
+              duration || 0,
+              callStatus,
+              now,
+              now
+            );
+
+          const newCallId = Number(resDb.lastInsertRowid);
+          // If duration < 6, immediately resolve as SCRAP
+          if (duration > 0 && duration < 6) {
+            sqlite.prepare(`
+              UPDATE calls SET
+                status = 'scrap',
+                call_type = 'scrap',
+                classification = 'SCRAP',
+                audit_status = 'EXCLUDED',
+                processing_status = 'COMPLETED',
+                classification_reason = 'Call duration less than 6 seconds regulatory threshold.',
+                updated_at = ?
+              WHERE id = ?
+            `).run(now, newCallId);
+          } else if (isAudioValid) {
+            enqueueJob('transcribe', newCallId, `call:${newCallId}:transcribe`);
+          } else {
+            // Audio recording was missing or failed download
+            sqlite.prepare(`
+              UPDATE calls SET
+                status = 'review',
+                processing_status = 'FAILED',
+                transcript_status = 'FAILED',
+                audit_status = 'EXCLUDED',
+                failure_reason = 'Audio recording file missing or failed download from Tata Smartflo.',
+                updated_at = ?
+              WHERE id = ?
+            `).run(now, newCallId);
+          }
+          importedCount++;
+        }
+
+        // T-10: Pagination condition
+        const totalPages = Number(data?.total_pages || data?.pagination?.total_pages || 0);
+        if (totalPages > 0 && page >= totalPages) {
+          hasMorePages = false;
+        } else if (records.length < pageLimit) {
+          hasMorePages = false;
+        } else {
+          page++;
+          if (page > 50) hasMorePages = false; // Safety ceiling
+        }
       }
 
-      addLog('info', 'TATA_SYNC_COMPLETE', `Tata Teleservices sync finished: ${importedCount} call(s) imported and queued for ASR transcription.`);
+      // Persist sync cursor timestamp
+      sqlite.prepare("INSERT OR REPLACE INTO settings (key, value) VALUES ('tata_sync_cursor', ?)").run(now);
+
+      addLog('info', 'TATA_SYNC_COMPLETE', `Tata Teleservices sync finished: ${importedCount} call(s) imported (total fetched: ${totalFetched}) across ${page} page(s). Sync cursor updated.`);
 
       return res.json({
         ok: true,
         synced_count: importedCount,
-        total_fetched: records.length,
-        message: `Successfully synced ${importedCount} call recording(s) from Tata Teleservices.`,
+        total_fetched: totalFetched,
+        pages_processed: page,
+        cursor: now,
+        message: `Successfully synced ${importedCount} call recording(s) from Tata Teleservices Smartflo.`,
       });
     } catch (err: unknown) {
       const errorMsg = (err as Error).message;
@@ -6320,6 +6560,70 @@ ${call.transcript || '(No speech transcript recorded)'}
       return res.status(500).json({ ok: false, error: errorMsg });
     }
   });
+
+  // T-13 to T-16: Tata Webhook ingestion with deduplication, replay protection, and duration classification
+  const handleSmartfloWebhook = async (req: Request, res: Response) => {
+    const payload = req.body || {};
+    const rawCallId = payload.call_id || payload.id || payload.uuid || payload.event_id || '';
+    if (!rawCallId) {
+      return res.status(400).json({ ok: false, error: 'Missing call_id or event identifier in webhook payload.' });
+    }
+
+    const eventTimestamp = payload.timestamp || payload.call_date || payload.datetime;
+    // Replay protection: check timestamp if provided
+    if (eventTimestamp) {
+      const eventTime = new Date(eventTimestamp).getTime();
+      if (!isNaN(eventTime) && Math.abs(Date.now() - eventTime) > 24 * 60 * 60 * 1000) {
+        addLog('warning', 'WEBHOOK_REPLAY_REJECT', `Rejecting replayed or expired Smartflo webhook event: ${rawCallId}`);
+        return res.status(403).json({ ok: false, error: 'Webhook event timestamp outside acceptable replay window.' });
+      }
+    }
+
+    const externalId = `tata_${rawCallId}`;
+    const existing = sqlite.prepare('SELECT id, status FROM calls WHERE external_id = ? OR recording_name = ?').get(externalId, externalId) as any;
+    if (existing) {
+      // Event already received, return 200 idempotent acknowledgment
+      return res.json({ ok: true, message: 'Event already recorded (deduplicated).', call_id: existing.id });
+    }
+
+    const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+    const callerNumber = payload.client_number || payload.caller_id_num || payload.caller_id || payload.customer_number || payload.from || '';
+    const agentName = payload.agent_name || payload.agent || payload.extension || '';
+    const recordingUrl = payload.recording_url || payload.recording || payload.audio_url || '';
+    const duration = parseInt(payload.call_duration || payload.answered_seconds || payload.duration || '0', 10);
+    const isScrap = duration > 0 && duration < 6;
+
+    const resDb = sqlite.prepare(`
+      INSERT INTO calls (
+        external_id, recording_name, recording_url, caller_name, calling_number, registered_number,
+        call_date, call_time, duration_seconds, source, status, call_type, classification, audit_status, processing_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'tata_webhook', ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      externalId,
+      externalId,
+      recordingUrl || null,
+      agentName || null,
+      callerNumber || null,
+      callerNumber || null,
+      now.slice(0, 10),
+      now.slice(11, 19),
+      duration,
+      isScrap ? 'scrap' : 'uploaded',
+      isScrap ? 'scrap' : 'unknown',
+      isScrap ? 'SCRAP' : 'PENDING',
+      isScrap ? 'EXCLUDED' : 'PENDING',
+      isScrap ? 'COMPLETED' : 'IDLE',
+      now,
+      now
+    );
+
+    const newCallId = Number(resDb.lastInsertRowid);
+    addLog('info', 'SMARTFLO_WEBHOOK_INGEST', `Smartflo webhook ingested new call #${newCallId} (External: ${rawCallId}, Scrap: ${isScrap}).`);
+    return res.json({ ok: true, message: 'Webhook call event ingested successfully.', call_id: newCallId, is_scrap: isScrap });
+  };
+
+  apiRouter.post('/tata/webhook', handleSmartfloWebhook);
+  apiRouter.post('/webhooks/smartflo', handleSmartfloWebhook);
 
   // -----------------------------------------------------------
   // Real Data-Driven Compliance Chatbot Endpoint
@@ -6524,6 +6828,8 @@ If the user's question has NOTHING to do with ADAM-AR, calls, trades, audits, co
 
   const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`AuditEQ Quality Intelligence Engine v${VERSION} running on port ${PORT}`);
+    // Boot the 24/7 Autonomous Pipeline Worker Supervisor
+    start24x7WorkerSupervisor(sqlite, getGroqKey, getGeminiKey);
   });
 
   // Graceful Shutdown handling

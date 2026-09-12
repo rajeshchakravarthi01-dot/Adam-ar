@@ -96,54 +96,66 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const queued = stats?.queued || 0;
   const processing = stats?.processing || 0;
   const pendingTranscription = stats?.transcription_pending || 0;
+  const blockedTranscription = stats?.transcription_blocked || 0;
   const failedJobs = stats?.failed || 0;
   const avgScore = stats?.avg_score || 0;
 
-  const isAIActive = processing > 0 || queued > 0 || pendingTranscription > 0;
+  const isBlockedAwaitingKey = blockedTranscription > 0 && processing === 0;
+  const isAIActive = processing > 0 || (queued > 0 && !isBlockedAwaitingKey) || (pendingTranscription > 0 && !isBlockedAwaitingKey);
   const progressPercent = trades > 0 ? Math.min(100, Math.round((scored / trades) * 100)) : totalCalls > 0 ? Math.min(100, Math.round((transcribed / totalCalls) * 100)) : 0;
 
   return (
     <div className="space-y-6">
-      {/* Live AI Status & Activity Banner - Answering "What AI is doing, if not doing anything then why" */}
+      {/* Live Processing Status & Activity Banner - Answering what engine is doing */}
       <div className={`p-5 rounded-2xl border shadow-sm transition-all ${
-        isAIActive
+        isBlockedAwaitingKey
+          ? 'bg-amber-50/80 border-amber-300'
+          : isAIActive
           ? 'bg-gradient-to-r from-amber-50 via-amber-100/40 to-white border-amber-300'
           : 'bg-white border-neutral-200'
       }`}>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-3.5">
             <div className={`p-2.5 rounded-xl shrink-0 ${
-              isAIActive ? 'bg-amber-400 text-black animate-pulse' : 'bg-neutral-100 text-neutral-700'
+              isBlockedAwaitingKey ? 'bg-amber-500 text-white' : isAIActive ? 'bg-amber-400 text-black animate-pulse' : 'bg-neutral-100 text-neutral-700'
             }`}>
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider font-mono ${
-                  isAIActive ? 'bg-amber-400 text-black' : 'bg-emerald-100 text-emerald-800'
+                  isBlockedAwaitingKey ? 'bg-amber-500 text-white' : isAIActive ? 'bg-amber-400 text-black' : 'bg-emerald-100 text-emerald-800'
                 }`}>
-                  <span className={`w-2 h-2 rounded-full ${isAIActive ? 'bg-black animate-ping' : 'bg-emerald-600'}`} />
-                  <span>{isAIActive ? 'AI Active & Working' : 'AI Standby / Idle'}</span>
+                  <span className={`w-2 h-2 rounded-full ${isBlockedAwaitingKey ? 'bg-white' : isAIActive ? 'bg-black animate-ping' : 'bg-emerald-600'}`} />
+                  <span>{isBlockedAwaitingKey ? 'Awaiting API Key' : isAIActive ? 'Engine Active & Working' : 'Engine Standby / Idle'}</span>
                 </span>
-                <span className="text-xs text-neutral-500 font-medium">3 Parallel Background Workers</span>
+                <span className="text-xs text-neutral-500 font-medium">Autonomous 24/7 Supervisor</span>
               </div>
               <h3 className="text-base font-bold text-neutral-900 mt-1">
-                {isAIActive ? (
+                {isBlockedAwaitingKey ? (
                   <span>
-                    AI is currently processing {processing + queued + pendingTranscription} active background task(s)
+                    Processing Engine Paused — {blockedTranscription} call(s) awaiting Processing API Key
+                  </span>
+                ) : isAIActive ? (
+                  <span>
+                    Pipeline is currently processing {processing + queued + pendingTranscription} active background task(s)
                   </span>
                 ) : (
-                  <span>AI Engine is Idle — All {totalCalls} audio calls &amp; scorecards fully processed</span>
+                  <span>Processing Engine is Idle — All {totalCalls} audio calls &amp; scorecards fully processed</span>
                 )}
               </h3>
               <p className="text-xs text-neutral-600 mt-0.5 leading-relaxed max-w-3xl">
-                {isAIActive ? (
+                {isBlockedAwaitingKey ? (
                   <span>
-                    <b>Current Action:</b> Groq Whisper Large-v3 is transcribing pending audio and GPT-OSS is evaluating SEBI Q1–Q5 fatal rules against matched trade parameters.
+                    <b>Action Required:</b> Audio transcription requires an API Key. Configure the key in Settings or Environment to activate verbatim transcription and compliance scoring.
+                  </span>
+                ) : isAIActive ? (
+                  <span>
+                    <b>Current Action:</b> Speech-to-text verbatim transcription and SEBI Q1–Q4 audit compliance evaluation are actively processing.
                   </span>
                 ) : (
                   <span>
-                    <b>Why AI is Idle:</b> The pipeline queue is empty ({queued} queued, {processing} processing). All uploaded calls have been transcribed, matched, and deterministic scorecards generated. AI is on standby ready for new audio ZIP uploads or trade spreadsheets.
+                    <b>Why Engine is Idle:</b> The pipeline queue is clear ({queued} queued, {processing} processing). All uploaded calls have reached terminal states (transcribed, matched, audited, or scrap). Pipeline supervisor is on standby ready for new audio ZIP uploads.
                   </span>
                 )}
               </p>
@@ -151,14 +163,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={onStartPipeline}
-              disabled={isLoading}
-              className="px-4 py-2 bg-neutral-900 hover:bg-black text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-neutral-700 transition-all cursor-pointer shadow-xs"
-            >
-              <Activity className="w-3.5 h-3.5" />
-              <span>Poll / Wake AI</span>
-            </button>
+            {isBlockedAwaitingKey ? (
+              <button
+                onClick={() => onNavigate('integrations')}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              >
+                <span>Configure API Key</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={onStartPipeline}
+                disabled={isLoading}
+                className="px-4 py-2 bg-neutral-900 hover:bg-black text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-neutral-700 transition-all cursor-pointer shadow-xs"
+              >
+                <Activity className="w-3.5 h-3.5" />
+                <span>Poll / Wake Engine</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('pipeline')}
               className="px-4 py-2 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-neutral-200 transition-all cursor-pointer shadow-xs"
@@ -175,13 +197,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 relative z-10">
           <div>
             <div className="text-xs font-bold text-amber-400 tracking-wider uppercase mb-1">
-              Production Pipeline · High-Accuracy Groq Whisper Engine
+              Production Pipeline · High-Accuracy Speech Engine
             </div>
             <h2 className="text-2xl font-black tracking-tight text-white">
-              Calls &rarr; Trades &rarr; Transcribe &rarr; Match &rarr; Q1–Q5 Audit &rarr; Scorecard
+              Calls &rarr; Trades &rarr; Transcribe &rarr; Match &rarr; Q1–Q4 Audit &rarr; Scorecard
             </h2>
             <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-              Groq Whisper powers speech-to-text verbatim transcription with audio conditioning; Groq GPT-OSS executes strict pre-order quality auditing. Valid audits synchronize directly across scorecards and editable master records.
+              Speech-to-text verbatim transcription with acoustic conditioning; strict pre-order quality auditing. Valid audits synchronize directly across scorecards and editable master records.
             </p>
           </div>
 
@@ -217,6 +239,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Queue Status: <span className="text-amber-400 font-mono font-bold">{stats?.queued || 0} queued</span> ·{' '}
             <span className="text-neutral-200 font-mono font-medium">{stats?.processing || 0} processing</span> ·{' '}
             <span className="text-neutral-200 font-mono font-medium">{pendingTranscription} pending transcription</span>
+            {blockedTranscription > 0 && (
+              <>
+                {' '}·{' '}
+                <span className="text-amber-400 font-mono font-bold">{blockedTranscription} awaiting API key</span>
+              </>
+            )}
           </div>
           <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -267,12 +295,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           className="bg-white p-5 rounded-2xl border border-neutral-200 hover:border-amber-400 transition-all cursor-pointer shadow-xs group"
         >
           <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">AI Audits (Q1–Q5)</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">Audits (Q1–Q4)</span>
             <CheckSquare className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
           </div>
           <div className="text-2xl font-black text-neutral-900">{audits.toLocaleString()}</div>
           <div className="text-xs text-neutral-500 mt-1 flex items-center justify-between">
-            <span>Model: <b className="text-neutral-800">GPT-OSS 120B</b></span>
+            <span>Standard: <b className="text-neutral-800">SEBI Regulatory</b></span>
             <span className="text-amber-600 font-bold">Automatic</span>
           </div>
         </div>
@@ -288,7 +316,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="text-2xl font-black text-neutral-900">{scored.toLocaleString()}</div>
           <div className="text-xs text-neutral-600 mt-1 flex items-center justify-between">
-            <span>Avg Score: <b>{avgScore}/5</b></span>
+            <span>Avg Score: <b>{avgScore}/4</b></span>
             <span className="font-bold text-amber-600">Finalized</span>
           </div>
         </div>
@@ -310,18 +338,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div className="space-y-3 text-xs">
             <div className="flex items-center justify-between py-2 border-b border-neutral-100">
-              <span className="text-neutral-600">Groq Whisper Transcription</span>
+              <span className="text-neutral-600">Speech-to-Text Transcription</span>
               <span className="font-semibold text-neutral-900 flex items-center gap-1.5 text-emerald-600">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>whisper-large-v3 (Primary)</span>
+                <span>High-Precision Acoustic Engine</span>
               </span>
             </div>
 
             <div className="flex items-center justify-between py-2 border-b border-neutral-100">
-              <span className="text-neutral-600">Groq GPT-OSS Compliance Auditing</span>
+              <span className="text-neutral-600">Compliance Auditing Engine</span>
               <span className="font-semibold text-neutral-900 flex items-center gap-1.5 text-emerald-600">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>openai/gpt-oss-120b (Structured)</span>
+                <span>Deterministic &amp; Contextual (Structured)</span>
               </span>
             </div>
 
@@ -470,10 +498,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           {[
             { step: '1. Calls', desc: 'Upload audio/ZIP', done: totalCalls > 0 },
             { step: '2. Trades', desc: 'Import CSV/XLSX', done: trades > 0 },
-            { step: '3. Transcribe', desc: 'Groq Whisper', done: transcribed > 0 },
+            { step: '3. Transcribe', desc: 'Speech Engine', done: transcribed > 0 },
             { step: '4. Match', desc: 'Deterministic links', done: matches > 0 },
-            { step: '5. AI Audit', desc: 'Groq GPT-OSS 120b', done: audits > 0 },
-            { step: '6. Score', desc: 'Fatal & 5-mark rules', done: scored > 0 },
+            { step: '5. Audit', desc: 'Compliance Engine', done: audits > 0 },
+            { step: '6. Score', desc: 'Fatal & 4-mark rules', done: scored > 0 },
             { step: '7. Master Grid', desc: 'Live editable table', done: scored > 0 },
             { step: '8. Dispatch', desc: 'Advisor email delivery', done: (stats?.scorecard_coverage || 0) > 0 },
           ].map((s, idx) => (

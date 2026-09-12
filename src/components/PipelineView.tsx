@@ -162,10 +162,10 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       stage: 3,
       name: 'Transcription',
       icon: Cpu,
-      desc: 'Groq Whisper Large V3 multi-pass ensemble transcription',
+      desc: 'Google Gemini 3.5 Transcribe API with 24/7 continuous quota and rate-limit protection',
       metric: `${stats?.transcribed || 0}/${stats?.calls || 0} transcribed`,
       active: (stats?.transcribed || 0) > 0,
-      badge: 'Ensemble ASR',
+      badge: 'Gemini 3.5 Transcribe',
     },
     {
       stage: 4,
@@ -201,13 +201,13 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       desc: 'Deterministic compliance rubric verification across SEBI guidelines',
       metric: `${stats?.audits || 0} audited`,
       active: (stats?.audits || 0) > 0,
-      badge: 'Groq / Gemini AI',
+      badge: 'Compliance Audit Engine',
     },
     {
       stage: 8,
       name: 'Scoring Engine',
       icon: Award,
-      desc: 'Deterministic 4-point scale: Q1/Q2/Q5 fatal -> 0, Q3 non-fatal -> 3',
+      desc: 'Deterministic 4-point scale: Q1/Q2 fatal -> 0, Q3/Q4 scored -> 4 max',
       metric: `${stats?.scored || 0} scored`,
       active: (stats?.scored || 0) > 0,
       badge: 'Max 4 / Fatal 0',
@@ -236,7 +236,7 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="text-lg font-bold text-white tracking-tight">
-                    Autonomous 24/7 AI Pipeline & Engine
+                    Autonomous 24/7 Processing Pipeline &amp; Supervisor
                   </h2>
                   <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
@@ -244,7 +244,7 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
                   </span>
                 </div>
                 <p className="text-xs text-neutral-400 mt-0.5">
-                  9-Stage Isolated Architecture • Conservative Accuracy • Zero Hallucination • Automatic Stalled Recovery
+                  9-Stage Isolated Architecture • Conservative Accuracy • Zero Guesswork • Automatic Stalled Recovery
                 </p>
               </div>
             </div>
@@ -264,9 +264,9 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
               </div>
               <span className="text-neutral-700">•</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-neutral-500">ASR Credential:</span>
-                <span className={`font-mono font-bold ${workerStatus?.has_groq_key ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {workerStatus?.has_groq_key ? 'Groq Configured' : 'Groq Pending'}
+                <span className="text-neutral-500">Speech Engine:</span>
+                <span className={`font-mono font-bold ${workerStatus?.has_gemini_key || workerStatus?.has_groq_key ? 'text-emerald-400' : 'text-amber-400'}`}>
+                  {workerStatus?.has_gemini_key || workerStatus?.has_groq_key ? 'Acoustic Speech-to-Text Active' : 'API Key Pending'}
                 </span>
               </div>
             </div>
@@ -567,7 +567,7 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
           <div>
             <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
               <Cpu className="w-4 h-4 text-amber-500" />
-              <span>24/7 Autonomous AI Supervisor Health & Watchdog</span>
+              <span>24/7 Autonomous Pipeline Supervisor Health & Watchdog</span>
             </h3>
             <p className="text-xs text-neutral-500 mt-0.5">
               The supervisor loop continuously monitors the SQLite queue, automatically resets stalled jobs (&gt; 2 mins), and applies exponential backoff on rate limits.

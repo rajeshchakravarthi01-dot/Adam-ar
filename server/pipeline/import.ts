@@ -115,15 +115,24 @@ export function stage1ImportCalls(
         extractedCallerId = match[1];
       }
     }
-    const regNumber = normalizePhoneNumber(file.registered_number || '') || file.registered_number || extractedCallerId;
-
-    // Extract client code from filename if not in metadata
+    // Extract client code from filename or metadata first
     let extractedClientCode = file.client_code || '';
     if (!extractedClientCode) {
       const match = file.original_filename.match(/\b([A-Z]{2,4}[0-9]{3,7})\b/i);
       if (match) {
         extractedClientCode = match[1].toUpperCase();
       }
+    }
+
+    // Registered number must come from metadata or authoritative clients master, NEVER fallback to calling number
+    let regNumber = normalizePhoneNumber(file.registered_number || '') || file.registered_number || '';
+    if (!regNumber && extractedClientCode) {
+      try {
+        const clientRow = db.prepare('SELECT phone_number, registered_mobile FROM clients WHERE client_code = ?').get(extractedClientCode) as any;
+        if (clientRow) {
+          regNumber = normalizePhoneNumber(clientRow.registered_mobile || clientRow.phone_number || '') || clientRow.phone_number || '';
+        }
+      } catch {}
     }
 
     const duration = file.duration_seconds || 0;

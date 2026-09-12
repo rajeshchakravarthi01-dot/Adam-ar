@@ -181,7 +181,7 @@ export const TataView: React.FC<TataViewProps> = ({
             <Key className="w-4 h-4 text-amber-500" />
             <span>Manual Gateway Credentials</span>
           </h3>
-          <span className="text-xs text-neutral-500">Same manual entry workflow as Groq AI</span>
+          <span className="text-xs text-neutral-500">Manual in-app credential storage</span>
         </div>
 
         <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl flex items-start gap-2.5 text-xs text-amber-900">

@@ -97,7 +97,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               AuditEQ Enterprise Control
             </div>
             <h2 className="text-lg font-bold text-white">
-              {mode === 'account' ? (currentUser ? 'User Profile' : 'Authorized Sign In') : 'Groq AI Key Management'}
+              {mode === 'account' ? (currentUser ? 'User Profile' : 'Authorized Sign In') : 'Processing Engine Key'}
             </h2>
           </div>
           <button
@@ -133,7 +133,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <Key className="w-3.5 h-3.5 text-amber-500" />
-            <span>Groq AI Key</span>
+            <span>Engine Key</span>
           </button>
         </div>
 
@@ -231,7 +231,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-bold text-neutral-700">
-                    Groq Cloud API Key
+                    Processing Engine API Key
                   </label>
                   <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
                     {groqConfigured ? '✓ Active & Ready' : 'Key Required'}
@@ -243,12 +243,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="password"
                     value={apiKeyInput}
                     onChange={(e) => setApiKeyInput(e.target.value)}
-                    placeholder="gsk_..."
+                    placeholder="Enter API key…"
                     className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-300 rounded-xl focus:border-amber-400 focus:outline-hidden font-mono"
                   />
                 </div>
                 <p className="text-[11px] text-neutral-500 mt-1">
-                  Used for Whisper Large v3 speech transcription and automated pre-order quality auditing.
+                  Used for acoustic speech transcription and automated pre-order quality auditing.
                 </p>
               </div>
 

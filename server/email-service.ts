@@ -45,8 +45,8 @@ export interface EmailDispatchResult {
 export function createMailTransporter(config?: SmtpConfig) {
   const host = config?.host || process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = config?.port || (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587);
-  const user = config?.user || process.env.SMTP_USER || 'ashutosh.kumar@fundsindia.com';
-  const pass = config?.pass || process.env.SMTP_PASS || 'xvfobfmkgyjgnpeo';
+  const user = config?.user || process.env.SMTP_USER || '';
+  const pass = config?.pass || process.env.SMTP_PASS || '';
   const secure = config?.secure !== undefined ? config.secure : port === 465;
 
   if (!host || !user || !pass) {

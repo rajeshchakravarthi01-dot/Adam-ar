@@ -37,7 +37,7 @@ interface CallsViewProps {
   isLoading?: boolean;
 }
 
-type CallCategoryFilter = 'all' | 'pre_order' | 'regular' | 'scrap';
+type CallCategoryFilter = 'all' | 'pre_order' | 'regular' | 'scrap' | 'review';
 
 export const CallsView: React.FC<CallsViewProps> = ({
   calls,
@@ -58,12 +58,76 @@ export const CallsView: React.FC<CallsViewProps> = ({
   const [isDownloadingZip, setIsDownloadingZip] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
+  // Review Workflow Resolution
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [resolvedClassification, setResolvedClassification] = useState<'PRE_ORDER' | 'REGULAR' | 'SCRAP'>('PRE_ORDER');
+  const [isResolvingReview, setIsResolvingReview] = useState(false);
+
   // Row selection for selective ZIP download
   const [selectedCallIds, setSelectedCallIds] = useState<Set<number>>(new Set());
 
   // Editing category manually
   const [editingCallId, setEditingCallId] = useState<number | null>(null);
   const [editCategoryVal, setEditCategoryVal] = useState<string>('pre_order');
+
+  const handleOpenCallDetail = async (call: CallRecord) => {
+    setSelectedCall(call);
+    setReviewNotes('');
+    setResolvedClassification('PRE_ORDER');
+    try {
+      const token = getStoredToken();
+      const res = await fetch(`/api/calls/${call.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (res.ok) {
+        const fullCall = await res.json();
+        setSelectedCall(fullCall);
+      }
+    } catch {}
+  };
+
+  const handleResolveReview = async (callId: number, action: 'CONTINUE' | 'REJECT') => {
+    setIsResolvingReview(true);
+    try {
+      const token = getStoredToken();
+      const res = await fetch(`/api/calls/${callId}/resolve-review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          action,
+          resolved_classification: resolvedClassification,
+          notes: reviewNotes,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Failed to resolve review');
+      }
+      setActionNotice(`Call #${callId} review resolved: ${action === 'CONTINUE' ? 'Approved for audit' : 'Rejected'}.`);
+      setTimeout(() => setActionNotice(null), 3500);
+
+      // Refresh call detail
+      if (selectedCall?.id === callId) {
+        const refreshed = await fetch(`/api/calls/${callId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (refreshed.ok) {
+          const fullCall = await refreshed.json();
+          setSelectedCall(fullCall);
+        }
+      }
+      if (onRefresh) {
+        await onRefresh();
+      }
+    } catch (err: any) {
+      alert(`Error resolving review: ${err.message}`);
+    } finally {
+      setIsResolvingReview(false);
+    }
+  };
 
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,7 +267,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
   };
 
   const handleDeleteAllScrap = async () => {
-    if (!window.confirm(`Delete all ${counts.scrap} short/scrap calls (≤ 6-8 seconds)?`)) return;
+    if (!window.confirm(`Delete all ${counts.scrap} short/scrap calls (< 6 seconds)?`)) return;
     setIsDeleting(true);
     try {
       const res = await api.bulkDeleteCalls({ type: 'scrap' });
@@ -222,12 +286,16 @@ export const CallsView: React.FC<CallsViewProps> = ({
     let preOrder = 0;
     let regular = 0;
     let scrap = 0;
+    let review = 0;
 
     calls.forEach((c) => {
       const dur = c.duration_seconds || 0;
-      const isScrap = c.call_type === 'scrap' || (dur > 0 && dur <= 6);
+      const isScrap = c.call_type === 'scrap' || (dur > 0 && dur < 6);
+      const isReview = c.classification === 'REVIEW' || c.status === 'review' || c.pipeline_stage === 'REVIEW_PENDING';
       if (isScrap) {
         scrap++;
+      } else if (isReview) {
+        review++;
       } else if (c.call_type === 'pre_order') {
         preOrder++;
       } else {
@@ -235,7 +303,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
       }
     });
 
-    return { all: calls.length, preOrder, regular, scrap };
+    return { all: calls.length, preOrder, regular, scrap, review };
   }, [calls]);
 
   // Filtering
@@ -243,10 +311,12 @@ export const CallsView: React.FC<CallsViewProps> = ({
     return calls.filter((c) => {
       // Category filter
       const dur = c.duration_seconds || 0;
-      const isScrap = c.call_type === 'scrap' || (dur > 0 && dur <= 6);
-      const isPreOrder = c.call_type === 'pre_order' && !isScrap;
-      const isRegular = !isScrap && !isPreOrder;
+      const isScrap = c.call_type === 'scrap' || (dur > 0 && dur < 6);
+      const isReview = c.classification === 'REVIEW' || c.status === 'review' || c.pipeline_stage === 'REVIEW_PENDING';
+      const isPreOrder = c.call_type === 'pre_order' && !isScrap && !isReview;
+      const isRegular = !isScrap && !isPreOrder && !isReview;
 
+      if (categoryFilter === 'review' && !isReview) return false;
       if (categoryFilter === 'pre_order' && !isPreOrder) return false;
       if (categoryFilter === 'regular' && !isRegular) return false;
       if (categoryFilter === 'scrap' && !isScrap) return false;
@@ -535,9 +605,24 @@ export const CallsView: React.FC<CallsViewProps> = ({
                   : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
               }`}
             >
-              <span>Scrap Calls (&le; 6s)</span>
+              <span>Scrap Calls (&lt; 6s)</span>
               <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'scrap' ? 'bg-rose-800 text-rose-100' : 'bg-rose-200 text-rose-800'}`}>
                 {counts.scrap}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setCategoryFilter('review')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                categoryFilter === 'review'
+                  ? 'bg-amber-500 text-black shadow-xs'
+                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
+              }`}
+            >
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>Review Required</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'review' ? 'bg-black text-white' : 'bg-amber-200 text-amber-900'}`}>
+                {counts.review}
               </span>
             </button>
           </div>
@@ -577,7 +662,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 onClick={handleDeleteAllScrap}
                 disabled={isDeleting}
                 className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-amber-300 cursor-pointer transition-colors"
-                title="Purge all short scrap recordings (≤ 6-8 seconds)"
+                title="Purge all short scrap recordings (< 6 seconds)"
               >
                 <Trash2 className="w-3.5 h-3.5 text-amber-700" />
                 <span>Purge Scrap ({counts.scrap})</span>
@@ -662,7 +747,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 filteredCalls.map((call) => {
                   const isSelected = selectedCallIds.has(call.id);
                   const dur = call.duration_seconds || 0;
-                  const isShortScrap = call.call_type === 'scrap' || (dur > 0 && dur <= 6);
+                  const isShortScrap = call.call_type === 'scrap' || (dur > 0 && dur < 6);
                   const isPreOrder = call.call_type === 'pre_order';
                   const isEditingThis = editingCallId === call.id;
 
@@ -728,17 +813,23 @@ export const CallsView: React.FC<CallsViewProps> = ({
                           </div>
                         ) : (
                           <div className="flex items-center gap-1.5">
-                            <span
-                              className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
-                                isPreOrder
-                                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                                  : isShortScrap
-                                  ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                  : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
-                              }`}
-                            >
-                              {isPreOrder ? 'Pre-Order' : isShortScrap ? 'Scrap Call' : 'Regular Call'}
-                            </span>
+                            {call.classification === 'REVIEW' || call.status === 'review' || call.pipeline_stage === 'REVIEW_PENDING' ? (
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-400">
+                                Review Required
+                              </span>
+                            ) : (
+                              <span
+                                className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                                  isPreOrder
+                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    : isShortScrap
+                                    ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                                    : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
+                                }`}
+                              >
+                                {isPreOrder ? 'Pre-Order' : isShortScrap ? 'Scrap Call' : 'Regular Call'}
+                              </span>
+                            )}
                             <button
                               onClick={() => {
                                 setEditingCallId(call.id);
@@ -792,12 +883,22 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
                       {/* Classification Evidence / Reason */}
                       <td className="py-2.5 px-3 max-w-[240px] truncate text-neutral-600" title={call.preorder_evidence || ''}>
-                        {call.preorder_evidence || (isPreOrder ? 'Order confirmation detected' : isShortScrap ? 'Duration <= 6s' : 'Advisory / Market discussion')}
+                        {call.preorder_evidence || (isPreOrder ? 'Order confirmation detected' : isShortScrap ? 'Duration < 6s' : 'Advisory / Market discussion')}
                       </td>
 
                       {/* Actions */}
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
+                          {(call.classification === 'REVIEW' || call.status === 'review' || call.pipeline_stage === 'REVIEW_PENDING') && (
+                            <button
+                              onClick={() => handleOpenCallDetail(call)}
+                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-black font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                              title="Resolve compliance review"
+                            >
+                              <AlertTriangle className="w-3 h-3" />
+                              <span>Resolve</span>
+                            </button>
+                          )}
                           {isPreOrder && (
                             <button
                               onClick={() => onForceAudit(call.id)}
@@ -808,7 +909,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                             </button>
                           )}
                           <button
-                            onClick={() => setSelectedCall(call)}
+                            onClick={() => handleOpenCallDetail(call)}
                             className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-200 rounded-md cursor-pointer"
                             title="View speech transcript and detail"
                           >
@@ -885,6 +986,128 @@ export const CallsView: React.FC<CallsViewProps> = ({
               </div>
             </div>
 
+            {/* Pipeline Stage, Gate & Diagnostics */}
+            <div className="p-3 bg-neutral-900 text-white rounded-xl border border-neutral-800 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-amber-400 font-bold uppercase tracking-wider text-[10px]">
+                  Pipeline Stage &amp; Diagnostic Telemetry
+                </span>
+                <span className="px-2 py-0.5 rounded bg-neutral-800 font-mono text-[10px] text-neutral-300">
+                  Gate: {selectedCall.current_gate || 'N/A'}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Stage:</span>
+                  <span className="font-mono font-semibold text-neutral-100">{selectedCall.pipeline_stage || 'IN_PROGRESS'}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Audit Status:</span>
+                  <span className="font-mono font-semibold text-neutral-100">{selectedCall.audit_status || 'PENDING'}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Processing:</span>
+                  <span className="font-mono font-semibold text-neutral-100">{selectedCall.processing_status || 'IDLE'}</span>
+                </div>
+                <div>
+                  <span className="text-neutral-400 block text-[10px]">Retry Count:</span>
+                  <span className="font-mono font-semibold text-neutral-100">{selectedCall.retry_count || 0}</span>
+                </div>
+              </div>
+              {(selectedCall.gate_reason || selectedCall.failure_reason) && (
+                <div className="pt-1 border-t border-neutral-800 text-[11px] text-neutral-300">
+                  <span className="text-neutral-400">Gate Reason: </span>
+                  <span>{selectedCall.gate_reason || selectedCall.failure_reason}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Human-in-the-Loop Review Resolution Workflow */}
+            {(selectedCall.classification === 'REVIEW' || selectedCall.status === 'review' || selectedCall.pipeline_stage === 'REVIEW_PENDING') && (
+              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600" />
+                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                      Compliance Review Required (REVIEW_PENDING)
+                    </h4>
+                  </div>
+                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-full">
+                    Awaiting Officer Decision
+                  </span>
+                </div>
+
+                <p className="text-xs text-amber-900">
+                  Order intent was marked ambiguous during automatic intent classification. Review the transcript below and specify resolution.
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-semibold text-neutral-800">Target Category:</label>
+                    <select
+                      value={resolvedClassification}
+                      onChange={(e) => setResolvedClassification(e.target.value as any)}
+                      className="text-xs font-bold px-2 py-1 border border-neutral-300 rounded-md bg-white"
+                    >
+                      <option value="PRE_ORDER">PRE_ORDER (Spoken order instruction)</option>
+                      <option value="REGULAR">REGULAR (Advisory / Query only)</option>
+                      <option value="SCRAP">SCRAP (Non-actionable / noise)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-neutral-800 block mb-1">Compliance Notes:</label>
+                    <input
+                      type="text"
+                      placeholder="e.g., Confirmed client instructed buy order at 01:23; proceeding to audit."
+                      value={reviewNotes}
+                      onChange={(e) => setReviewNotes(e.target.value)}
+                      className="w-full text-xs px-3 py-1.5 border border-neutral-300 rounded-lg bg-white"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <button
+                      onClick={() => handleResolveReview(selectedCall.id, 'CONTINUE')}
+                      disabled={isResolvingReview}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                    >
+                      <Check className="w-4 h-4" />
+                      <span>{isResolvingReview ? 'Resolving...' : 'Approve & Continue Audit'}</span>
+                    </button>
+                    <button
+                      onClick={() => handleResolveReview(selectedCall.id, 'REJECT')}
+                      disabled={isResolvingReview}
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                    >
+                      <X className="w-4 h-4" />
+                      <span>{isResolvingReview ? 'Resolving...' : 'Reject & Exclude'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Previous Review Resolution History */}
+            {selectedCall.review_resolution && (
+              <div className="p-3 bg-neutral-100 border border-neutral-300 rounded-xl text-xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-neutral-800">Human Resolution History:</span>
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    selectedCall.review_resolution === 'CONTINUED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                  }`}>
+                    {selectedCall.review_resolution}
+                  </span>
+                </div>
+                {selectedCall.review_resolution_notes && (
+                  <p className="text-neutral-700 text-[11px]">Notes: "{selectedCall.review_resolution_notes}"</p>
+                )}
+                {selectedCall.review_resolved_at && (
+                  <p className="text-neutral-400 text-[10px]">Resolved at: {selectedCall.review_resolved_at}</p>
+                )}
+              </div>
+            )}
+
             <div>
               <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-1.5">
                 Classification Reason
@@ -894,14 +1117,71 @@ export const CallsView: React.FC<CallsViewProps> = ({
               </p>
             </div>
 
+            {/* SEBI Hierarchical Correlation: Orders & Executions */}
+            {selectedCall.orders && selectedCall.orders.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center justify-between">
+                  <span>Extracted Call Orders ({selectedCall.orders.length})</span>
+                  <span className="text-[10px] font-normal text-neutral-500">
+                    1 Call → Multiple Orders &amp; Executions
+                  </span>
+                </h4>
+                <div className="space-y-2">
+                  {selectedCall.orders.map((order, idx) => {
+                    const orderExecs = (selectedCall.executions || []).filter((e) => e.order_id === order.id);
+                    const totalFilled = orderExecs.reduce((acc, curr) => acc + curr.matched_quantity, 0);
+                    const isFullyFilled = order.quantity != null && totalFilled >= order.quantity;
+                    return (
+                      <div key={order.id || idx} className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${order.intent_type === 'SELL' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {order.intent_type}
+                            </span>
+                            <span className="font-bold text-neutral-900">{order.symbol || 'Stock'}</span>
+                            <span className="text-neutral-500">Qty: {order.quantity || '—'}</span>
+                            <span className="text-neutral-500">Price: {order.price_type === 'CMP' ? 'CMP' : (order.limit_price ? `₹${order.limit_price}` : 'Market')}</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            isFullyFilled ? 'bg-emerald-100 text-emerald-800' : totalFilled > 0 ? 'bg-amber-100 text-amber-800' : 'bg-neutral-200 text-neutral-700'
+                          }`}>
+                            {isFullyFilled ? 'FULLY EXECUTED' : totalFilled > 0 ? `PARTIAL (${totalFilled}/${order.quantity || '?'})` : 'UNMATCHED'}
+                          </span>
+                        </div>
+
+                        {orderExecs.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-neutral-200 space-y-1">
+                            <div className="text-[10px] font-bold text-neutral-600">
+                              Linked Executions ({orderExecs.length}):
+                            </div>
+                            {orderExecs.map((exec, eIdx) => (
+                              <div key={exec.id || eIdx} className="flex items-center justify-between text-[11px] bg-white p-2 rounded border border-neutral-200">
+                                <span className="font-mono text-neutral-700">
+                                  Trade #{exec.trade_id}: {exec.matched_quantity} shares @ ₹{exec.trade_price || '—'}
+                                </span>
+                                <span className="text-neutral-500">
+                                  {exec.trade_time ? `${exec.trade_date || ''} ${exec.trade_time}` : 'Executed'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div>
               <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-1.5">
-                Spoken Speech Transcript &amp; Evidence Highlights
+                Spoken Speech Transcript &amp; Speaker Diarization
               </h4>
-              <div className="p-3.5 bg-neutral-950 text-neutral-200 font-mono text-xs rounded-xl border border-neutral-800 max-h-64 overflow-y-auto">
+              <div className="p-3 bg-neutral-950 text-neutral-200 text-xs rounded-xl border border-neutral-800">
                 <TranscriptHighlighter
                   transcript={selectedCall.transcript || ''}
                   clientCode={selectedCall.client}
+                  advisorName={selectedCall.caller_name || selectedCall.dealer}
                 />
               </div>
             </div>

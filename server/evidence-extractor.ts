@@ -14,6 +14,7 @@ import {
   normalizeClientCode,
 } from './normalizer';
 import type { TradeRecord } from '../src/types';
+import type { StructuredOrderExtraction } from './pipeline/types';
 
 export interface SpokenEvidenceItem {
   id: string;
@@ -147,32 +148,63 @@ export function extractSpokenEvidence(
   // 2. Stock / Symbol Extraction
   const detectedSymbols: SpokenEvidenceItem[] = [];
   const lowerTranscript = transcript.toLowerCase();
+  interface SymbolCandidate {
+    symKey: string;
+    quote: string;
+    start: number;
+    end: number;
+    confidence: number;
+  }
+  const symbolCandidates: SymbolCandidate[] = [];
 
   for (const [symKey, aliases] of Object.entries(SYMBOL_ALIASES)) {
     for (const alias of aliases) {
       const aliasEscaped = alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const aliasRegex = new RegExp(`\\b${aliasEscaped}\\b`, 'i');
-      const match = lowerTranscript.match(aliasRegex);
-      if (match) {
-        const quote = match[0];
-        const ts = findTimestamps(quote);
-        const item: SpokenEvidenceItem = {
-          id: nextId('symbol'),
-          field: 'symbol',
-          value: quote,
-          normalized_value: symKey,
-          exact_quote: quote,
-          speaker: ts.speaker,
-          timestamp_start: ts.start,
-          timestamp_end: ts.end,
-          source: 'primary_asr',
+      const aliasRegex = new RegExp(`\\b${aliasEscaped}\\b`, 'gi');
+      let m: RegExpExecArray | null;
+      while ((m = aliasRegex.exec(lowerTranscript)) !== null) {
+        symbolCandidates.push({
+          symKey,
+          quote: transcript.slice(m.index, m.index + m[0].length),
+          start: m.index,
+          end: m.index + m[0].length,
           confidence: 0.95,
-        };
-        detectedSymbols.push(item);
-        evidenceItems.push(item);
-        break; // matched this canonical symbol
+        });
       }
     }
+  }
+
+  // S-02, S-03: Substring anti-collision - sort by length descending, reject overlapping shorter substrings
+  symbolCandidates.sort((a, b) => b.quote.length - a.quote.length);
+  const selectedCandidates: SymbolCandidate[] = [];
+  for (const cand of symbolCandidates) {
+    const overlaps = selectedCandidates.some(
+      (sel) => cand.start < sel.end && sel.start < cand.end
+    );
+    if (!overlaps) {
+      selectedCandidates.push(cand);
+    }
+  }
+
+  // Sort selected candidates by appearance order in transcript
+  selectedCandidates.sort((a, b) => a.start - b.start);
+
+  for (const sc of selectedCandidates) {
+    const ts = findTimestamps(sc.quote);
+    const item: SpokenEvidenceItem = {
+      id: nextId('symbol'),
+      field: 'symbol',
+      value: sc.quote,
+      normalized_value: sc.symKey,
+      exact_quote: sc.quote,
+      speaker: ts.speaker,
+      timestamp_start: ts.start,
+      timestamp_end: ts.end,
+      source: 'primary_asr',
+      confidence: sc.confidence,
+    };
+    detectedSymbols.push(item);
+    evidenceItems.push(item);
   }
 
   // Also check reference trade symbol if not in aliases
@@ -198,28 +230,50 @@ export function extractSpokenEvidence(
     }
   }
 
-  // 3. Buy / Sell Side Extraction
+  // 3. Buy / Sell Side Extraction (supporting multiple order directives)
   const detectedSides: SpokenEvidenceItem[] = [];
-  const buySell = detectBuySell(transcript);
-  if (buySell.side && buySell.quote) {
-    const ts = findTimestamps(buySell.quote);
+  const sideRegex = /\b(buy(?:ing)?|purchase|khareed(?:na|o|iye)?|sell(?:ing)?|bech(?:na|o|iye)?)\b/gi;
+  let sm: RegExpExecArray | null;
+  while ((sm = sideRegex.exec(transcript)) !== null) {
+    const rawMatch = sm[0];
+    const isBuy = /^(?:buy|purchase|khareed)/i.test(rawMatch);
+    const sideVal: 'BUY' | 'SELL' = isBuy ? 'BUY' : 'SELL';
+    const ts = findTimestamps(rawMatch);
     const item: SpokenEvidenceItem = {
       id: nextId('side'),
       field: 'side',
-      value: buySell.side,
-      normalized_value: buySell.side,
-      exact_quote: buySell.quote,
+      value: sideVal,
+      normalized_value: sideVal,
+      exact_quote: rawMatch,
       speaker: ts.speaker,
       timestamp_start: ts.start,
       timestamp_end: ts.end,
       source: 'primary_asr',
-      confidence: buySell.confidence,
+      confidence: 0.95,
     };
     detectedSides.push(item);
     evidenceItems.push(item);
   }
-  if (buySell.conflict) {
-    conflictReasons.push('BUY vs SELL conflict detected in spoken dialogue.');
+
+  if (detectedSides.length === 0) {
+    const buySell = detectBuySell(transcript);
+    if (buySell.side && buySell.quote) {
+      const ts = findTimestamps(buySell.quote);
+      const item: SpokenEvidenceItem = {
+        id: nextId('side'),
+        field: 'side',
+        value: buySell.side,
+        normalized_value: buySell.side,
+        exact_quote: buySell.quote,
+        speaker: ts.speaker,
+        timestamp_start: ts.start,
+        timestamp_end: ts.end,
+        source: 'primary_asr',
+        confidence: buySell.confidence,
+      };
+      detectedSides.push(item);
+      evidenceItems.push(item);
+    }
   }
 
   // 4. Derivatives (Call/Put, CE/PE, Strike)
@@ -427,6 +481,43 @@ export function extractSpokenEvidence(
     }
   }
 
+  // Sort quantities and prices in order of appearance in transcript, and deduplicate overlapping matches
+  detectedQuantities.sort((a, b) => {
+    const idxA = transcript.toLowerCase().indexOf(a.exact_quote.toLowerCase());
+    const idxB = transcript.toLowerCase().indexOf(b.exact_quote.toLowerCase());
+    return idxA - idxB;
+  });
+
+  const dedupedQuantities: SpokenEvidenceItem[] = [];
+  for (const q of detectedQuantities) {
+    const qIndex = transcript.toLowerCase().indexOf(q.exact_quote.toLowerCase());
+    const isDup = dedupedQuantities.some((ex) => {
+      const exIndex = transcript.toLowerCase().indexOf(ex.exact_quote.toLowerCase());
+      return ex.normalized_value === q.normalized_value && Math.abs(exIndex - qIndex) < 30;
+    });
+    if (!isDup) dedupedQuantities.push(q);
+  }
+  detectedQuantities.length = 0;
+  detectedQuantities.push(...dedupedQuantities);
+
+  detectedPrices.sort((a, b) => {
+    const idxA = transcript.toLowerCase().indexOf(a.exact_quote.toLowerCase());
+    const idxB = transcript.toLowerCase().indexOf(b.exact_quote.toLowerCase());
+    return idxA - idxB;
+  });
+
+  const dedupedPrices: SpokenEvidenceItem[] = [];
+  for (const p of detectedPrices) {
+    const pIndex = transcript.toLowerCase().indexOf(p.exact_quote.toLowerCase());
+    const isDup = dedupedPrices.some((ex) => {
+      const exIndex = transcript.toLowerCase().indexOf(ex.exact_quote.toLowerCase());
+      return ex.normalized_value === p.normalized_value && Math.abs(exIndex - pIndex) < 30;
+    });
+    if (!isDup) dedupedPrices.push(p);
+  }
+  detectedPrices.length = 0;
+  detectedPrices.push(...dedupedPrices);
+
   // 6. Customer Acknowledgement (Q4)
   const ack = evaluateCustomerAcknowledgement(transcript);
   const ackTs = findTimestamps(ack.quote);
@@ -534,4 +625,107 @@ export function extractSpokenEvidence(
     hasCriticalConflict,
     conflictReasons,
   };
+}
+
+/**
+ * Extracts structured order objects from conversation dialogue (O-01 through O-12).
+ * Strictly preserves null values for omitted parameters (no invented values).
+ * Links each extracted field to exact transcript segment evidence.
+ */
+export function extractStructuredOrders(
+  transcript: string,
+  segments: SegmentInfo[] = [],
+  referenceTrade?: TradeRecord
+): StructuredOrderExtraction[] {
+  const callEvidence = extractSpokenEvidence(transcript, segments, referenceTrade);
+  const orders: StructuredOrderExtraction[] = [];
+
+  // Helper to map evidence segment IDs
+  const getEvidenceSegmentIds = (quote?: string): string[] => {
+    if (!quote || segments.length === 0) return [];
+    const lowerQuote = quote.toLowerCase();
+    const matched = segments
+      .map((s, idx) => ({ id: `seg_${idx + 1}`, text: s.text.toLowerCase() }))
+      .filter((s) => s.text.includes(lowerQuote))
+      .map((s) => s.id);
+    return matched.length > 0 ? matched : [];
+  };
+
+  // Detect temporal context
+  const isHistorical = /\b(?:yesterday|kal\s+(?:liya|becha|kar\s+diya)|already\s+done|previously\s+executed|last\s+week)\b/i.test(transcript);
+  const isFuture = /\b(?:tomorrow|kal\s+(?:dena|karenge|dekhna)|next\s+week|after\s+some\s+time)\b/i.test(transcript);
+  const timing = isHistorical ? 'HISTORICAL' : isFuture ? 'FUTURE' : 'CURRENT';
+
+  // Extract client UCC
+  const spokenUcc = callEvidence.detectedClientCode ? String(callEvidence.detectedClientCode.normalized_value) : (referenceTrade?.client ? normalizeClientCode(referenceTrade.client) : null);
+  const uccEvidence = callEvidence.detectedClientCode?.exact_quote ? getEvidenceSegmentIds(callEvidence.detectedClientCode.exact_quote) : [];
+
+  // Iterate over detected actions or default single order
+  const detectedSide = detectBuySell(transcript);
+  const actionItems = callEvidence.detectedSides.length > 0 ? callEvidence.detectedSides : [{
+    value: detectedSide.side || null,
+    exact_quote: detectedSide.quote || '',
+    confidence: detectedSide.confidence,
+  }];
+
+  const symbolItems = callEvidence.detectedSymbols;
+  const quantityItems = callEvidence.detectedQuantities;
+  const priceItems = callEvidence.detectedPrices;
+  const hasCmp = callEvidence.hasCmpMention || mentionsMarketPriceOrCMP(transcript);
+
+  const numOrders = Math.max(1, Math.min(actionItems.length, Math.max(symbolItems.length, 1)));
+
+  for (let i = 0; i < numOrders; i++) {
+    const actItem = actionItems[i] || actionItems[0];
+    const symItem = symbolItems[i] || symbolItems[0];
+    const qtyItem = quantityItems[i] || quantityItems[0];
+    const prcItem = priceItems[i] || priceItems[0];
+
+    const actionVal = (actItem?.value as 'BUY' | 'SELL') || null;
+    const symbolVal = symItem ? String(symItem.normalized_value) : (referenceTrade && matchSymbolInTranscript(referenceTrade.symbol, transcript).matched ? referenceTrade.symbol : null);
+    const qtyVal = qtyItem ? Number(qtyItem.normalized_value) : null;
+    const isOrderCmp = prcItem?.normalized_value === 'CMP' || (i === 0 && hasCmp && (!prcItem || typeof prcItem.normalized_value !== 'number'));
+    const isNumericPrice = prcItem && typeof prcItem.normalized_value === 'number' && prcItem.normalized_value > 0;
+
+    const priceVal = isOrderCmp ? null : (isNumericPrice ? Number(prcItem.normalized_value) : null);
+    const priceTypeVal = isOrderCmp ? 'CMP' : (isNumericPrice ? 'LIMIT' : (hasCmp ? 'CMP' : null));
+
+    const evidenceObj: StructuredOrderExtraction['evidence'] = {};
+    if (actItem?.exact_quote) evidenceObj.action = getEvidenceSegmentIds(actItem.exact_quote);
+    if (symItem?.exact_quote) evidenceObj.symbol = getEvidenceSegmentIds(symItem.exact_quote);
+    if (qtyItem?.exact_quote) evidenceObj.quantity = getEvidenceSegmentIds(qtyItem.exact_quote);
+    if (hasCmp) evidenceObj.price_type = getEvidenceSegmentIds('cmp');
+    if (prcItem?.exact_quote) evidenceObj.price = getEvidenceSegmentIds(prcItem.exact_quote);
+    if (callEvidence.detectedClientCode?.exact_quote) evidenceObj.ucc = uccEvidence;
+
+    const confAction = actItem?.confidence || (actionVal ? 0.90 : 0);
+    const confSymbol = symItem?.confidence || (symbolVal ? 0.90 : 0);
+    const confQty = qtyItem?.confidence || (qtyVal !== null ? 0.90 : 0);
+    const confPrice = hasCmp ? 0.95 : (prcItem?.confidence || (priceVal !== null ? 0.85 : 0));
+    const confUcc = callEvidence.detectedClientCode?.confidence || (spokenUcc ? 0.80 : 0);
+
+    const scores = [confAction, confSymbol, confQty, confPrice].filter((s) => s > 0);
+    const overall = scores.length > 0 ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(2)) : 0.50;
+
+    orders.push({
+      action: actionVal,
+      symbol: symbolVal,
+      quantity: qtyVal,
+      price: priceVal,
+      price_type: priceTypeVal,
+      ucc: spokenUcc,
+      order_timing: timing,
+      confidence: {
+        action: confAction,
+        symbol: confSymbol,
+        quantity: confQty,
+        price: confPrice,
+        ucc: confUcc,
+        overall,
+      },
+      evidence: evidenceObj,
+    });
+  }
+
+  return orders;
 }

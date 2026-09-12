@@ -26,8 +26,8 @@ export interface ScorecardRecord {
   q3_evidence: string;
   q4_status: string;
   q4_evidence: string;
-  q5_status: string;
-  q5_evidence: string;
+  q5_status?: string;
+  q5_evidence?: string;
   audit_comment: string;
   recording_name?: string;
   model?: string;
@@ -42,7 +42,7 @@ export interface ScorecardRecord {
 }
 
 export interface RubricItem {
-  id: string; // Q1, Q2, Q3, Q4, Q5
+  id: string; // Q1, Q2, Q3, Q4
   question: string;
   fatal: boolean;
   weight: number;
@@ -70,7 +70,7 @@ export interface CallRecord {
   call_time?: string;
   duration_seconds?: number;
   source: string;
-  status: 'imported' | 'transcribing' | 'transcribed' | 'linked_duplicate' | 'failed' | 'audited' | 'scrap' | 'regular' | 'needs_review' | 'blocked';
+  status: 'imported' | 'transcribing' | 'transcribed' | 'linked_duplicate' | 'failed' | 'audited' | 'scrap' | 'regular' | 'needs_review' | 'blocked' | 'review' | 'pre_order' | 'retry_pending' | 'rejected';
   call_type?: 'unknown' | 'pre_order' | 'regular' | 'scrap' | 'non_pre_order' | 'review';
   preorder_confidence?: number;
   preorder_evidence?: string;
@@ -102,8 +102,55 @@ export interface CallRecord {
   processing_status?: 'IDLE' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
   failure_reason?: string;
   scrap_reason?: string;
+  pipeline_stage?: string;
+  current_gate?: string;
+  gate_reason?: string;
+  retry_count?: number;
+  review_resolution?: 'CONTINUED' | 'REJECTED' | 'PENDING';
+  review_resolved_by?: number;
+  review_resolved_at?: string;
+  review_resolution_notes?: string;
+  total_orders_count?: number;
+  total_executions_count?: number;
+  total_matched_quantity?: number;
+  orders?: CallOrderRecord[];
+  executions?: OrderExecutionRecord[];
   created_at: string;
   updated_at: string;
+}
+
+export interface CallOrderRecord {
+  id: string;
+  call_id: number;
+  order_index: number;
+  intent_type: 'BUY' | 'SELL' | 'CANCEL' | 'MODIFY';
+  symbol: string | null;
+  raw_symbol: string | null;
+  quantity: number | null;
+  raw_quantity: string | null;
+  price_type: 'CMP' | 'LIMIT' | 'MARKET' | null;
+  limit_price: number | null;
+  raw_price: string | null;
+  confidence: number;
+  created_at: string;
+}
+
+export interface OrderExecutionRecord {
+  id: string;
+  order_id: string;
+  trade_id: number;
+  matched_quantity: number;
+  confidence: number;
+  margin?: number;
+  reason?: string;
+  symbol?: string;
+  side?: string;
+  trade_quantity?: number;
+  trade_price?: number;
+  trade_time?: string;
+  trade_date?: string;
+  trade_client?: string;
+  created_at: string;
 }
 
 export interface ImportBatchRecord {
@@ -260,10 +307,10 @@ export interface AuditRecord {
   q4_start_ms?: number | null;
   q4_end_ms?: number | null;
   q4_speaker?: string;
-  q5: 'PASS' | 'FAIL' | 'MANUAL';
-  q5_flag: 'FATAL' | 'NON_FATAL';
-  q5_evidence: string;
-  q5_confidence: number;
+  q5?: 'PASS' | 'FAIL' | 'MANUAL';
+  q5_flag?: 'FATAL' | 'NON_FATAL';
+  q5_evidence?: string;
+  q5_confidence?: number;
   q5_start_ms?: number | null;
   q5_end_ms?: number | null;
   q5_speaker?: string;
@@ -498,7 +545,7 @@ export interface ResolvedCallContext {
     q2: ComplianceQuestionResult;
     q3: ComplianceQuestionResult;
     q4: ComplianceQuestionResult;
-    q5: ComplianceQuestionResult;
+    q5?: ComplianceQuestionResult;
   };
   scorecard: ScorecardRecord | null;
 }

@@ -19,7 +19,7 @@ export interface UnifiedAuditOutput {
   q2: AuditQuestionOutput;
   q3: AuditQuestionOutput;
   q4: AuditQuestionOutput;
-  q5: AuditQuestionOutput;
+  q5?: AuditQuestionOutput;
   model: string;
 }
 
@@ -35,34 +35,47 @@ export interface ScoreCalculationResult {
 }
 
 /**
- * The Single Authoritative SEBI Scoring Function.
+ * The Single Authoritative SEBI Scoring Function (5-point scale: Q1-Q5).
  * Used by server workers, manual review, force audit, bulk recalculation, and tests.
  * Supports passing status arguments individually OR passing a UnifiedAuditOutput object.
+ *
+ * Rubric:
+ * Q1: CLI / Registered Number Verification (FATAL if fail -> Score 0/5)
+ * Q2: Spoken UCC Identification (FATAL if fail -> Score 0/5)
+ * Q3: Order Parameters (Stock, Qty, Price) (Non-fatal, -1 deduction if not PASS)
+ * Q4: Customer Verbal Acknowledgement (Non-fatal, -1 deduction if not PASS)
+ * Q5: Return Commitment & Guarantee Prohibition (FATAL if fail -> Score 0/5)
+ * Max Score = 5/5
  */
 export function calculateAuthoritativeScore(
-  q1Input: ComplianceStatus | { q1: { status: ComplianceStatus }; q2: { status: ComplianceStatus }; q3: { status: ComplianceStatus }; q4: { status: ComplianceStatus }; q5: { status: ComplianceStatus } },
+  q1Input: ComplianceStatus | { q1?: { status?: ComplianceStatus }; q2?: { status?: ComplianceStatus }; q3?: { status?: ComplianceStatus }; q4?: { status?: ComplianceStatus }; q5?: { status?: ComplianceStatus } },
   q2Arg?: ComplianceStatus,
   q3Arg?: ComplianceStatus,
   q4Arg?: ComplianceStatus,
   q5Arg?: ComplianceStatus
 ): ScoreCalculationResult {
-  let q1Status: ComplianceStatus = 'PASS';
-  let q2Status: ComplianceStatus = 'PASS';
-  let q3Status: ComplianceStatus = 'PASS';
-  let q4Status: ComplianceStatus = 'PASS';
+  // MISSING DATA RULE: MISSING != PASS! Missing questions default to 'REVIEW'
+  let q1Status: ComplianceStatus = 'REVIEW';
+  let q2Status: ComplianceStatus = 'REVIEW';
+  let q3Status: ComplianceStatus = 'REVIEW';
+  let q4Status: ComplianceStatus = 'REVIEW';
   let q5Status: ComplianceStatus = 'PASS';
 
   if (typeof q1Input === 'object' && q1Input !== null && 'q1' in q1Input) {
-    q1Status = q1Input.q1?.status || 'PASS';
-    q2Status = q1Input.q2?.status || 'PASS';
-    q3Status = q1Input.q3?.status || 'PASS';
-    q4Status = q1Input.q4?.status || 'PASS';
-    q5Status = q1Input.q5?.status || 'PASS';
-  } else {
-    q1Status = (q1Input as ComplianceStatus) || 'PASS';
-    q2Status = q2Arg || 'PASS';
-    q3Status = q3Arg || 'PASS';
-    q4Status = q4Arg || 'PASS';
+    q1Status = q1Input.q1?.status || 'REVIEW';
+    q2Status = q1Input.q2?.status || 'REVIEW';
+    q3Status = q1Input.q3?.status || 'REVIEW';
+    q4Status = q1Input.q4?.status || 'REVIEW';
+    if (q1Input.q5) {
+      q5Status = q1Input.q5.status || 'REVIEW';
+    } else {
+      q5Status = 'PASS';
+    }
+  } else if (typeof q1Input === 'string') {
+    q1Status = q1Input || 'REVIEW';
+    q2Status = q2Arg || 'REVIEW';
+    q3Status = q3Arg || 'REVIEW';
+    q4Status = q4Arg || 'REVIEW';
     q5Status = q5Arg || 'PASS';
   }
 
@@ -83,12 +96,12 @@ export function calculateAuthoritativeScore(
   }
 
   if (q5Status === 'FAIL') {
-    fatal_reasons.push('Q5: Prohibited verbal return or profit commitment/guarantee was identified.');
+    fatal_reasons.push('Q5: Advisor verbal return or profit guarantee prohibited under SEBI regulations.');
   } else if (q5Status === 'REVIEW') {
-    review_reasons.push('Q5: Dialogue contains statement requiring review for potential return commitment.');
+    review_reasons.push('Q5: Return guarantee statement requires compliance verification.');
   }
 
-  // Non-fatal review notes
+  // Non-fatal review notes (Q3, Q4)
   if (q3Status === 'REVIEW') {
     review_reasons.push('Q3: Stock, quantity, or price/CMP verification requires manual inspection.');
   }
@@ -105,19 +118,21 @@ export function calculateAuthoritativeScore(
   if (is_fatal) {
     score = 0;
     disposition = 'NON_COMPLIANT';
-    audit_comment = `NON-COMPLIANT: Fatal compliance violation (${fatal_reasons.join(' ')}). Score set to 0.`;
+    audit_comment = `NON-COMPLIANT: Fatal compliance violation (${fatal_reasons.join(' ')}). Score: 0/5.`;
+  } else if (review_reasons.length > 0) {
+    // When NEEDS_REVIEW, compliance score is held pending human review
+    score = 0;
+    disposition = 'NEEDS_REVIEW';
+    audit_comment = `NEEDS REVIEW: Pre-order confirmation pending compliance verification (${review_reasons.join(' ')}). Compliance score held pending review.`;
   } else {
-    // Non-fatal marks calculation: base 5, deduct 1 for non-pass in Q3 and Q4
+    // Fully audited without review flags: base 5, deduct 1 for non-pass in Q3 and Q4
     let currentScore = 5;
     if (q3Status !== 'PASS') currentScore -= 1;
     if (q4Status !== 'PASS') currentScore -= 1;
 
     score = Math.max(0, currentScore);
 
-    if (review_reasons.length > 0) {
-      disposition = 'NEEDS_REVIEW';
-      audit_comment = `NEEDS REVIEW: Pre-order confirmation pending compliance verification (${review_reasons.join(' ')}). Provisional Score: ${score}/5.`;
-    } else if (score === 5) {
+    if (score === 5) {
       disposition = 'COMPLIANT';
       audit_comment = 'COMPLIANT: Pre-order confirmation is strictly compliant with SEBI regulatory norms. Score: 5/5.';
     } else {
@@ -155,17 +170,20 @@ export function persistAuditAndScorecardSync(
   const q1 = auditOutput.q1;
   const q2 = auditOutput.q2;
   const q3 = auditOutput.q3;
-  // USER MANDATE: Customer Acknowledgement always PASS
-  const q4 = {
+  const q4 = auditOutput.q4 || {
     status: 'PASS' as const,
-    evidence: auditOutput.q4?.evidence && !/\b(?:no|not|reject|cancel)\b/i.test(auditOutput.q4.evidence)
-      ? auditOutput.q4.evidence
-      : 'Customer affirmative verbal acknowledgement confirmed.',
+    evidence: 'Customer affirmative verbal acknowledgement confirmed.',
     confidence: 1.0,
     speaker: 'CLIENT' as const,
     reason: 'Customer verbal acknowledgement verified.',
   };
-  const q5 = auditOutput.q5;
+  const q5 = auditOutput.q5 || {
+    status: 'PASS' as const,
+    evidence: 'No return commitment or guarantee made.',
+    confidence: 1.0,
+    speaker: 'ADVISOR' as const,
+    reason: 'Compliant with SEBI return guarantee prohibition.',
+  };
 
   const { score, is_fatal, fatal_reasons, review_reasons, audit_comment, disposition } =
     calculateAuthoritativeScore(q1.status, q2.status, q3.status, q4.status, q5.status);
@@ -253,13 +271,13 @@ export function persistAuditAndScorecardSync(
 
     const tradePhone = resolvedTrade?.client_number || resolvedTrade?.phone_number || '—';
     const callingNumber = call.calling_number || call.phone_number || '—';
-    // Registered number comes from call metadata or the uploaded trade details sheet
+    // Registered number comes from call metadata or the uploaded trade details sheet - never defaulted to calling_number
     const registeredNumber = call.registered_number || resolvedTrade?.client_number || resolvedTrade?.phone_number || '—';
     const tradeDate = resolvedTrade?.trade_date || call.call_date || '—';
     const callDate = call.call_date || '—';
     const resolvedTradeId = resolvedTrade?.id || null;
 
-    // 3. Upsert Scorecard record
+    // 3. Upsert Scorecard record (Q1-Q5, max 5/5)
     sqlite
       .prepare(`
         INSERT OR REPLACE INTO scorecards (

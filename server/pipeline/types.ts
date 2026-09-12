@@ -7,7 +7,7 @@ export type IdentitySource = 'METADATA' | 'FILENAME' | 'TRADE_EXACT' | 'MANUAL';
 
 export type TranscriptStatus = 'PENDING' | 'VALID' | 'FAILED';
 
-export type CallClassification = 'PENDING' | 'PRE_ORDER' | 'REGULAR' | 'SCRAP' | 'REVIEW';
+export type CallClassification = 'PENDING' | 'ORDER_INTENT' | 'PRE_ORDER' | 'REGULAR' | 'SCRAP' | 'REVIEW';
 
 export type TradeMatchStatus = 'PENDING' | 'CONFIRMED' | 'REVIEW' | 'NO_MATCH';
 
@@ -95,14 +95,14 @@ export interface StageAuditResult {
   q1: AuditQuestionResult;
   q2: AuditQuestionResult;
   q3: AuditQuestionResult;
-  q4?: AuditQuestionResult;
-  q5: AuditQuestionResult;
+  q4: AuditQuestionResult;
+  q5?: AuditQuestionResult;
   model: string;
 }
 
 export interface StageScoreResult {
   score: number; // 0 to 5
-  max_score: 5;
+  max_score: 4 | 5;
   is_fatal: boolean;
   fatal_reasons: string[];
   review_reasons: string[];
@@ -140,4 +140,30 @@ export interface PipelineCallState {
   audit_status: AuditStageStatus;
   processing_status: ProcessingStatus;
   failure_reason?: string;
+}
+
+export interface StructuredOrderExtraction {
+  action: 'BUY' | 'SELL' | null;
+  symbol: string | null;
+  quantity: number | null;
+  price: number | null;
+  price_type: 'CMP' | 'LTP' | 'LIMIT' | 'MARKET' | null;
+  ucc: string | null;
+  order_timing: 'CURRENT' | 'HISTORICAL' | 'FUTURE' | 'UNKNOWN';
+  confidence: {
+    action: number;
+    symbol: number;
+    quantity: number;
+    price: number;
+    ucc: number;
+    overall: number;
+  };
+  evidence: {
+    action?: string[];
+    symbol?: string[];
+    quantity?: string[];
+    price?: string[];
+    price_type?: string[];
+    ucc?: string[];
+  };
 }

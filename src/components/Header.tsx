@@ -108,7 +108,7 @@ export const Header: React.FC<HeaderProps> = ({
           <span className="hidden sm:inline">Refresh</span>
         </button>
 
-        {/* API Key Status Pill */}
+        {/* Engine Key Status Pill */}
         <button
           onClick={onOpenAuth}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer shadow-xs ${
@@ -116,10 +116,10 @@ export const Header: React.FC<HeaderProps> = ({
               ? 'bg-amber-400/15 text-amber-400 border-amber-400/40 hover:bg-amber-400/25'
               : 'bg-neutral-900 text-amber-400 border-amber-400 animate-pulse hover:bg-neutral-800'
           }`}
-          title="Click to manage custom AI API keys"
+          title="Click to manage processing engine API keys"
         >
           <Key className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden sm:inline">{groqConfigured ? 'Groq Active' : 'API Key'}</span>
+          <span className="hidden sm:inline">{groqConfigured ? 'Engine Active' : 'API Key'}</span>
         </button>
 
         <div className="h-6 w-px bg-neutral-800" />
@@ -175,7 +175,7 @@ export const Header: React.FC<HeaderProps> = ({
                 className="w-full text-left px-3.5 py-2 hover:bg-neutral-900 hover:text-amber-400 flex items-center gap-2 text-neutral-300 cursor-pointer transition-colors"
               >
                 <Key className="w-4 h-4 text-amber-500" />
-                <span>AI Model &amp; API Key Setup</span>
+                <span>Processing Engine &amp; API Key Setup</span>
               </button>
 
               <div className="border-t border-neutral-800 my-1" />

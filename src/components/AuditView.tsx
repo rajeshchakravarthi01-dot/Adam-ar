@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { AuditRecord, CallRecord } from '../types';
+import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface AuditViewProps {
   audits: AuditRecord[];
@@ -207,7 +208,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
       alert('Please select calls to re-audit.');
       return;
     }
-    if (!confirm(`Re-audit ${ids.length} selected calls with Groq AI compliance engine?`)) return;
+    if (!confirm(`Re-audit ${ids.length} selected calls with compliance audit engine?`)) return;
 
     for (const id of ids) {
       try {
@@ -377,7 +378,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
             <span>Comprehensive Compliance Audit Master</span>
           </h2>
           <p className="text-xs text-neutral-500 mt-0.5">
-            Audit every call in one unified grid: Pass, Fail (Fatal), Not Audited, Scrap calls (&lt;8s), and Regular calls. 100 audits per page with bulk export.
+            Audit every call in one unified grid: Pass, Fail (Fatal), Not Audited, Scrap calls (&lt;6s), and Regular calls. 100 audits per page with bulk export.
           </p>
         </div>
 
@@ -470,7 +471,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
         >
           <div className="text-[11px] font-medium text-slate-600 flex items-center gap-1">
             <AlertTriangle className="w-3 h-3" />
-            <span>Scrap (&lt;8s)</span>
+            <span>Scrap (&lt;6s)</span>
           </div>
           <div className="text-lg font-extrabold text-slate-700 font-mono mt-0.5">{stats.scrap}</div>
         </button>
@@ -686,7 +687,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
                     {computedStatus === 'scrap' && (
                       <span className="px-2.5 py-1 bg-slate-100 text-slate-800 border border-slate-300 rounded-lg text-xs font-bold flex items-center gap-1">
                         <AlertTriangle className="w-3.5 h-3.5 text-slate-500" />
-                        <span>SCRAP CALL (&lt;8s)</span>
+                        <span>SCRAP CALL (&lt;6s)</span>
                       </span>
                     )}
 
@@ -877,7 +878,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
                       <span>Verbatim Evidences &amp; Audit Breakdown</span>
                       {audit && (
                         <span className="text-[11px] text-neutral-400 font-mono">
-                          Audit ID #{audit.id} · Evaluated by Groq AI
+                          Audit ID #{audit.id} · Evaluated by Compliance Engine
                         </span>
                       )}
                     </div>
@@ -913,13 +914,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
                             </div>
                           </div>
                           <div>
-                            <span className="font-bold text-neutral-300">Q5 Evidence (Return Commitment Prohibited):</span>
-                            <div className="p-2 bg-neutral-950 rounded border border-neutral-800 text-neutral-300 font-mono text-[11px] mt-0.5">
-                              {audit.q5_evidence || 'No return guarantees provided'}
-                            </div>
-                          </div>
-                          <div>
-                            <span className="font-bold text-neutral-300">Auditor / AI Summary Comment:</span>
+                            <span className="font-bold text-neutral-300">Auditor Summary Comment:</span>
                             <div className="p-2 bg-neutral-950 rounded border border-neutral-800 text-amber-300 font-mono text-[11px] mt-0.5">
                               {audit.audit_comment || 'Pre-order confirmation evaluated as per regulatory compliance norm.'}
                             </div>
@@ -928,15 +923,19 @@ export const AuditView: React.FC<AuditViewProps> = ({
                       </div>
                     ) : (
                       <div className="text-neutral-400 italic">
-                        This call has not been audited yet. Click "Run Audit" to analyze with Groq AI.
+                        This call has not been audited yet. Click "Run Audit" to analyze with compliance engine.
                       </div>
                     )}
 
                     {call.transcript && (
                       <div className="pt-2 border-t border-neutral-800">
-                        <span className="font-bold text-neutral-300 block mb-1">Raw Speech Transcript:</span>
-                        <div className="p-2.5 bg-neutral-950 rounded-lg border border-neutral-800 text-neutral-400 font-mono text-[11px] max-h-36 overflow-y-auto leading-relaxed">
-                          {call.transcript}
+                        <span className="font-bold text-neutral-300 block mb-1.5 text-xs">Spoken Speech Transcript &amp; Diarization:</span>
+                        <div className="p-3 bg-neutral-950 rounded-xl border border-neutral-800">
+                          <TranscriptHighlighter
+                            transcript={call.transcript}
+                            clientCode={call.client || (call as any).client_code}
+                            advisorName={call.caller_name || call.dealer}
+                          />
                         </div>
                       </div>
                     )}

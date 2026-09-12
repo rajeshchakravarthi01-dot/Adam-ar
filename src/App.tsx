@@ -316,7 +316,7 @@ export function App() {
   const handleSaveIntegrations = async (data: Record<string, string>) => {
     await api.saveIntegrations(data);
     await fetchAllData();
-    showToast('Integrations and Groq AI parameters saved.');
+    showToast('Integrations and processing parameters saved.');
   };
 
   const handleTestGroq = async (key?: string): Promise<boolean> => {
@@ -359,7 +359,7 @@ export function App() {
   const tabTitles: Record<ActiveTab, { title: string; subtitle: string }> = {
     dashboard: {
       title: 'Operations Dashboard',
-      subtitle: 'Real-time overview of call ingestion, Groq Whisper transcription, trade matching, and compliance scoring.',
+      subtitle: 'Real-time overview of call ingestion, acoustic transcription, trade matching, and compliance scoring.',
     },
     adambee: {
       title: 'AdamBee Screen & CRM Ticket Auditor',
@@ -382,8 +382,8 @@ export function App() {
       subtitle: 'Correlate trades to call recordings using 4 primary anchors (Client Code, Symbol, Price, Quantity).',
     },
     audit: {
-      title: 'Groq AI Compliance Auditing (Q1–Q5)',
-      subtitle: 'Review structured AI compliance determinations with fatal rules and verbatim transcript evidence.',
+      title: 'Regulatory Compliance Auditing (Q1–Q4)',
+      subtitle: 'Review structured compliance determinations with fatal rules and verbatim transcript evidence.',
     },
     pipeline: {
       title: 'Production Pipeline Automation',
@@ -395,11 +395,11 @@ export function App() {
     },
     manual_trade_audit: {
       title: 'Missing Call Reconciliation & Mail Audit',
-      subtitle: 'Audit trades that lack phone recordings via client email/mail confirmation, update 5 parameters, and publish directly to scorecards.',
+      subtitle: 'Audit trades that lack phone recordings via client email/mail confirmation, update parameters, and publish directly to scorecards.',
     },
     scorecards: {
       title: 'Official Quality Audit Scorecards',
-      subtitle: 'Real call-level scorecards with 5-mark calculation, fatal zero rules, formatted copy, and export.',
+      subtitle: 'Real call-level scorecards with 4-mark calculation, fatal zero rules, formatted copy, and export.',
     },
     mail: {
       title: 'Advisor Scorecard Mail Dispatch',
@@ -410,12 +410,12 @@ export function App() {
       subtitle: 'Verified period archives and full historical scorecard exports in CSV format.',
     },
     integrations: {
-      title: 'Groq AI Integrations & Settings',
-      subtitle: 'Configure Groq Whisper, GPT-OSS 120b, advisor email mapping, and 5-parameter rubric.',
+      title: 'Gateway & Engine Settings',
+      subtitle: 'Configure speech recognition, compliance models, advisor email mapping, and rubric.',
     },
     diagnostics: {
       title: 'System Diagnostics & Health',
-      subtitle: 'REST route verification, database tables status, Groq API connectivity, and worker state.',
+      subtitle: 'REST route verification, database tables status, processing engine connectivity, and worker state.',
     },
     logs: {
       title: 'System & Worker Event Logs',

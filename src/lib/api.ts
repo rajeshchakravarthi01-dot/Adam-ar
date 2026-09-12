@@ -115,6 +115,7 @@ export const api = {
   // Data endpoints
   getStats: () => apiRequest<PipelineStats>('/api/stats'),
   getCalls: (perPage = 100) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
+  getCall: (id: number) => apiRequest<CallRecord & { segments?: any[]; orders?: any[]; executions?: any[] }>(`/api/calls/${id}`),
   getTrades: (perPage = 100) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
   getMatches: (perPage = 100) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
   getAudits: (perPage = 100) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),

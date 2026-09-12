@@ -189,7 +189,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
       }
 
       await onSaveIntegrations(payload);
-      setSaveStatus('All integration settings (Groq AI & Tata Teleservices) saved successfully.');
+      setSaveStatus('All integration settings (Processing Engine & Tata Teleservices) saved successfully.');
       setGroqKey('');
       setTataKey('');
     } catch (err: unknown) {
@@ -210,7 +210,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
               <span>Integrations &amp; Telephony Gateway Setup</span>
             </h2>
             <p className="text-xs text-neutral-500 mt-0.5">
-              Manually manage your Tata Teleservices Enterprise telephony keys and Groq AI Speech/Audit models. No automatic background imports are forced.
+              Manually manage your Tata Teleservices Enterprise telephony keys and Speech/Audit models. No automatic background imports are forced.
             </p>
           </div>
           <span className="text-[11px] font-semibold bg-amber-400/10 text-amber-900 px-3 py-1 rounded-full border border-amber-400/30 flex items-center gap-1.5 shrink-0 self-start">
@@ -448,7 +448,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
         </div>
 
         {/* ========================================================== */}
-        {/* 2. GROQ AI ENGINE CONFIGURATION (MANUAL SETUP)            */}
+        {/* 2. PROCESSING ENGINE CONFIGURATION (MANUAL SETUP)          */}
         {/* ========================================================== */}
         <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
@@ -458,10 +458,10 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
               </span>
               <div>
                 <h3 className="text-sm font-bold text-neutral-900">
-                  Groq AI Engine Configuration (Manual API Setup)
+                  Processing Engine Configuration (Manual API Setup)
                 </h3>
                 <p className="text-[11px] text-neutral-500">
-                  Powers Whisper speech-to-text and SEBI regulatory reasoning.
+                  Powers speech-to-text and SEBI regulatory compliance auditing.
                 </p>
               </div>
             </div>
@@ -478,15 +478,15 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                   integrations?.groq_configured ? 'bg-emerald-500' : 'bg-amber-500'
                 }`}
               />
-              <span>{integrations?.groq_configured ? 'ACTIVE: GROQ' : 'PENDING KEY'}</span>
+              <span>{integrations?.groq_configured ? 'ACTIVE: CONFIGURED' : 'PENDING KEY'}</span>
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* GROQ API KEY */}
+            {/* ENGINE API KEY */}
             <div>
               <label className="block font-bold text-neutral-800 mb-1">
-                GROQ_API_KEY *
+                ENGINE_API_KEY *
               </label>
               <div className="relative">
                 <input
@@ -496,7 +496,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                   placeholder={
                     integrations?.groq_configured
                       ? '•••••••••••••••• (Configured — enter to update)'
-                      : 'Enter GROQ_API_KEY…'
+                      : 'Enter Engine API Key…'
                   }
                   className="w-full pl-3 pr-9 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono text-neutral-900 focus:border-amber-400 focus:outline-hidden"
                 />
@@ -510,7 +510,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                 </button>
               </div>
               <div className="text-[10px] text-neutral-400 mt-1">
-                Official Groq Cloud developer key.
+                Private transcription &amp; compliance evaluation key.
               </div>
             </div>
 
@@ -522,11 +522,11 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                 onChange={(e) => setTranscriptionModel(e.target.value)}
                 className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-900 focus:border-amber-400 focus:outline-hidden cursor-pointer"
               >
-                <option value="whisper-large-v3">whisper-large-v3 (Accuracy-First Primary)</option>
-                <option value="whisper-large-v3-turbo">whisper-large-v3-turbo (Speed Optimized Fallback)</option>
+                <option value="whisper-large-v3">Accuracy-First Model (Recommended)</option>
+                <option value="whisper-large-v3-turbo">Speed-Optimized Model</option>
               </select>
               <div className="text-[10px] text-neutral-400 mt-1">
-                Multilingual Whisper speech recognition model.
+                Acoustic speech recognition model.
               </div>
             </div>
 
@@ -538,15 +538,15 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                 onChange={(e) => setAuditModel(e.target.value)}
                 className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-900 focus:border-amber-400 focus:outline-hidden cursor-pointer"
               >
-                <option value="openai/gpt-oss-120b">openai/gpt-oss-120b (Primary Strict Structured JSON)</option>
-                <option value="openai/gpt-oss-20b">openai/gpt-oss-20b (Structured Fallback)</option>
+                <option value="openai/gpt-oss-120b">Compliance Model 120B (Primary Strict Structured JSON)</option>
+                <option value="openai/gpt-oss-20b">Compliance Model 20B (Structured Fast Fallback)</option>
               </select>
               <div className="text-[10px] text-neutral-400 mt-1">
-                Reasoning LLM for Q1-Q5 compliance fact extraction.
+                Evaluation engine for Q1–Q4 compliance fact extraction.
               </div>
             </div>
 
-            {/* Test Groq Connection Button */}
+            {/* Test Connection Button */}
             <div className="flex items-end">
               <button
                 type="button"
@@ -555,7 +555,7 @@ export const IntegrationsView: React.FC<IntegrationsViewProps> = ({
                 className="w-full px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-xl border border-neutral-300 text-xs transition-colors cursor-pointer flex items-center justify-center gap-2"
               >
                 <Sparkles className={`w-3.5 h-3.5 text-amber-500 ${isTestingGroq ? 'animate-spin' : ''}`} />
-                <span>{isTestingGroq ? 'Testing Groq…' : 'Test Groq Connection'}</span>
+                <span>{isTestingGroq ? 'Testing Connection…' : 'Test Engine Connection'}</span>
               </button>
             </div>
           </div>

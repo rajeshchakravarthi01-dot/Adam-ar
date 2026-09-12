@@ -163,8 +163,8 @@ export async function preprocessAudioForTranscription(filePath: string): Promise
   // 2. Channel separation if stereo telephony call
   if (metrics.channels >= 2) {
     try {
-      const ch0 = path.join(dir, `${base}_ch0_advisor.wav`);
-      const ch1 = path.join(dir, `${base}_ch1_customer.wav`);
+      const ch0 = path.join(dir, `${base}_ch0_audio.wav`);
+      const ch1 = path.join(dir, `${base}_ch1_audio.wav`);
 
       await execFileAsync('ffmpeg', [
         '-y',

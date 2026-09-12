@@ -10,13 +10,16 @@
 // - UI / API endpoints
 //
 // Checks strictly:
-// 1. classification === 'PRE_ORDER'
-// 2. identity_status === 'CONFIRMED'
-// 3. transcript_status === 'VALID'
-// 4. speaker attribution usable (has segments with speaker attribution)
-// 5. trade_match_status === 'CONFIRMED'
+// 1. classification === 'PRE_ORDER' (spoken order intent verified)
+// 2. identity_status === 'CONFIRMED' (client UCC / account verified)
+// 3. transcript_status === 'VALID' (valid verbatim transcript)
+// 4. speaker attribution usable (has dialogue segments)
 //
-// If ANY check fails: BLOCKED. DO NOT AUDIT.
+// CRITICAL ARCHITECTURAL MANDATE:
+// Execution matching status (CONFIRMED / PARTIAL / NO_MATCH / REVIEW)
+// must NEVER gate or block compliance auditing. Every genuine pre-order
+// dialogue must be audited for regulatory compliance regardless of whether
+// an executed trade was found, cancelled, or pending.
 // =============================================================
 
 import type { DatabaseSync } from 'node:sqlite';
@@ -43,28 +46,32 @@ export function isAuditEligible(
     };
   }
 
-  // Gate 1: Classification check
+  // Gate 1: Classification check (Spoken Order Intent)
   const classification = (call.classification || call.call_type || '').toUpperCase();
   if (classification !== 'PRE_ORDER') {
     return {
       eligible: false,
       gateCode: 'NOT_PRE_ORDER',
-      reason: `Call classification is "${classification || 'UNCLASSIFIED'}". Only confirmed PRE_ORDER calls are eligible for SEBI audit.`,
+      reason: `Call classification is "${classification || 'UNCLASSIFIED'}". Only confirmed PRE_ORDER calls are eligible for SEBI compliance audit.`,
     };
   }
 
   // Gate 2: Identity check
   let identityStatus = (call.identity_status || '').toUpperCase();
+  const hasClientCode = Boolean((call.client_code && call.client_code.trim()) || (call.client && call.client.trim()));
+  const hasPhoneNumber = Boolean((call.phone_number && call.phone_number.trim()) || (call.calling_number && call.calling_number.trim()));
+
   if (identityStatus !== 'CONFIRMED') {
-    // If call has a matched_trade_id or phone_number / client_code populated, confirm identity
-    if (call.matched_trade_id || (call.phone_number && call.phone_number.trim()) || (call.client && call.client.trim())) {
+    if (hasClientCode || hasPhoneNumber) {
       identityStatus = 'CONFIRMED';
-      db.prepare("UPDATE calls SET identity_status = 'CONFIRMED' WHERE id = ?").run(call.id);
+      try {
+        db.prepare("UPDATE calls SET identity_status = 'CONFIRMED' WHERE id = ?").run(call.id);
+      } catch {}
     } else {
       return {
         eligible: false,
         gateCode: 'IDENTITY_NOT_CONFIRMED',
-        reason: `Client identity status is "${identityStatus || 'PENDING'}". Identity resolution must be CONFIRMED before audit.`,
+        reason: `Client identity status is "${identityStatus || 'PENDING'}". Client code or phone identifier is required before compliance audit.`,
       };
     }
   }
@@ -85,40 +92,17 @@ export function isAuditEligible(
     db.prepare('SELECT count(*) as count FROM call_segments WHERE call_id = ?').get(call.id) as { count: number }
   )?.count || 0;
 
-  if (segmentCount === 0 && !transcript.includes('ADVISOR:')) {
+  if (segmentCount === 0 && !transcript.toUpperCase().includes('ADVISOR:') && !transcript.toUpperCase().includes('DEALER:')) {
     return {
       eligible: false,
       gateCode: 'SPEAKER_ATTRIBUTION_UNUSABLE',
-      reason: 'No speaker-attributed dialogue segments exist for this call. Speaker attribution is mandatory for Q2/Q5 evaluation.',
-    };
-  }
-
-  // Gate 5: Trade Match check
-  let tradeMatchStatus = (call.trade_match_status || '').toUpperCase();
-  if (tradeMatchStatus !== 'CONFIRMED') {
-    if (call.matched_trade_id) {
-      tradeMatchStatus = 'CONFIRMED';
-      db.prepare("UPDATE calls SET trade_match_status = 'CONFIRMED' WHERE id = ?").run(call.id);
-    } else {
-      return {
-        eligible: false,
-        gateCode: 'TRADE_MATCH_NOT_CONFIRMED',
-        reason: `Trade match status is "${tradeMatchStatus || 'PENDING'}". Pre-order audit requires a CONFIRMED trade candidate match.`,
-      };
-    }
-  }
-
-  if (!call.matched_trade_id) {
-    return {
-      eligible: false,
-      gateCode: 'TRADE_RECORD_MISSING',
-      reason: 'No matched trade ID is linked to this call.',
+      reason: 'No speaker-attributed dialogue segments exist for this call. Speaker attribution is mandatory for Q2/Q4/Q5 evaluation.',
     };
   }
 
   return {
     eligible: true,
     gateCode: 'ELIGIBLE',
-    reason: 'Call has passed all 5 prerequisite compliance gates and is eligible for SEBI Q1/Q2/Q3/Q5 audit.',
+    reason: 'Call passed all pre-order compliance gates (spoken order intent and client identity confirmed). Eligible for compliance audit.',
   };
 }

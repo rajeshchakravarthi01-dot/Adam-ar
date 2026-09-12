@@ -501,9 +501,25 @@ export async function executeDualAsrAndDeterministicAudit(
     ? `Stock: ${stockSpoken || 'Confirmed'}, Qty: ${qtySpoken || 'Confirmed'}, Price: ${priceSpoken}. Explicitly confirmed before order.`
     : `Order parameter missing: Stock: ${hasStockSpoken ? stockSpoken : 'Missing'}, Qty: ${hasQtySpoken ? qtySpoken : 'Missing'}, Price: ${hasPriceSpoken ? priceSpoken : 'Missing'}.`;
 
-  // Q4: Customer Acknowledgement - Always PASS
-  const q4Status: 'PASS' | 'FAIL' | 'REVIEW' = 'PASS';
-  const q4Evidence = 'Customer affirmative verbal acknowledgement confirmed.';
+  // Q4: Customer Acknowledgement - Strict Verbal Acknowledgement Evaluation
+  const negativeAcks = ['no', 'dont', "don't", 'cancel', 'mat lo', 'mat karo', 'roko', 'ruko', 'mana kiya', 'nahi', 'hold'];
+  const affirmativeAcks = ['yes', 'yeah', 'yep', 'okay', 'ok', 'sure', 'proceed', 'haan', 'ha', 'theek', 'thik', 'kar do', 'le lo', 'bhejo', 'order laga do', 'confirm', 'correct'];
+  const hasNegative = negativeAcks.some((n) => new RegExp(`\\b${n}\\b`, 'i').test(combinedLower));
+  const hasAffirmative = affirmativeAcks.some((a) => new RegExp(`\\b${a}\\b`, 'i').test(combinedLower));
+
+  let q4Status: 'PASS' | 'FAIL' | 'REVIEW' = 'FAIL';
+  let q4Evidence = 'No explicit customer verbal acknowledgement detected in audio transcript.';
+  let q4Reason = 'Customer verbal consent absent before order placement.';
+
+  if (hasNegative && !hasAffirmative) {
+    q4Status = 'FAIL';
+    q4Evidence = 'Customer explicitly rejected or cancelled the proposed order placement.';
+    q4Reason = 'Customer refusal/cancellation recorded (Fatal violation).';
+  } else if (hasAffirmative) {
+    q4Status = 'PASS';
+    q4Evidence = 'Customer affirmative verbal acknowledgement confirmed in dialogue.';
+    q4Reason = 'Customer explicitly consented to order execution.';
+  }
 
   // Q5: Return Commitment
   const fatalTerms = ['guarantee', 'pakka return', 'fixed profit', 'double money', '100% safe', 'risk free return'];
@@ -559,7 +575,7 @@ export async function executeDualAsrAndDeterministicAudit(
       q4: {
         status: q4Status,
         evidence: q4Evidence,
-        reason: 'Customer affirmative verbal acknowledgement confirmed (always PASS).',
+        reason: q4Reason,
         speaker: 'CUSTOMER',
         confidence: 0.95,
       },

@@ -1,107 +1,39 @@
 // =============================================================
 // Stage 8: SCORING
-// The Single Authoritative Scoring Engine.
-// Nothing else calculates scores.
+// Unified with Single Authoritative Scoring Engine (scoring-engine.ts)
 //
-// Rules:
-// Q1 = 1
-// Q2 = 1
-// Q3 = 1
-// Q5 = 1
-// MAX = 4
-//
-// Fatal rules:
-// Q1 FAIL -> FATAL -> Score 0
-// Q2 FAIL -> FATAL -> Score 0
-// Q5 FAIL -> FATAL -> Score 0
-// Q3 FAIL -> Score 3 (Non-fatal)
-// All PASS -> Score 4
-//
-// User Mandate Scoring Rules:
-// Q1 = 1 (Fatal if fail)
-// Q2 = 1 (Fatal if fail)
-// Q3 = 1 (Non-fatal, -1 if fail)
-// Q4 = 1 (Always PASS, never fail)
-// Q5 = 1 (Fatal if fail)
+// Scoring Rules (5 Max Points):
+// Q1 = 1 (Fatal if fail -> Score 0/5)
+// Q2 = 1 (Fatal if fail -> Score 0/5)
+// Q3 = 1 (Non-fatal, -1 deduction if fail)
+// Q4 = 1 (Evaluated customer verbal consent, -1 deduction if fail)
+// Q5 = 1 (Fatal if fail -> Score 0/5, Return Commitment Prohibition)
 // MAX = 5
 //
 // All PASS = 5/5
-// Q3 FAIL = 4/5
-// Q1/Q2/Q5 FAIL = 0/FATAL
+// Q3 or Q4 non-pass = 4/5 or 3/5
+// Q1, Q2, or Q5 FAIL = 0/5 (FATAL)
 // =============================================================
 
 import type { StageAuditResult, StageScoreResult } from './types';
+import { calculateAuthoritativeScore } from '../scoring-engine';
 
 export function stage8CalculateScore(audit: StageAuditResult): StageScoreResult {
-  const q1 = audit.q1.status;
-  const q2 = audit.q2.status;
-  const q3 = audit.q3.status;
-  const q5 = audit.q5.status;
-
-  const fatal_reasons: string[] = [];
-  const review_reasons: string[] = [];
-
-  // Check Fatal Violations: Q1, Q2, Q5
-  if (q1 === 'FAIL') {
-    fatal_reasons.push('Q1 Fatal: Calling phone does not match registered phone number.');
-  } else if (q1 === 'REVIEW') {
-    review_reasons.push('Q1: Telephone authorization requires compliance verification.');
-  }
-
-  if (q2 === 'FAIL') {
-    fatal_reasons.push('Q2 Fatal: Client UCC not confirmed in dialogue prior to order execution.');
-  } else if (q2 === 'REVIEW') {
-    review_reasons.push('Q2: Spoken client UCC requires human compliance review.');
-  }
-
-  if (q5 === 'FAIL') {
-    fatal_reasons.push('Q5 Fatal: Prohibited return, assurance, or profit guarantee was identified.');
-  } else if (q5 === 'REVIEW') {
-    review_reasons.push('Q5: Potential return guarantee requires compliance officer review.');
-  }
-
-  // Non-fatal check: Q3
-  if (q3 === 'REVIEW') {
-    review_reasons.push('Q3: Stock, quantity, or price/CMP verification requires inspection.');
-  }
-
-  const is_fatal = fatal_reasons.length > 0;
-
-  let score = 0;
-  let disposition: 'COMPLIANT' | 'NON_COMPLIANT' | 'NEEDS_REVIEW' = 'COMPLIANT';
-  let audit_comment = '';
-
-  if (is_fatal) {
-    score = 0;
-    disposition = 'NON_COMPLIANT';
-    audit_comment = `NON-COMPLIANT: Fatal compliance violation (${fatal_reasons.join(' ')}). Authoritative Score: 0/5.`;
-  } else {
-    // Base 5 points (Q1=1, Q2=1, Q3=1, Q4=1, Q5=1)
-    let currentScore = 5;
-    if (q3 !== 'PASS') {
-      currentScore -= 1; // Q3 non-fatal deduction -> 4
-    }
-    score = currentScore;
-
-    if (review_reasons.length > 0) {
-      disposition = 'NEEDS_REVIEW';
-      audit_comment = `NEEDS REVIEW: Pre-order confirmation pending compliance verification (${review_reasons.join(' ')}). Provisional Score: ${score}/5.`;
-    } else if (score === 5) {
-      disposition = 'COMPLIANT';
-      audit_comment = 'COMPLIANT: Pre-order confirmation is strictly compliant with SEBI regulatory norms. Score: 5/5.';
-    } else {
-      disposition = 'COMPLIANT';
-      audit_comment = `COMPLIANT WITH REMARKS: Pre-order confirmed with minor order detail remarks. Score: ${score}/5.`;
-    }
-  }
+  const authScore = calculateAuthoritativeScore({
+    q1: { status: audit.q1.status },
+    q2: { status: audit.q2.status },
+    q3: { status: audit.q3.status },
+    q4: { status: audit.q4?.status || 'FAIL' },
+    q5: { status: audit.q5?.status || 'PASS' },
+  });
 
   return {
-    score,
+    score: authScore.finalScore,
     max_score: 5,
-    is_fatal,
-    fatal_reasons,
-    review_reasons,
-    audit_comment,
-    disposition,
+    is_fatal: authScore.isFatal,
+    fatal_reasons: authScore.fatal_reasons,
+    review_reasons: authScore.review_reasons,
+    audit_comment: authScore.audit_comment,
+    disposition: authScore.disposition,
   };
 }

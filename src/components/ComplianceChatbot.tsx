@@ -47,7 +47,7 @@ export const ComplianceChatbot: React.FC = () => {
     {
       id: 'welcome',
       sender: 'assistant',
-      text: 'Hello! I am your **ADAM-AR AI Intelligence Assistant**.\n\nChoose **ADAM-AR Data Mode** to ask anything about your web app, call records, scorecards, issues, or request reports in downloadable format.\n\nChoose **Google & Web AI Mode** for general web search and any market or knowledge questions.',
+      text: 'Hello! I am your **ADAM-AR Intelligence Assistant**.\n\nChoose **ADAM-AR Data Mode** to ask anything about your web app, call records, scorecards, issues, or request reports in downloadable format.\n\nChoose **Google & Web Knowledge Mode** for general web search and any market questions.',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -193,11 +193,11 @@ export const ComplianceChatbot: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h3 className="text-xs font-bold text-white">ADAM-AR AI Assistant</h3>
+                    <h3 className="text-xs font-bold text-white">ADAM-AR Assistant</h3>
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   </div>
                   <p className="text-[10px] text-neutral-400">
-                    {mode === 'internal' ? 'Mode 1: App & Compliance Data (Reports & Issues)' : 'Mode 2: Google & Web AI Intelligence'}
+                    {mode === 'internal' ? 'Mode 1: App & Compliance Data (Reports & Issues)' : 'Mode 2: Google & Web Knowledge'}
                   </p>
                 </div>
               </div>
@@ -355,7 +355,7 @@ export const ComplianceChatbot: React.FC = () => {
                 <div className="bg-white border border-neutral-200 rounded-2xl px-3.5 py-2 rounded-bl-none flex items-center gap-2 text-neutral-500 shadow-xs">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-500" />
                   <span className="text-[11px]">
-                    {mode === 'internal' ? 'Scanning ADAM-AR database & reports...' : 'Searching Google knowledge & AI...'}
+                    {mode === 'internal' ? 'Scanning ADAM-AR database & reports...' : 'Searching Google knowledge...'}
                   </span>
                 </div>
               </div>
@@ -415,12 +415,12 @@ export const ComplianceChatbot: React.FC = () => {
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="group px-4 py-2.5 bg-neutral-950 hover:bg-black text-white rounded-full shadow-xl border border-neutral-800 flex items-center gap-2.5 cursor-pointer transition-all hover:scale-105 active:scale-95"
-        title="Open ADAM-AR AI Assistant"
+        title="Open ADAM-AR Assistant"
       >
         <div className="w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold">
           <MessageSquare className="w-3.5 h-3.5" />
         </div>
-        <span className="text-xs font-bold text-white tracking-wide">ADAM-AR AI</span>
+        <span className="text-xs font-bold text-white tracking-wide">ADAM-AR Assistant</span>
         <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
       </button>
     </aside>

@@ -58,10 +58,10 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ diagnostics, i
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-          <div className="text-xs text-neutral-500 font-bold uppercase tracking-wider mb-1">AI Provider &amp; Key</div>
+          <div className="text-xs text-neutral-500 font-bold uppercase tracking-wider mb-1">Engine &amp; Key Status</div>
           <div className="text-xl font-black text-neutral-900">
             {diagnostics?.groq_configured ? (
-              <span className="text-emerald-700">GROQ Active</span>
+              <span className="text-emerald-700">Engine Active</span>
             ) : (
               <span className="text-amber-600">No Key Inbuilt</span>
             )}
@@ -123,7 +123,7 @@ export const DiagnosticsView: React.FC<DiagnosticsViewProps> = ({ diagnostics, i
           <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-1.5 leading-relaxed">
             <div className="font-bold text-neutral-900 mb-1">Authentication &amp; User Accounts</div>
             <div>• <b>Separate Login/Signup:</b> Dedicated registration with salt &amp; scrypt hashing.</div>
-            <div>• <b>Default Admin:</b> <span className="font-mono">admin</span> / <span className="font-mono">AuditEQ@Production2026</span>.</div>
+            <div>• <b>Administrator Access:</b> Configured via secure initial administrator provisioning or sign-up.</div>
             <div>• <b>Multiple Users:</b> Create separate auditor/compliance accounts anytime.</div>
           </div>
         </div>

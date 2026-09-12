@@ -106,14 +106,10 @@ export function verifyAuditEligibility(
     };
   }
 
-  // Gate 5: Exact trade must exist
-  if (!trade || !trade.id) {
-    return {
-      eligible: false,
-      reason: 'Missing exact trade match. Pre-order calls cannot be audited without a verified trade match.',
-      gateCode: 'NO_EXACT_TRADE',
-    };
-  }
+  // Gate 5: Exact trade check (SEBI decoupled compliance mandate)
+  // Even if no executed trade is matched, genuine pre-order conversations
+  // MUST be audited for compliance parameters.
+  // Trade execution absence does NOT disqualify pre-order compliance audit.
 
   return {
     eligible: true,
@@ -445,7 +441,8 @@ export function evaluateEvidenceCompliance(
   const lowerT = transcript.toLowerCase();
 
   const hasNegationOrRiskDisclaimer =
-    /\b(?:cannot|can't|do\s+not|don't|never|no|not)\s+(?:give\s+any\s+)?guarantee\b/i.test(lowerT) ||
+    /\b(?:cannot|can't|do\s+not|don't|never|no|not)\s+(?:give\s+any\s+|any\s+|offer\s+)?(?:returns?|profit|fixed|assured)?\s*guarantee(?:d|s)?\b/i.test(lowerT) ||
+    /\bno\s+(?:returns?|profit|gain)?\s*guarantee\b/i.test(lowerT) ||
     /\bguarantee\s+(?:nahi\s+hai|nahi\s+hota|nahi\s+hoga|nahi\s+de\s+sakte)\b/i.test(lowerT) ||
     /\bsubject\s+to\s+market\s+risks?\b/i.test(lowerT) ||
     /\bno\s+guaranteed\s+(?:returns?|profit)\b/i.test(lowerT) ||
@@ -453,8 +450,9 @@ export function evaluateEvidenceCompliance(
 
   const hasAffirmativeGuarantee =
     (retItem?.normalized_value === 'FAIL' && !hasNegationOrRiskDisclaimer) ||
-    /\bguaranteed\s+(?:\d+%\s+)?(?:return|profit|gain|target|income)\b/i.test(lowerT) ||
-    /\b(?:will\s+(?:definitely\s+)?(?:give|get|make|recover|double)|definitely\s+(?:give|get|make|recover|double))\s+(?:profit|return|returns|recovery|gain)\b/i.test(lowerT) ||
+    /\b(?:\d+%\s+)?guarantee(?:d)?\s+(?:(?:\w+\s+){0,3})?(?:returns?|profit|gain|target|income|double)\b/i.test(lowerT) ||
+    (/\bguarantee(?:d)?\b/i.test(lowerT) && /\b(?:returns?|profit|gain|recovery|double|paisa)\b/i.test(lowerT)) ||
+    /\b(?:will\s+(?:definitely\s+)?(?:give|get|make|recover|double)|definitely\s+(?:give|get|make|recover|double))\b/i.test(lowerT) ||
     /\b(?:guarantee\s+hai|pakka\s+profit|fixed\s+profit|guaranteed\s+return|guaranteed\s+profit|100%\s+safe\s+double|risk\s*free\s+return)\b/i.test(lowerT) ||
     /\b(?:sure\s+shot\s+profit|definitely\s+double|loss\s+nahi\s+hoga|paisa\s+banega\s+hi\s+banega|recovery\s+hoga\s+hi\s+hoga)\b/i.test(lowerT);
 
