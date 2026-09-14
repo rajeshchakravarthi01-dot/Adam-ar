@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { ScorecardRecord } from '../types';
 import { api, getStoredToken } from '../lib/api';
+import { cleanCallerName } from '../lib/clientCode';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
 import { ManualTradeAuditView } from './ManualTradeAuditView';
 
@@ -206,7 +207,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
     );
 
     return {
-      caller_name: String(sc.caller_name || ''),
+      caller_name: cleanCallerName(String(sc.caller_name || '')),
       client: resolvedClient,
       trade_date: resolvedTradeDate,
       team: String(sc.team || ''),
@@ -1204,7 +1205,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                   <span>Compliance Audit Details · Record #{activeModalItem.id}</span>
                 </h3>
                 <p className="text-xs text-neutral-500">
-                  Advisor: {activeModalItem.caller_name || '—'} · Client: {activeModalItem.client_code || activeModalItem.client || '—'}
+                  Advisor: {cleanCallerName(activeModalItem.caller_name) || '—'} · Client: {activeModalItem.client_code || activeModalItem.client || '—'}
                 </p>
               </div>
               <button

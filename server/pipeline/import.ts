@@ -7,7 +7,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import type { ImportBatchRecord } from './types';
-import { normalizePhoneNumber } from '../normalizer';
+import { normalizePhoneNumber, cleanCallerName } from '../normalizer';
 
 export interface UploadedFileInfo {
   original_filename: string;
@@ -153,8 +153,8 @@ export function stage1ImportCalls(
       regNumber,
       extractedClientCode,
       extractedClientCode,
-      file.advisor_name || '',
-      file.dealer || '',
+      cleanCallerName(file.advisor_name || ''),
+      cleanCallerName(file.dealer || ''),
       callDate,
       callTime,
       duration,

@@ -279,34 +279,48 @@ Return ONLY the verbatim timestamped transcript lines.`;
       },
     };
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-transcribe',
-      contents: {
-        parts: [
-          audioPart,
-          { text: domainPrompt },
-        ],
-      },
-    });
+    const candidateModels = [
+      'gemini-flash-latest',
+      'gemini-3.1-flash-lite',
+      'gemini-3.8-flash',
+      'gemini-3.5-transcribe',
+    ];
 
-    let text = (response.text || '').trim();
+    let lastError: any = null;
+    for (const modelName of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model: modelName,
+          contents: {
+            parts: [
+              audioPart,
+              { text: domainPrompt },
+            ],
+          },
+        });
 
-    // Sanitize any accidental Arabic/Urdu script output
-    if (containsArabicScript(text)) {
-      text = text.replace(/[\u0600-\u06FF]+/g, ' ').replace(/\s+/g, ' ').trim();
+        let text = (response.text || '').trim();
+
+        // Sanitize any accidental Arabic/Urdu script output
+        if (containsArabicScript(text)) {
+          text = text.replace(/[\u0600-\u06FF]+/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+
+        if (text && text.length > 0) {
+          const segments = parseTimestampedSegments(text, durationSeconds);
+          return {
+            text,
+            segments,
+            model: modelName,
+          };
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Gemini ASR] Model ${modelName} returned error (${err?.message?.slice(0, 100)}). Trying next candidate model...`);
+      }
     }
 
-    if (!text) {
-      throw new Error('Gemini 3.5 Transcribe returned an empty transcript.');
-    }
-
-    const segments = parseTimestampedSegments(text, durationSeconds);
-
-    return {
-      text,
-      segments,
-      model: 'gemini-3.5-transcribe',
-    };
+    throw lastError || new Error('All Gemini transcription models failed or returned empty output.');
   });
 }
 

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { getStoredToken, api } from '../lib/api';
 import type { CallRecord } from '../types';
+import { cleanCallerName } from '../lib/clientCode';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface CallsViewProps {
@@ -531,7 +532,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 </span>
               </div>
               <div className="text-[11px] text-neutral-400">
-                Client ID: <span className="text-amber-400 font-mono font-bold">{playingCall.client || '—'}</span> · Advisor: {playingCall.caller_name || '—'} · Duration: {formatDuration(playingCall.duration_seconds)}
+                Client ID: <span className="text-amber-400 font-mono font-bold">{playingCall.client || '—'}</span> · Advisor: {cleanCallerName(playingCall.caller_name) || '—'} · Duration: {formatDuration(playingCall.duration_seconds)}
               </div>
             </div>
           </div>
@@ -863,7 +864,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
                       {/* Caller */}
                       <td className="py-2.5 px-3 text-neutral-800 whitespace-nowrap">
-                        {call.caller_name || '—'}
+                        {cleanCallerName(call.caller_name) || '—'}
                       </td>
 
                       {/* Client Code */}
@@ -970,7 +971,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
               </div>
               <div>
                 <span className="text-neutral-500">Advisor:</span>
-                <span className="font-medium text-neutral-900 ml-1.5">{selectedCall.caller_name || '—'}</span>
+                <span className="font-medium text-neutral-900 ml-1.5">{cleanCallerName(selectedCall.caller_name) || '—'}</span>
               </div>
               <div>
                 <span className="text-neutral-500">Client Code:</span>
@@ -1181,7 +1182,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 <TranscriptHighlighter
                   transcript={selectedCall.transcript || ''}
                   clientCode={selectedCall.client}
-                  advisorName={selectedCall.caller_name || selectedCall.dealer}
+                  advisorName={cleanCallerName(selectedCall.caller_name) || selectedCall.dealer}
                 />
               </div>
             </div>

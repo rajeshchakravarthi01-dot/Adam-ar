@@ -65,7 +65,7 @@ import {
   type UnifiedAuditOutput,
   type AuditQuestionOutput,
 } from './server/scoring-engine';
-import { normalizeToIsoDate } from './server/normalizer';
+import { normalizeToIsoDate, cleanCallerName } from './server/normalizer';
 import { evaluateEvidenceCompliance, verifyAuditEligibility } from './server/audit-evaluator';
 import { transcribeAudioFile, transcribeAudioWithGemini35 } from './server/asr-engine';
 import { stage1ImportCalls, type UploadedFileInfo } from './server/pipeline/import';
@@ -78,14 +78,15 @@ import { stage5MultiExecutionMatch } from './server/pipeline/multiExecutionMatch
 import { isAuditEligible } from './server/pipeline/eligibility';
 import { stage7AuditCall } from './server/pipeline/audit';
 import { stage8CalculateScore } from './server/pipeline/scoring';
-import { stage9PublishAudit, stage9ReconcileMissingCalls } from './server/pipeline/reconciliation';
+import { stage9PublishAudit, stage9ReconcileMissingCalls, ensureScorecardsForMatchedCalls } from './server/pipeline/reconciliation';
 import {
   runFullPipelineForCall,
   start24x7WorkerSupervisor,
   getPipelineWorkerStatus,
 } from './server/pipeline/pipelineRunner';
-import { resolveCallReview } from './server/pipeline/reviewWorkflow';
+import { resolveCallReview, autoResolveAllPendingReviews } from './server/pipeline/reviewWorkflow';
 import { getPreOrdersAnalysisFromDb, matchPreOrdersWithCalls } from './server/pipeline/tradePreOrderClusterer';
+import { matchUploadedMailConfirmations } from './server/mail-confirmation-matcher';
 
 // Top-level crash protection: Ensure server never dies on unhandled rejection or exception
 process.on('unhandledRejection', (reason) => {
@@ -209,6 +210,30 @@ try {
   console.log('[AuditEQ Database] Integrity check passed:', integrity[0]?.integrity_check || 'ok');
 } catch (e) {
   console.warn('[AuditEQ Database] Integrity check notice:', (e as Error).message);
+}
+
+// User Mandate: Sanitize caller/advisor names in database (remove phone suffix (+91...) or numbers in parentheses)
+try {
+  sqlite.exec(`
+    UPDATE calls 
+    SET caller_name = TRIM(SUBSTR(caller_name, 1, INSTR(caller_name, '(') - 1)) 
+    WHERE caller_name LIKE '%(%';
+
+    UPDATE scorecards 
+    SET caller_name = TRIM(SUBSTR(caller_name, 1, INSTR(caller_name, '(') - 1)) 
+    WHERE caller_name LIKE '%(%';
+
+    UPDATE audits 
+    SET caller_name = TRIM(SUBSTR(caller_name, 1, INSTR(caller_name, '(') - 1)) 
+    WHERE caller_name LIKE '%(%';
+
+    UPDATE trades 
+    SET advisor_name = TRIM(SUBSTR(advisor_name, 1, INSTR(advisor_name, '(') - 1)) 
+    WHERE advisor_name LIKE '%(%';
+  `);
+  console.log('[AuditEQ Database] Caller name phone-suffix cleanup completed.');
+} catch (cleanErr) {
+  console.warn('[AuditEQ Database] Caller name cleanup warning:', cleanErr);
 }
 
 // Automatic backup function to prevent data loss
@@ -2931,6 +2956,9 @@ async function startServer() {
   // Pipeline Stats
   // -----------------------------------------------------------
   apiRouter.get('/stats', requireAuth, (_req: Request, res: Response) => {
+    try {
+      ensureScorecardsForMatchedCalls(sqlite);
+    } catch {}
     const callCount = (sqlite.prepare('SELECT COUNT(*) as c FROM calls').get() as { c: number }).c;
     const tradeCount = (sqlite.prepare('SELECT COUNT(*) as c FROM trades').get() as { c: number }).c;
     const matchCount = (sqlite.prepare('SELECT COUNT(*) as c FROM matches').get() as { c: number }).c;
@@ -4678,6 +4706,50 @@ ${call.transcript || '(No speech transcript recorded)'}
     }
   });
 
+  // User Mandate: Manual Trade Audit (Missing Call / Mail Confirmation) PDF Upload
+  // Rule: Ignore client code. Match based on stock name, quantity, and price. If CMP mentioned, ignore price and pass.
+  apiRouter.post('/trades/upload-mail-confirmations', requireAuth, upload.array('files') as any, async (req: Request, res: Response) => {
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ ok: false, error: 'No files uploaded. Please attach PDF or mail confirmation files.' });
+      }
+
+      const fileBuffers = files.map((f) => ({
+        originalname: f.originalname,
+        buffer: fs.readFileSync(f.path),
+      }));
+
+      const summary = await matchUploadedMailConfirmations(sqlite, fileBuffers);
+      backupDatabase();
+
+      return res.json({
+        ok: true,
+        summary,
+        message: `Processed ${summary.filesProcessed} file(s). Matched ${summary.matchedCount} missing trade(s) with pre-order audits generated.`,
+      });
+    } catch (err: any) {
+      console.error('Error in /trades/upload-mail-confirmations:', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
+  // User Mandate: Automate "Review Required" calls
+  apiRouter.post('/pipeline/auto-resolve-reviews', requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const result = await autoResolveAllPendingReviews(sqlite, getGroqKey(), getGeminiKey());
+      backupDatabase();
+      return res.json({
+        ok: true,
+        ...result,
+        message: `Successfully automated review for ${result.resolvedCount} call(s).`,
+      });
+    } catch (err: any) {
+      console.error('Error in /pipeline/auto-resolve-reviews:', err);
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  });
+
   // -----------------------------------------------------------
   // Multi-User Database Management Endpoints
   // -----------------------------------------------------------
@@ -4932,6 +5004,9 @@ ${call.transcript || '(No speech transcript recorded)'}
   });
 
   apiRouter.get('/scorecards', requireAuth, (req: Request, res: Response) => {
+    try {
+      ensureScorecardsForMatchedCalls(sqlite);
+    } catch {}
     const limit = parseInt(req.query.per_page as string, 10) || 5000;
     const scorecards = sqlite.prepare('SELECT * FROM scorecards ORDER BY id DESC LIMIT ?').all(limit) as unknown as ScorecardRecord[];
     

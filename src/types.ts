@@ -678,7 +678,7 @@ export interface PreOrderTradeCluster {
   matched_call_id?: number | null;
   matched_call_recording?: string | null;
   match_confidence?: number | null;
-  match_status?: 'MATCHED' | 'MISSING_CALL';
+  match_status?: 'MATCHED' | 'MISSING_CALL' | 'CONFIRMED_VIA_MAIL';
   trades: TradeRecord[];
 }
 

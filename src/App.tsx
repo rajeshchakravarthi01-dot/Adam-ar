@@ -597,6 +597,7 @@ export function App() {
                 preOrdersSummary={preOrdersSummary}
                 onUploadTrades={handleUploadTrades}
                 onRefreshTrades={fetchAllData}
+                onNavigateToManualAudit={() => setActiveTab('manual_trade_audit')}
                 onSelectCall={(_id) => {
                   setActiveTab('calls');
                 }}

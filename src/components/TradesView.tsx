@@ -13,6 +13,7 @@ import {
   ChevronUp,
   PhoneCall,
   Sparkles,
+  MailCheck,
 } from 'lucide-react';
 import type { TradeRecord, TradePreOrdersSummary } from '../types';
 import { api } from '../lib/api';
@@ -23,6 +24,7 @@ interface TradesViewProps {
   onUploadTrades: (file: File) => Promise<void>;
   onRefreshTrades?: () => Promise<void>;
   onSelectCall?: (callId: number) => void;
+  onNavigateToManualAudit?: () => void;
   isLoading: boolean;
 }
 
@@ -32,6 +34,7 @@ export const TradesView: React.FC<TradesViewProps> = ({
   onUploadTrades,
   onRefreshTrades,
   onSelectCall,
+  onNavigateToManualAudit,
   isLoading,
 }) => {
   const [search, setSearch] = useState('');
@@ -210,6 +213,18 @@ export const TradesView: React.FC<TradesViewProps> = ({
               <span>{showClustersBreakdown ? 'Hide Clusters' : 'Inspect Pre-Orders & Clusters'}</span>
               {showClustersBreakdown ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
+
+            {onNavigateToManualAudit && (
+              <button
+                type="button"
+                onClick={onNavigateToManualAudit}
+                className="px-3 py-2 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold rounded-xl text-xs transition-colors flex items-center gap-1.5 border border-amber-400/40 cursor-pointer"
+                title="Audit missing trades via mail confirmations"
+              >
+                <MailCheck className="w-3.5 h-3.5 text-amber-400" />
+                <span>Audit via Mail ({preOrdersSummary?.missing_calls_count ?? 0} Pending)</span>
+              </button>
+            )}
           </div>
         </div>
 

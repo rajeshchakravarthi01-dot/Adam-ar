@@ -142,3 +142,77 @@ export async function resolveCallReview(
     pipeline_result: pipelineRes,
   };
 }
+
+/**
+ * Automatically resolves all calls currently stuck in REVIEW / REVIEW_PENDING.
+ * Inspects transcript for trading keywords or trade matches:
+ * - If order indicators exist -> Promotes to PRE_ORDER, runs full pipeline to complete audit!
+ * - If no order indicators and duration < 6s -> SCRAP
+ * - Else -> REGULAR
+ */
+export async function autoResolveAllPendingReviews(
+  db: DatabaseSync,
+  groqApiKey?: string,
+  geminiApiKey?: string
+): Promise<{ resolvedCount: number; results: ReviewResolutionResult[] }> {
+  ensureCallColumns(db);
+  const pendingCalls = db.prepare(`
+    SELECT * FROM calls 
+    WHERE classification = 'REVIEW'
+       OR pipeline_stage = 'REVIEW_PENDING'
+       OR status = 'review'
+       OR call_type = 'review'
+    ORDER BY id ASC
+  `).all() as unknown as CallRecord[];
+
+  const results: ReviewResolutionResult[] = [];
+
+  for (const call of pendingCalls) {
+    const transcript = (call.transcript || '').toLowerCase();
+    const duration = call.duration_seconds || 0;
+
+    // Check for trading keywords
+    const hasTradingIntent =
+      /\b(?:buy|sell|order|shares?|qty|quantity|cmp|market\s*price|kharid|bech|limit|pe|ce|call|put|nifty|banknifty|holding|portfolio)\b/i.test(transcript);
+
+    // Check if client has trades
+    const clientCode = call.client_code || call.client;
+    let hasClientTrades = false;
+    if (clientCode) {
+      try {
+        const trade = db.prepare('SELECT id FROM trades WHERE client = ? OR client_number = ? LIMIT 1').get(clientCode, clientCode);
+        if (trade) hasClientTrades = true;
+      } catch {}
+    }
+
+    if (hasTradingIntent || hasClientTrades) {
+      const res = await resolveCallReview(db, call.id, {
+        action: 'CONTINUE',
+        resolvedClassification: 'PRE_ORDER',
+        notes: 'Automated Review: Verified trading context/client trade corroboration. Promoted to PRE_ORDER.',
+        groqApiKey,
+        geminiApiKey,
+      });
+      results.push(res);
+    } else if (duration > 0 && duration < 6) {
+      const res = await resolveCallReview(db, call.id, {
+        action: 'REJECT',
+        resolvedClassification: 'SCRAP',
+        notes: 'Automated Review: Short recording (<6s) without trading instructions.',
+      });
+      results.push(res);
+    } else {
+      const res = await resolveCallReview(db, call.id, {
+        action: 'REJECT',
+        resolvedClassification: 'REGULAR',
+        notes: 'Automated Review: General advisory dialogue without pre-order execution.',
+      });
+      results.push(res);
+    }
+  }
+
+  return {
+    resolvedCount: results.length,
+    results,
+  };
+}

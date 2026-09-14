@@ -367,4 +367,36 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ audits }),
     }),
+  uploadMailConfirmations: (formData: FormData) =>
+    apiRequest<{
+      ok: boolean;
+      summary: {
+        filesProcessed: number;
+        matchedCount: number;
+        unmatchedCount: number;
+        matches: Array<{
+          tradeId: number;
+          symbol: string;
+          quantity: number;
+          price: number;
+          advisor: string;
+          client: string;
+          fileName: string;
+          matchedBy: string;
+          isCmp: boolean;
+          scorecardId: number;
+          auditId: number;
+        }>;
+        unmatchedFiles: string[];
+        errorFiles: Array<{ fileName: string; error: string }>;
+      };
+      message: string;
+    }>('/api/trades/upload-mail-confirmations', {
+      method: 'POST',
+      body: formData,
+    }),
+  autoResolveReviews: () =>
+    apiRequest<{ ok: boolean; resolvedCount: number; message: string }>('/api/pipeline/auto-resolve-reviews', {
+      method: 'POST',
+    }),
 };

@@ -13,7 +13,7 @@
 // =============================================================
 
 import type { DatabaseSync } from 'node:sqlite';
-import { normalizePhoneNumber, normalizeClientCode } from '../normalizer';
+import { normalizePhoneNumber, normalizeClientCode, cleanCallerName } from '../normalizer';
 import { FUNDSINDIA_ADVISOR_DIRECTORY } from '../fundsindia-directory';
 import {
   extractSpokenUccCandidates,
@@ -77,7 +77,7 @@ export function stage2ResolveIdentity(
 
   // 3. Resolve Advisor, Dealer, and Team
   let dealer = call.dealer || '';
-  let advisor = call.caller_name || '';
+  let advisor = cleanCallerName(call.caller_name || '');
   let team = call.team || 'Equity';
 
   if (dealer && !advisor) {
@@ -85,7 +85,7 @@ export function stage2ResolveIdentity(
       (a) => a.dealer.toUpperCase() === dealer.toUpperCase()
     );
     if (matchedAdvisor) {
-      advisor = matchedAdvisor.advisor_name;
+      advisor = cleanCallerName(matchedAdvisor.advisor_name);
     }
   } else if (advisor && !dealer) {
     const matchedAdvisor = FUNDSINDIA_ADVISOR_DIRECTORY.find(

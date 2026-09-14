@@ -27,6 +27,7 @@ import {
   mentionsMarketPriceOrCMP,
   fuzzySimilarity,
   evaluateCustomerAcknowledgement,
+  formatCleanClientCode,
   SYMBOL_ALIASES,
 } from '../normalizer';
 import { evaluateDeterministicQ1 } from '../q1-evaluator';
@@ -127,7 +128,7 @@ export async function stage7AuditCall(
   // -----------------------------------------------------------
   // Q2: Pre-Order Client Code / UCC Confirmation (ASR-Aware)
   // -----------------------------------------------------------
-  const expectedUcc = normalizeClientCode(call.client_code || call.client || (trade ? trade.client : ''));
+  const expectedUcc = formatCleanClientCode(call.client_code || call.client || (trade ? trade.client : ''));
   let q2Result: AuditQuestionResult;
 
   if (!expectedUcc) {
@@ -280,32 +281,63 @@ export async function stage7AuditCall(
       };
     }
   } else {
-    // Spoken dialogue direct extraction when no call_orders exist
+    // Spoken dialogue direct extraction or matched trade validation
     let stockFound = false;
     let spokenStockName = 'Not spoken';
-    for (const [symKey, aliases] of Object.entries(SYMBOL_ALIASES)) {
-      if (transcript.toUpperCase().includes(symKey)) {
+
+    if (trade && trade.symbol) {
+      const symCheck = matchSymbolInTranscript(trade.symbol, transcript);
+      if (symCheck.matched) {
         stockFound = true;
-        spokenStockName = symKey;
-        break;
+        spokenStockName = symCheck.matchedAlias || trade.symbol;
       }
-      for (const al of aliases) {
-        if (transcript.toLowerCase().includes(al.toLowerCase())) {
-          stockFound = true;
-          spokenStockName = al;
-          break;
-        }
-      }
-      if (stockFound) break;
     }
 
-    const qtyMatch = transcript.match(/\b(\d+)\s*(?:quantities|quantity|qty|shares|share|lots?|units?|scrips?)\b/i)
-      || transcript.match(/\b(?:quantity|qty|shares?)\s*(?:is|of|:)?\s*(\d+)\b/i);
-    const hasQty = !!qtyMatch;
-    const spokenQty = qtyMatch ? qtyMatch[1] : 'Not spoken';
+    if (!stockFound) {
+      for (const [symKey, aliases] of Object.entries(SYMBOL_ALIASES)) {
+        if (transcript.toUpperCase().includes(symKey)) {
+          stockFound = true;
+          spokenStockName = symKey;
+          break;
+        }
+        for (const al of aliases) {
+          if (transcript.toLowerCase().includes(al.toLowerCase())) {
+            stockFound = true;
+            spokenStockName = al;
+            break;
+          }
+        }
+        if (stockFound) break;
+      }
+    }
 
-    const hasPrice = isCmpMentioned || /\b(?:cmp|current\s*market\s*price|at\s*market|bhav)\b/i.test(transcript) || /(?:₹|rs\.?|inr|price|rate|at)\s*(\d+(?:\.\d{1,2})?)/i.test(transcript);
-    const spokenPrice = isCmpMentioned ? 'Current Market Price (CMP)' : (hasPrice ? 'Specified Price' : 'Not spoken');
+    let hasQty = false;
+    let spokenQty = 'Not spoken';
+    if (trade && trade.quantity && matchQuantityInTranscript(trade.quantity, transcript)) {
+      hasQty = true;
+      spokenQty = String(trade.quantity);
+    } else {
+      const qtyMatch = transcript.match(/\b(\d+)\s*(?:quantities|quantity|qty|shares|share|lots?|units?|scrips?)\b/i)
+        || transcript.match(/\b(?:quantity|qty|shares?)\s*(?:is|of|:)?\s*(\d+)\b/i);
+      if (qtyMatch) {
+        hasQty = true;
+        spokenQty = qtyMatch[1];
+      }
+    }
+
+    let hasPrice = isCmpMentioned;
+    let spokenPrice = isCmpMentioned ? 'Current Market Price (CMP)' : 'Not spoken';
+    if (!hasPrice && trade && trade.price && matchPriceInTranscript(trade.price, transcript)) {
+      hasPrice = true;
+      spokenPrice = `₹${trade.price}`;
+    } else if (!hasPrice) {
+      const priceMatch = /(?:₹|rs\.?|inr|price|rate|at)\s*(\d+(?:\.\d{1,2})?)/i.exec(transcript)
+        || /\b(?:cmp|current\s*market\s*price|at\s*market|bhav)\b/i.exec(transcript);
+      if (priceMatch) {
+        hasPrice = true;
+        spokenPrice = priceMatch[1] ? `₹${priceMatch[1]}` : 'Market Price';
+      }
+    }
 
     const missingPoints: string[] = [];
     if (!stockFound) missingPoints.push('Stock Symbol');

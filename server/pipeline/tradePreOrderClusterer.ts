@@ -25,6 +25,7 @@ import {
   matchClientCodeInTranscript,
   matchSymbolInTranscript,
 } from '../normalizer';
+import { ensureScorecardsForMatchedCalls } from './reconciliation';
 
 export interface PreOrderTradeCluster {
   cluster_id: string;
@@ -48,7 +49,7 @@ export interface PreOrderTradeCluster {
   matched_call_id?: number | null;
   matched_call_recording?: string | null;
   match_confidence?: number | null;
-  match_status?: 'MATCHED' | 'MISSING_CALL';
+  match_status?: 'MATCHED' | 'MISSING_CALL' | 'CONFIRMED_VIA_MAIL';
   trades: TradeRecord[];
 }
 
@@ -565,6 +566,13 @@ export function matchPreOrdersWithCalls(db: DatabaseSync): TradePreOrdersSummary
     } catch {}
   }
 
+  // Ensure all confirmed pre-order call matches have scorecards generated
+  try {
+    ensureScorecardsForMatchedCalls(db);
+  } catch (err: any) {
+    console.warn('[PreOrderClusterer] ensureScorecardsForMatchedCalls error in matchPreOrdersWithCalls:', err?.message);
+  }
+
   // Update summary totals
   summary.total_matched_calls = matchedClusterIds.size;
   summary.missing_calls_count = Math.max(0, summary.total_pre_orders - summary.total_matched_calls);
@@ -588,38 +596,113 @@ export function getPreOrdersAnalysisFromDb(db: DatabaseSync): TradePreOrdersSumm
       return summary;
     }
 
-    // Check existing matched calls from matches and calls tables
+    // Check existing matched calls from matches, calls, and audits tables
     try {
-      const matchedCalls = db.prepare(`
-        SELECT c.id as call_id, c.recording_name, m.trade_id, m.confidence
-        FROM calls c
-        JOIN matches m ON m.call_id = c.id
-        WHERE c.classification = 'PRE_ORDER'
-           OR m.status = 'matched'
-      `).all() as Array<{ call_id: number; recording_name: string; trade_id: number; confidence: number }>;
+      const tradeToCallMap = new Map<number, { call_id?: number; recording_name: string; confidence: number; isMail?: boolean }>();
 
-      const tradeToCallMap = new Map<number, { call_id: number; recording_name: string; confidence: number }>();
-      for (const mc of matchedCalls) {
-        tradeToCallMap.set(mc.trade_id, {
-          call_id: mc.call_id,
-          recording_name: mc.recording_name,
-          confidence: mc.confidence,
-        });
-      }
+      // 1. Matches table
+      try {
+        const matchedCalls = db.prepare(`
+          SELECT c.id as call_id, c.recording_name, m.trade_id, m.confidence
+          FROM calls c
+          JOIN matches m ON m.call_id = c.id
+          WHERE c.classification = 'PRE_ORDER'
+             OR m.status = 'matched'
+        `).all() as Array<{ call_id: number; recording_name: string; trade_id: number; confidence: number }>;
+
+        for (const mc of matchedCalls) {
+          tradeToCallMap.set(mc.trade_id, {
+            call_id: mc.call_id,
+            recording_name: mc.recording_name,
+            confidence: mc.confidence || 0.95,
+          });
+        }
+      } catch {}
+
+      // 2. Direct matched_trade_id in calls table
+      try {
+        const directMatches = db.prepare(`
+          SELECT id as call_id, recording_name, matched_trade_id
+          FROM calls
+          WHERE matched_trade_id IS NOT NULL
+        `).all() as Array<{ call_id: number; recording_name: string; matched_trade_id: number }>;
+
+        for (const dm of directMatches) {
+          if (!tradeToCallMap.has(dm.matched_trade_id)) {
+            tradeToCallMap.set(dm.matched_trade_id, {
+              call_id: dm.call_id,
+              recording_name: dm.recording_name,
+              confidence: 0.98,
+            });
+          }
+        }
+      } catch {}
+
+      // 3. Mail confirmation audits or manual audits in audits table
+      try {
+        const mailAudits = db.prepare(`
+          SELECT trade_id, model, audit_comment
+          FROM audits
+          WHERE trade_id IS NOT NULL
+        `).all() as Array<{ trade_id: number; model: string; audit_comment: string }>;
+
+        for (const ma of mailAudits) {
+          if (!tradeToCallMap.has(ma.trade_id)) {
+            const isMail = ma.model === 'manual-mail-audit' || (ma.audit_comment && ma.audit_comment.toLowerCase().includes('mail'));
+            tradeToCallMap.set(ma.trade_id, {
+              recording_name: isMail ? 'Client Mail Confirmation (PDF)' : 'Manual Trade Audit',
+              confidence: 1.0,
+              isMail,
+            });
+          }
+        }
+      } catch {}
 
       let matchedCount = 0;
+      let hasUnmatched = false;
       for (const cluster of summary.clusters) {
+        let clusterMatched = false;
         for (const tradeId of cluster.trade_ids) {
           if (tradeToCallMap.has(tradeId)) {
             const matchInfo = tradeToCallMap.get(tradeId)!;
             cluster.matched_call_id = matchInfo.call_id;
             cluster.matched_call_recording = matchInfo.recording_name;
             cluster.match_confidence = matchInfo.confidence || 0.95;
-            cluster.match_status = 'MATCHED';
+            cluster.match_status = matchInfo.isMail ? 'CONFIRMED_VIA_MAIL' : 'MATCHED';
             matchedCount++;
+            clusterMatched = true;
             break;
           }
         }
+        if (!clusterMatched) {
+          hasUnmatched = true;
+        }
+      }
+
+      // If some clusters are still missing calls, run matchPreOrdersWithCalls to correlate any available calls
+      if (hasUnmatched) {
+        try {
+          matchPreOrdersWithCalls(db);
+          // Re-check after correlation
+          matchedCount = 0;
+          const reCheckDirect = db.prepare('SELECT id as call_id, recording_name, matched_trade_id FROM calls WHERE matched_trade_id IS NOT NULL').all() as Array<{ call_id: number; recording_name: string; matched_trade_id: number }>;
+          for (const dm of reCheckDirect) {
+            tradeToCallMap.set(dm.matched_trade_id, { call_id: dm.call_id, recording_name: dm.recording_name, confidence: 0.95 });
+          }
+          for (const cluster of summary.clusters) {
+            for (const tradeId of cluster.trade_ids) {
+              if (tradeToCallMap.has(tradeId)) {
+                const matchInfo = tradeToCallMap.get(tradeId)!;
+                cluster.matched_call_id = matchInfo.call_id;
+                cluster.matched_call_recording = matchInfo.recording_name;
+                cluster.match_confidence = matchInfo.confidence || 0.95;
+                cluster.match_status = matchInfo.isMail ? 'CONFIRMED_VIA_MAIL' : 'MATCHED';
+                matchedCount++;
+                break;
+              }
+            }
+          }
+        } catch {}
       }
 
       summary.total_matched_calls = matchedCount;
@@ -627,6 +710,11 @@ export function getPreOrdersAnalysisFromDb(db: DatabaseSync): TradePreOrdersSumm
       summary.coverage_percentage = summary.total_pre_orders > 0
         ? Math.round((matchedCount / summary.total_pre_orders) * 100)
         : 0;
+    } catch {}
+
+    // Ensure all pre-order call matches produce matching scorecards
+    try {
+      ensureScorecardsForMatchedCalls(db);
     } catch {}
 
     return summary;

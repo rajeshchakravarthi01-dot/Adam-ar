@@ -118,3 +118,18 @@ export function isStrictValidClientCode(code?: string | null): boolean {
   const clean = formatCleanClientCode(code);
   return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD)\d{2,10}$/.test(clean);
 }
+
+/**
+ * Cleans advisor / dealer / caller names by stripping phone numbers in parentheses or brackets.
+ * e.g., "Ajeet kumar pandey (+9042565871)" -> "Ajeet kumar pandey"
+ *       "Ajeetkumar Bharthidasan (8106365245)" -> "Ajeetkumar Bharthidasan"
+ */
+export function cleanCallerName(name: string | null | undefined): string {
+  if (!name) return '';
+  const str = String(name).trim();
+  const cleaned = str
+    .replace(/\s*[\(\[]\s*\+?[\d\s-]{7,15}\s*[\)\]]\s*$/i, '')
+    .replace(/\s*[\(\[]\s*ext\s*\d+\s*[\)\]]\s*$/i, '')
+    .trim();
+  return cleaned || str;
+}

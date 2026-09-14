@@ -180,6 +180,14 @@ export function detectHighRecallPreOrderCandidate(
 
   const text = transcript.toLowerCase();
 
+  // Exclude explicit advisory advice NOT to trade, holding recommendations, or past research calls
+  if (
+    /\b(?:mat\s+(?:bech[a-z]*|kharid[a-z]*)|don'?t\s+(?:sell|buy)|do\s+not\s+(?:sell|buy)|holding\s+(?:for\s+long\s+term|mat\s+becho))\b/i.test(text) ||
+    /\b(?:gave|given|give)?\s*(?:a\s+)?(?:buy|sell)\s+call\s+(?:yesterday|earlier|previously)\b/i.test(text)
+  ) {
+    return { isCandidate: false, confidence: 0, evidence: '', reason: 'Advisory advice, holding recommendation, or past research call' };
+  }
+
   // 1. Action / Side detection across English, Hindi & Hinglish dealer vernacular
   const buyMatch = text.match(/\b(?:buy|buying|purchase|kharid(?:na|iye|lo|ein)?|le\s*lo|punch\s*(?:kar\s*do|do)?|daal\s*do|dal\s*do)\b/i);
   const sellMatch = text.match(/\b(?:sell|selling|exit|square\s*off|bech(?:na|iye|do|ein)?|bech\s*do)\b/i);

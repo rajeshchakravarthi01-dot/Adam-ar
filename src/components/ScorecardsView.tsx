@@ -24,6 +24,7 @@ import {
 import * as XLSX from 'xlsx';
 import type { ScorecardRecord } from '../types';
 import { getStoredToken } from '../lib/api';
+import { cleanCallerName } from '../lib/clientCode';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface ScorecardsViewProps {
@@ -108,7 +109,7 @@ export const ScorecardsView: React.FC<ScorecardsViewProps> = ({
     const stars = isFatal ? '*' : '*'.repeat(sc.score || 0);
 
     const plainText = `Offline Pre Order Confirmation Call Audit Score Card
-Caller Name: ${sc.caller_name || '—'}\tTeam: ${sc.team || '—'}
+Caller Name: ${cleanCallerName(sc.caller_name) || '—'}\tTeam: ${sc.team || '—'}
 Client ID: ${sc.client || '—'}\tPhone Number: ${sc.trade_phone || sc.calling_number || '—'}
 Trade Date: ${sc.trade_date || sc.call_date || '—'}\tAudit Date: ${sc.created_at?.slice(0, 10) || '—'}
 
@@ -148,7 +149,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
         <table>
           <tr><th colspan="4" class="header">Offline Pre Order Confirmation Call Audit Score Card</th></tr>
           <tr>
-            <td colspan="2"><b>Caller Name:</b> ${sc.caller_name || '—'}</td>
+            <td colspan="2"><b>Caller Name:</b> ${cleanCallerName(sc.caller_name) || '—'}</td>
             <td colspan="2"><b>Team:</b> ${sc.team || '—'}</td>
           </tr>
           <tr>
@@ -510,7 +511,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                         Caller Name
                       </th>
                       <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 text-slate-900 font-medium w-1/4">
-                        {sc.caller_name || '—'}
+                        {cleanCallerName(sc.caller_name) || '—'}
                       </td>
                       <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800 w-1/4">
                         Team
@@ -781,7 +782,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                             </span>
                           </div>
                           <div className="text-[11px] text-neutral-400">
-                            Client: <span className="text-amber-400 font-mono font-semibold">{sc.client || sc.client_code || '—'}</span> · Advisor: <span className="text-neutral-200 font-medium">{sc.caller_name || sc.dealer || '—'}</span>
+                            Client: <span className="text-amber-400 font-mono font-semibold">{sc.client || sc.client_code || '—'}</span> · Advisor: <span className="text-neutral-200 font-medium">{cleanCallerName(sc.caller_name) || sc.dealer || '—'}</span>
                           </div>
                         </div>
                       </div>

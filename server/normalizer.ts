@@ -572,6 +572,21 @@ export function normalizeClientCode(clientCode?: string | null): string {
 }
 
 /**
+ * Cleans advisor / dealer / caller names by stripping phone numbers in parentheses or brackets.
+ * e.g., "Ajeet kumar pandey (+9042565871)" -> "Ajeet kumar pandey"
+ *       "Ajeetkumar Bharthidasan (8106365245)" -> "Ajeetkumar Bharthidasan"
+ */
+export function cleanCallerName(name: string | null | undefined): string {
+  if (!name) return '';
+  const str = String(name).trim();
+  const cleaned = str
+    .replace(/\s*[\(\[]\s*\+?[\d\s-]{7,15}\s*[\)\]]\s*$/i, '')
+    .replace(/\s*[\(\[]\s*ext\s*\d+\s*[\)\]]\s*$/i, '')
+    .trim();
+  return cleaned || str;
+}
+
+/**
  * Checks if a client code is present in a transcript using speech-tolerant matching.
  */
 export function matchClientCodeInTranscript(
@@ -602,71 +617,123 @@ export function matchClientCodeInTranscript(
   }
 
   // 3. Phonetic letter variations (Whisper/ASR phonetic tolerant matching):
-  // Handles 'WIA' (VIA, V.I.A, W I A, WAS, WAA, WYA, DOUBLE U I A),
-  // 'WIG' (VIG, V.I.G, W I G, DOUBLE U I G, DHABLU I G), and arbitrary prefixes + numeric digits
+  // 3. Robust prefix-aware matching for FundsIndia canonical prefixes (WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD)
   const alphaPrefixMatch = normCode.match(/^([A-Z]+)(\d{2,8})$/i);
   if (alphaPrefixMatch) {
-    const rawPrefix = alphaPrefixMatch[1].toLowerCase();
+    const rawPrefix = alphaPrefixMatch[1].toUpperCase();
     const numericSuffix = alphaPrefixMatch[2];
 
-    const prefixVariations = new Set<string>();
-    // Direct spaced / dotted
-    prefixVariations.add(rawPrefix.split('').join('[\\s\\-_.]*'));
+    // Build comprehensive phonetic & spoken patterns for this exact prefix
+    const prefixVariants: string[] = [];
 
-    // W <-> V phonetic interchange in Indian English / Hindi ASR
-    if (rawPrefix.startsWith('w')) {
-      const vPrefix = 'v' + rawPrefix.slice(1);
-      prefixVariations.add(vPrefix.split('').join('[\\s\\-_.]*'));
-      prefixVariations.add(`double\\s*u[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
-      prefixVariations.add(`dhablu[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
-      prefixVariations.add(`w1${rawPrefix.slice(1)}`);
-    } else if (rawPrefix.startsWith('v')) {
-      const wPrefix = 'w' + rawPrefix.slice(1);
-      prefixVariations.add(wPrefix.split('').join('[\\s\\-_.]*'));
-      prefixVariations.add(`double\\s*u[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
+    // Exact letters spaced/unspaced: e.g. WIA, W I A, W-I-A, W.I.A
+    prefixVariants.push(rawPrefix.split('').join('[\\s\\-_.]*'));
+
+    if (rawPrefix === 'WIA') {
+      prefixVariants.push('(?:W\\s*I\\s*A|WIA|WI\\s*A|W\\s*IA)');
+      prefixVariants.push('(?:V\\s*I\\s*A|VIA|VI\\s*A|V\\s*IA)');
+      prefixVariants.push('(?:W1A|V1A)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*A');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*a)');
+    } else if (rawPrefix === 'WIF') {
+      prefixVariants.push('(?:W\\s*I\\s*F|WIF|WI\\s*F|W\\s*IF)');
+      prefixVariants.push('(?:V\\s*I\\s*F|VIF|VI\\s*F|V\\s*IF)');
+      prefixVariants.push('(?:W1F|V1F)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*F');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*f)');
+    } else if (rawPrefix === 'WIC') {
+      prefixVariants.push('(?:W\\s*I\\s*C|WIC|WI\\s*C|W\\s*IC)');
+      prefixVariants.push('(?:V\\s*I\\s*C|VIC|VI\\s*C|V\\s*IC)');
+      prefixVariants.push('(?:W1C|V1C)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*C');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*c)');
+    } else if (rawPrefix === 'WID') {
+      prefixVariants.push('(?:W\\s*I\\s*D|WID|WI\\s*D|W\\s*ID)');
+      prefixVariants.push('(?:V\\s*I\\s*D|VID|VI\\s*D|V\\s*ID)');
+      prefixVariants.push('(?:W1D|V1D)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*D');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*d)');
+    } else if (rawPrefix === 'WIG') {
+      prefixVariants.push('(?:W\\s*I\\s*G|WIG|WI\\s*G|W\\s*IG)');
+      prefixVariants.push('(?:V\\s*I\\s*G|VIG|VI\\s*G|V\\s*IG)');
+      prefixVariants.push('(?:W1G|V1G)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*G');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*g)');
+    } else if (rawPrefix === 'WIE') {
+      prefixVariants.push('(?:W\\s*I\\s*E|WIE|WI\\s*E|W\\s*IE)');
+      prefixVariants.push('(?:V\\s*I\\s*E|VIE|VI\\s*E|V\\s*IE)');
+      prefixVariants.push('(?:W1E|V1E)');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*E');
+      prefixVariants.push('(?:w\\s*u\\s*i\\s*e)');
+    } else if (rawPrefix === 'FIA') {
+      prefixVariants.push('(?:F\\s*I\\s*A|FIA|FI\\s*A|F\\s*IA)');
+    } else if (rawPrefix === 'PWD') {
+      prefixVariants.push('(?:P\\s*W\\s*D|PWD|PW\\s*D|P\\s*WD)');
+      prefixVariants.push('P[\\s\\-_.]*(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*D');
+      prefixVariants.push('(?:P\\s*V\\s*D|PVD)');
+    } else if (rawPrefix.startsWith('W')) {
+      const vPrefix = 'V' + rawPrefix.slice(1);
+      prefixVariants.push(vPrefix.split('').join('[\\s\\-_.]*'));
+      prefixVariants.push(`(?:double\\s*[-_]?\\s*u|dhablu)[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
     }
 
-    // Common Whisper mis-recognitions for WIA specifically
-    if (rawPrefix === 'wia') {
-      prefixVariations.add('w[\\s\\-_.]*a[\\s\\-_.]*a');
-      prefixVariations.add('w[\\s\\-_.]*a[\\s\\-_.]*s');
-      prefixVariations.add('v[\\s\\-_.]*a[\\s\\-_.]*a');
-      prefixVariations.add('v[\\s\\-_.]*a[\\s\\-_.]*s');
-      prefixVariations.add('w[\\s\\-_.]*y[\\s\\-_.]*a');
-      prefixVariations.add('v[\\s\\-_.]*y[\\s\\-_.]*a');
-      prefixVariations.add('double\\s*u\\s*a\\s*a');
-      prefixVariations.add('double\\s*u\\s*a\\s*s');
-    }
+    // Convert numeric suffix into digit & spoken word regex
+    const digitWordsMap: Record<string, string> = {
+      '0': '(?:zero|shunya|0)',
+      '1': '(?:one|ek|1)',
+      '2': '(?:two|do|2)',
+      '3': '(?:three|teen|3)',
+      '4': '(?:four|chaar|char|4)',
+      '5': '(?:five|paanch|panch|5)',
+      '6': '(?:six|chhe|che|6)',
+      '7': '(?:seven|saat|7)',
+      '8': '(?:eight|aath|8)',
+      '9': '(?:nine|nau|9)',
+    };
+    const spokenSuffixPattern = numericSuffix.split('').map((d) => digitWordsMap[d] || d).join('[\\s\\-_.]*');
+    const numSpacedPat = numericSuffix.split('').join('[\\s\\-_.]*');
 
-    for (const pVar of prefixVariations) {
-      const fullPat = `${pVar}[\\s\\-_.]*${numericSuffix}`;
-      if (new RegExp(`\\b${fullPat}\\b`, 'i').test(lowerTranscript) || new RegExp(`\\b${fullPat}\\b`, 'i').test(spokenNormalizedTranscript.toLowerCase())) {
+    for (const pVar of prefixVariants) {
+      // 1. Prefix + digits
+      const patDigits = new RegExp(`\\b${pVar}[\\s\\-_.:]*${numSpacedPat}\\b`, 'i');
+      if (patDigits.test(transcript) || patDigits.test(spokenNormalizedTranscript)) {
+        return { matched: true, score: 0.35, matchedVariant: normCode };
+      }
+      // 2. Prefix + spoken words (e.g. W I A one two three four five)
+      const patWords = new RegExp(`\\b${pVar}[\\s\\-_.:]*${spokenSuffixPattern}\\b`, 'i');
+      if (patWords.test(transcript) || patWords.test(spokenNormalizedTranscript)) {
         return { matched: true, score: 0.35, matchedVariant: normCode };
       }
     }
   }
 
-  // 4. Numeric Code Matching (SEBI Audio Audit standard):
-  // When clients or advisors confirm identity, they routinely state the numeric code (e.g. "account number 26779" for WIA26779, or "81138").
-  // P0 CRITICAL: Pure numbers without account context must NOT match UCC to prevent price/quantity collision!
+  // 4. Numeric Code with explicit account/code/client/identity context:
+  // ONLY if the spoken context does NOT explicitly mention a conflicting client prefix!
   const numericPartMatch = normCode.match(/\d{3,8}/);
   if (numericPartMatch) {
     const numPart = numericPartMatch[0];
+    const numSpacedPat = numPart.split('').join('[\\s\\-_.]*');
 
     // Check if the number appears with explicit account/code/client/identity context
-    const numSpacedPat = numPart.split('').join('[\\s\\-_.]*');
-    const accountContextRegex = new RegExp(`\\b(?:account|code|ucc|client|id|a\\/c|number|no\\.?)\\s*(?:is|no|number|hai|hai\\s*na|tha)?\\s*[:\\-]?\\s*${numSpacedPat}\\b`, 'i');
-    const accountContextRegexSuffix = new RegExp(`\\b${numSpacedPat}\\s*(?:account|code|ucc|client|id|number)\\b`, 'i');
+    const accountContextRegex = new RegExp(`\\b(?:account|code|ucc|client\\s+id|client\\s+code|a\\/c|number|no\\.?)\\s*(?:is|no|number|hai|hai\\s*na|tha)?\\s*[:\\-]?\\s*${numSpacedPat}\\b`, 'i');
+    const accountContextRegexSuffix = new RegExp(`\\b${numSpacedPat}\\s*(?:account|code|ucc|client\\s+id|client\\s+code|number)\\b`, 'i');
 
-    if (accountContextRegex.test(transcript) || accountContextRegexSuffix.test(transcript) ||
-        accountContextRegex.test(spokenNormalizedTranscript) || accountContextRegexSuffix.test(spokenNormalizedTranscript)) {
-      return { matched: true, score: 0.35, matchedVariant: numPart };
-    }
+    const hasContext = accountContextRegex.test(transcript) || accountContextRegexSuffix.test(transcript) ||
+      accountContextRegex.test(spokenNormalizedTranscript) || accountContextRegexSuffix.test(spokenNormalizedTranscript);
 
-    // Long numeric codes (>= 5 digits) with boundary protection
-    if (numPart.length >= 5) {
-      if (new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(transcript) || new RegExp(`\\b${numSpacedPat}\\b`, 'i').test(spokenNormalizedTranscript)) {
-        return { matched: true, score: 0.35, matchedVariant: numPart };
+    if (hasContext) {
+      // Guard against conflicting client prefix preceding the number (e.g. "WIA 12345" when expecting "PWD12345")
+      const conflictingPrefixRegex = new RegExp(`(?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|VIA|VIF|VIC|VID|VIG|VIE|double\\s*u|dhablu)\\s*${numSpacedPat}`, 'i');
+      const expectedPrefix = normCode.replace(/\d+/g, '').toUpperCase();
+      const matchConflicting = transcript.match(conflictingPrefixRegex) || spokenNormalizedTranscript.match(conflictingPrefixRegex);
+      if (matchConflicting) {
+        const cleanedFound = formatCleanClientCode(matchConflicting[0]);
+        if (cleanedFound.startsWith(expectedPrefix)) {
+          return { matched: true, score: 0.35, matchedVariant: normCode };
+        }
+        // Found conflicting prefix, do not match!
+      } else {
+        return { matched: true, score: 0.35, matchedVariant: normCode };
       }
     }
   }
@@ -711,11 +778,13 @@ export function matchClientCodeInTranscript(
           const codeNum = normCode.replace(/\D/g, '');
           const candPrefix = phrase.replace(/\d/g, '');
           const codePrefix = normCode.replace(/\d/g, '');
-          if (candNum && codeNum && candNum === codeNum && candNum.length >= 2 && levenshteinDistance(candPrefix, codePrefix) <= 1) {
-            return { matched: true, score: 0.35, matchedVariant: normCode };
-          }
-          if (numericPartMatch && phrase.includes(numericPartMatch[0])) {
-            return { matched: true, score: 0.35, matchedVariant: normCode };
+          if (candNum && codeNum && candNum === codeNum && candNum.length >= 2) {
+            // Must have matching prefix (or within 1 edit distance if phonetic alias)
+            if (candPrefix && codePrefix) {
+              if (levenshteinDistance(candPrefix, codePrefix) <= 1 || (candPrefix.startsWith('V') && codePrefix.startsWith('W') && candPrefix.slice(1) === codePrefix.slice(1))) {
+                return { matched: true, score: 0.35, matchedVariant: normCode };
+              }
+            }
           }
         }
       }

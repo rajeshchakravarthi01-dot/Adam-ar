@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   MailCheck,
   Search,
@@ -20,9 +20,15 @@ import {
   FileText,
   Clock,
   ArrowRight,
+  UploadCloud,
+  FileCheck2,
+  HelpCircle,
+  X,
+  FileUp,
 } from 'lucide-react';
 import type { MissingCallTrade } from '../types';
 import { api } from '../lib/api';
+import { cleanCallerName } from '../lib/clientCode';
 
 interface ManualTradeAuditViewProps {
   onScorecardCreated?: () => void;
@@ -68,6 +74,64 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
   const [successIds, setSuccessIds] = useState<Set<number>>(new Set());
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
 
+  // User Mandate: Mail Confirmation / PDF Upload & Auto-Resolve States
+  const [isUploadingPdfs, setIsUploadingPdfs] = useState(false);
+  const [isResolvingReviews, setIsResolvingReviews] = useState(false);
+  const [uploadSummary, setUploadSummary] = useState<any | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePdfFiles = async (files: FileList | File[]) => {
+    const fileArray = Array.from(files);
+    if (fileArray.length === 0) return;
+
+    setIsUploadingPdfs(true);
+    setErrorMessage(null);
+    setUploadSummary(null);
+
+    try {
+      const formData = new FormData();
+      fileArray.forEach((f) => formData.append('files', f));
+
+      const res = await api.uploadMailConfirmations(formData);
+      if (res.ok && res.summary) {
+        setUploadSummary(res.summary);
+        setActionMessage(
+          `Mail Confirmation Audit: ${res.summary.matchedCount} trade(s) successfully verified and scorecards published!`
+        );
+        await fetchMissingTrades();
+        if (onScorecardCreated) onScorecardCreated();
+      } else {
+        setErrorMessage(res.message || 'Failed to process mail confirmation PDFs.');
+      }
+    } catch (err: any) {
+      console.error('Mail confirmation upload failed:', err);
+      setErrorMessage(err.message || 'Error uploading and matching mail confirmation files.');
+    } finally {
+      setIsUploadingPdfs(false);
+    }
+  };
+
+  const handleAutoResolveReviews = async () => {
+    setIsResolvingReviews(true);
+    setErrorMessage(null);
+    try {
+      const res = await api.autoResolveReviews();
+      if (res.ok) {
+        setActionMessage(`Automated review resolved ${res.resolvedCount} call(s). Audits and scorecards updated.`);
+        await fetchMissingTrades();
+        if (onScorecardCreated) onScorecardCreated();
+      } else {
+        setErrorMessage('Failed to auto-resolve reviews.');
+      }
+    } catch (err: any) {
+      console.error('Auto resolve reviews failed:', err);
+      setErrorMessage(err.message || 'Error auto-resolving reviews.');
+    } finally {
+      setIsResolvingReviews(false);
+    }
+  };
+
   const fetchMissingTrades = async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -104,7 +168,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
       audit_comment: 'Pre-order instruction confirmed and verified via authorized client email confirmation.',
       phone: t.phone_number || t.client_number || '',
       client: t.client || '',
-      caller_name: t.advisor_name || t.dealer || 'Advisor',
+      caller_name: cleanCallerName(t.advisor_name || t.dealer || 'Advisor'),
     };
   };
 
@@ -363,6 +427,37 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.eml,.txt,.csv"
+            className="hidden"
+            onChange={(e) => {
+              if (e.target.files) handlePdfFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingPdfs}
+            className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+          >
+            <UploadCloud className={`w-3.5 h-3.5 text-amber-400 ${isUploadingPdfs ? 'animate-bounce' : ''}`} />
+            <span>{isUploadingPdfs ? 'Processing PDFs...' : 'Upload Mail / PDF Confirmations'}</span>
+          </button>
+
+          <button
+            onClick={handleAutoResolveReviews}
+            disabled={isResolvingReviews}
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 transition-colors cursor-pointer"
+            title="Auto-resolve calls in Review Required state"
+          >
+            <Sparkles className={`w-3.5 h-3.5 text-emerald-600 ${isResolvingReviews ? 'animate-spin' : ''}`} />
+            <span>{isResolvingReviews ? 'Resolving...' : 'Auto-Resolve Reviews'}</span>
+          </button>
+
           {pendingCount > 0 && (
             <button
               onClick={handleBulkApprovePending}
@@ -392,6 +487,106 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Upload Drop Zone for Mail / PDF Confirmations */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver(true);
+        }}
+        onDragLeave={() => setIsDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(false);
+          if (e.dataTransfer.files) handlePdfFiles(e.dataTransfer.files);
+        }}
+        className={`border-2 border-dashed rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
+          isDragOver
+            ? 'border-amber-500 bg-amber-50/50'
+            : 'border-neutral-300 hover:border-neutral-400 bg-neutral-50/50'
+        }`}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
+            <FileUp className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+              <span>Automatic Mail / PDF Trade Audit Upload</span>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+                SEBI Matching Rules
+              </span>
+            </div>
+            <p className="text-[11px] text-neutral-600 mt-0.5">
+              Drag and drop client confirmation PDFs or email exports (.pdf, .eml, .txt). Matches stock name,
+              quantity, and price. If CMP (Current Market Price) is mentioned, price is automatically accepted.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploadingPdfs}
+            className="px-3.5 py-1.5 bg-white hover:bg-neutral-100 text-neutral-900 font-bold text-xs rounded-xl border border-neutral-300 shadow-xs cursor-pointer flex items-center gap-1.5"
+          >
+            <UploadCloud className="w-3.5 h-3.5 text-neutral-700" />
+            <span>Select PDF Files</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Upload Results Summary Modal / Card */}
+      {uploadSummary && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileCheck2 className="w-4 h-4 text-emerald-600" />
+              <h3 className="text-xs font-bold text-emerald-900">
+                Mail Confirmation Matching Results ({uploadSummary.matchedCount} Matched / {uploadSummary.filesProcessed} Files Processed)
+              </h3>
+            </div>
+            <button
+              onClick={() => setUploadSummary(null)}
+              className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {uploadSummary.matches && uploadSummary.matches.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {uploadSummary.matches.map((m: any, idx: number) => (
+                <div key={idx} className="bg-white p-2.5 rounded-xl border border-emerald-200 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between font-bold text-neutral-900">
+                    <span>Trade #{m.tradeId} &bull; {m.symbol}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">
+                      Score: 5 / 5
+                    </span>
+                  </div>
+                  <div className="text-neutral-600">
+                    Qty: <span className="font-semibold text-neutral-900">{m.quantity}</span> | Price:{' '}
+                    <span className="font-semibold text-neutral-900">
+                      {m.isCmp ? 'CMP (Market Price Passed)' : `₹${m.price}`}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-neutral-500 truncate" title={m.fileName}>
+                    File: {m.fileName}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {uploadSummary.unmatchedFiles && uploadSummary.unmatchedFiles.length > 0 && (
+            <div className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
+              <span className="font-semibold">Unmatched files ({uploadSummary.unmatchedFiles.length}):</span>{' '}
+              {uploadSummary.unmatchedFiles.join(', ')}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
