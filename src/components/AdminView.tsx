@@ -499,8 +499,8 @@ export const AdminView: React.FC<AdminViewProps> = ({ onRefreshStats }) => {
                 />
                 <div className="flex justify-between text-[10px] text-neutral-400 font-mono mt-0.5">
                   <span>1 (Sequential)</span>
-                  <span>3 (Default)</span>
-                  <span>6 (Ultra High-Speed)</span>
+                  <span>3 Workers</span>
+                  <span>9 (High-Speed Turbo)</span>
                 </div>
               </div>
 

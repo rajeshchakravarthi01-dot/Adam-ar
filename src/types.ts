@@ -656,4 +656,52 @@ export interface DatabaseWorkspaceInfo {
   owner: string;
 }
 
+export interface PreOrderTradeCluster {
+  cluster_id: string;
+  client_code: string;
+  symbol: string;
+  trade_date: string;
+  start_time: string;
+  end_time: string;
+  start_seconds: number;
+  end_seconds: number;
+  total_quantity: number;
+  average_price: number;
+  total_value: number;
+  trade_count: number;
+  trade_ids: number[];
+  dealer?: string;
+  advisor_name?: string;
+  team?: string;
+  phone_number?: string;
+  order_type?: string;
+  matched_call_id?: number | null;
+  matched_call_recording?: string | null;
+  match_confidence?: number | null;
+  match_status?: 'MATCHED' | 'MISSING_CALL';
+  trades: TradeRecord[];
+}
+
+export interface DailyPreOrderBreakdown {
+  date: string;
+  unique_client_count: number;
+  unique_clients: string[];
+  total_trades: number;
+  total_pre_orders: number;
+  clusters: PreOrderTradeCluster[];
+}
+
+export interface TradePreOrdersSummary {
+  total_pre_orders: number;
+  total_trades: number;
+  total_unique_clients: number;
+  total_matched_calls: number;
+  target_pre_order_calls: number;
+  missing_calls_count?: number;
+  coverage_percentage?: number;
+  daily_breakdown: DailyPreOrderBreakdown[];
+  clusters: PreOrderTradeCluster[];
+  algorithm_notes: string;
+}
+
 

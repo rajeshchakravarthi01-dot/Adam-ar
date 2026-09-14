@@ -464,6 +464,94 @@ export function normalizePhoneNumber(phone?: string | null): string {
   return digits;
 }
 
+export const VALID_CLIENT_PREFIXES = [
+  'WIA',
+  'WIF',
+  'WIC',
+  'WID',
+  'WIG',
+  'WIE',
+  'FIA',
+  'PWD',
+] as const;
+
+export type ValidClientPrefix = typeof VALID_CLIENT_PREFIXES[number];
+
+/**
+ * Strictly normalizes client codes across spoken, spaced, hyphenated, and raw formats.
+ * e.g., "W I A 46884", "WIA-46884", "WIA 46884", "wia46884", "double u I A 12345",
+ * "W I A one two three four five", "PWD 12345", "P W D one two three four five"
+ * -> strictly outputs canonical "PWD12345", "WIA12345", etc. without any spaces or words.
+ */
+export function formatCleanClientCode(clientCode?: string | null): string {
+  if (!clientCode) return '';
+  let str = String(clientCode).trim().toLowerCase();
+  if (!str) return '';
+
+  // 1. Spoken letter normalization: double u / double-u / double you / dablu -> w
+  str = str.replace(/\bdouble\s*[-_]?\s*u\b/gi, 'w');
+  str = str.replace(/\bdouble\s*[-_]?\s*you\b/gi, 'w');
+  str = str.replace(/\bdhablu\b/gi, 'w');
+  str = str.replace(/\bdablu\b/gi, 'w');
+
+  // 2. Spoken repeated digit qualifiers: "double five" -> "55", "triple five" -> "555"
+  for (const [word, digit] of Object.entries(WORD_TO_DIGIT)) {
+    if (digit.endsWith('x')) continue;
+    str = str.replace(new RegExp(`\\bdouble\\s+${word}\\b`, 'gi'), `${digit}${digit}`);
+    str = str.replace(new RegExp(`\\btriple\\s+${word}\\b`, 'gi'), `${digit}${digit}${digit}`);
+  }
+
+  // 3. Spoken individual digits: "one two three four five" -> "12345"
+  for (const [word, digit] of Object.entries(WORD_TO_DIGIT)) {
+    if (digit.endsWith('x')) continue;
+    str = str.replace(new RegExp(`\\b${word}\\b`, 'gi'), digit);
+  }
+
+  // 4. Strip punctuation, whitespace, dashes, dots, underscores
+  const squashed = str.replace(/[\s\-._:;,/]/g, '').toUpperCase();
+
+  // 5. Canonical prefix matching with phonetic tolerance (e.g. VIA -> WIA, VIF -> WIF)
+  const prefixMap: Array<{ pattern: RegExp; canonical: ValidClientPrefix }> = [
+    { pattern: /^(?:WIA|VIA|W1A|V1A)/, canonical: 'WIA' },
+    { pattern: /^(?:WIF|VIF|W1F|V1F)/, canonical: 'WIF' },
+    { pattern: /^(?:WIC|VIC|W1C|V1C)/, canonical: 'WIC' },
+    { pattern: /^(?:WID|VID|W1D|V1D)/, canonical: 'WID' },
+    { pattern: /^(?:WIG|VIG|W1G|V1G)/, canonical: 'WIG' },
+    { pattern: /^(?:WIE|VIE|W1E|V1E)/, canonical: 'WIE' },
+    { pattern: /^(?:FIA)/, canonical: 'FIA' },
+    { pattern: /^(?:PWD)/, canonical: 'PWD' },
+  ];
+
+  for (const item of prefixMap) {
+    const match = squashed.match(item.pattern);
+    if (match) {
+      const remaining = squashed.slice(match[0].length);
+      const digitMatch = remaining.match(/^(\d{2,10})/);
+      if (digitMatch) {
+        return `${item.canonical}${digitMatch[1]}`;
+      }
+    }
+  }
+
+  for (const p of VALID_CLIENT_PREFIXES) {
+    if (squashed.startsWith(p)) {
+      const digits = squashed.slice(p.length).replace(/\D/g, '');
+      if (digits.length >= 2) {
+        return `${p}${digits}`;
+      }
+    }
+  }
+
+  // If input was already a clean alphanumeric or digits
+  return squashed;
+}
+
+export function isStrictValidClientCode(code?: string | null): boolean {
+  if (!code) return false;
+  const clean = formatCleanClientCode(code);
+  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD)\d{2,10}$/.test(clean);
+}
+
 /**
  * Normalizes client codes across spoken, spaced, hyphenated, and raw formats.
  * e.g., "W I A 46884", "WIA-46884", "WIA 46884", "wia46884" -> "WIA46884"
@@ -471,16 +559,15 @@ export function normalizePhoneNumber(phone?: string | null): string {
  */
 export function normalizeClientCode(clientCode?: string | null): string {
   if (!clientCode) return '';
-  let normalized = String(clientCode).trim().toLowerCase();
+  const cleaned = formatCleanClientCode(clientCode);
+  if (cleaned) return cleaned;
 
-  // Replace spoken digits
+  let normalized = String(clientCode).trim().toLowerCase();
   for (const [word, digit] of Object.entries(WORD_TO_DIGIT)) {
     if (digit.endsWith('x')) continue;
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     normalized = normalized.replace(regex, digit);
   }
-
-  // Remove spaces, hyphens, dots, underscores
   return normalized.replace(/[\s\-._]/g, '').toUpperCase();
 }
 
@@ -514,27 +601,46 @@ export function matchClientCodeInTranscript(
     return { matched: true, score: 0.35, matchedVariant: normCode };
   }
 
-  // 3. Phonetic letter variations:
-  // Whisper often transcribes 'WIA' as 'VIA', 'V.I.A.', 'V I A', 'DOUBLE U I A', 'W I A', 'W-I-A', 'WAS', 'WAA', 'WYA'
-  const numericSuffix = normCode.replace(/^[A-Z]+/i, '');
-  if (numericSuffix && numericSuffix.length >= 2) {
-    const phoneticPatterns = [
-      `v[\\s\\-_.]*i[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `w[\\s\\-_.]*i[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `w[\\s\\-_.]*a[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `w[\\s\\-_.]*a[\\s\\-_.]*s[\\s\\-_.]*${numericSuffix}`,
-      `v[\\s\\-_.]*a[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `v[\\s\\-_.]*a[\\s\\-_.]*s[\\s\\-_.]*${numericSuffix}`,
-      `w[\\s\\-_.]*y[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `v[\\s\\-_.]*y[\\s\\-_.]*a[\\s\\-_.]*${numericSuffix}`,
-      `double\\s*u\\s*i\\s*a\\s*${numericSuffix}`,
-      `double\\s*u\\s*a\\s*a\\s*${numericSuffix}`,
-      `double\\s*u\\s*a\\s*s\\s*${numericSuffix}`,
-      `dhablu\\s*i\\s*a\\s*${numericSuffix}`,
-      `w1a\\s*${numericSuffix}`,
-    ];
-    for (const pp of phoneticPatterns) {
-      if (new RegExp(`\\b${pp}\\b`, 'i').test(lowerTranscript) || new RegExp(`\\b${pp}\\b`, 'i').test(spokenNormalizedTranscript.toLowerCase())) {
+  // 3. Phonetic letter variations (Whisper/ASR phonetic tolerant matching):
+  // Handles 'WIA' (VIA, V.I.A, W I A, WAS, WAA, WYA, DOUBLE U I A),
+  // 'WIG' (VIG, V.I.G, W I G, DOUBLE U I G, DHABLU I G), and arbitrary prefixes + numeric digits
+  const alphaPrefixMatch = normCode.match(/^([A-Z]+)(\d{2,8})$/i);
+  if (alphaPrefixMatch) {
+    const rawPrefix = alphaPrefixMatch[1].toLowerCase();
+    const numericSuffix = alphaPrefixMatch[2];
+
+    const prefixVariations = new Set<string>();
+    // Direct spaced / dotted
+    prefixVariations.add(rawPrefix.split('').join('[\\s\\-_.]*'));
+
+    // W <-> V phonetic interchange in Indian English / Hindi ASR
+    if (rawPrefix.startsWith('w')) {
+      const vPrefix = 'v' + rawPrefix.slice(1);
+      prefixVariations.add(vPrefix.split('').join('[\\s\\-_.]*'));
+      prefixVariations.add(`double\\s*u[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
+      prefixVariations.add(`dhablu[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
+      prefixVariations.add(`w1${rawPrefix.slice(1)}`);
+    } else if (rawPrefix.startsWith('v')) {
+      const wPrefix = 'w' + rawPrefix.slice(1);
+      prefixVariations.add(wPrefix.split('').join('[\\s\\-_.]*'));
+      prefixVariations.add(`double\\s*u[\\s\\-_.]*${rawPrefix.slice(1).split('').join('[\\s\\-_.]*')}`);
+    }
+
+    // Common Whisper mis-recognitions for WIA specifically
+    if (rawPrefix === 'wia') {
+      prefixVariations.add('w[\\s\\-_.]*a[\\s\\-_.]*a');
+      prefixVariations.add('w[\\s\\-_.]*a[\\s\\-_.]*s');
+      prefixVariations.add('v[\\s\\-_.]*a[\\s\\-_.]*a');
+      prefixVariations.add('v[\\s\\-_.]*a[\\s\\-_.]*s');
+      prefixVariations.add('w[\\s\\-_.]*y[\\s\\-_.]*a');
+      prefixVariations.add('v[\\s\\-_.]*y[\\s\\-_.]*a');
+      prefixVariations.add('double\\s*u\\s*a\\s*a');
+      prefixVariations.add('double\\s*u\\s*a\\s*s');
+    }
+
+    for (const pVar of prefixVariations) {
+      const fullPat = `${pVar}[\\s\\-_.]*${numericSuffix}`;
+      if (new RegExp(`\\b${fullPat}\\b`, 'i').test(lowerTranscript) || new RegExp(`\\b${fullPat}\\b`, 'i').test(spokenNormalizedTranscript.toLowerCase())) {
         return { matched: true, score: 0.35, matchedVariant: normCode };
       }
     }

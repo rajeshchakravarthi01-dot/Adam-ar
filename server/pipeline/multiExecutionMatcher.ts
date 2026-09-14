@@ -21,12 +21,14 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { CallRecord, TradeRecord } from '../../src/types';
 import {
   normalizeClientCode,
+  formatCleanClientCode,
   normalizePhoneNumber,
   normalizeSpokenNumbers,
   normalizeOrderSide,
   matchSymbolInTranscript,
   SYMBOL_ALIASES,
 } from '../normalizer';
+import { parseTradeSecondsFromMidnight } from './tradePreOrderClusterer';
 
 export interface ExtractedCallOrder {
   id: string;
@@ -470,6 +472,35 @@ export function stage5MultiExecutionMatch(
         margin: 0.25,
         reason: `Matched ${trade.symbol} (${normTradeSide}) Qty ${tradeQty} @ ₹${trade.price} to call order #${order.order_index} with confidence ${execConf}.`,
       });
+
+      // 4-Minute Gap Pre-Order Clustering Rule:
+      // If other trades exist for the same client code & stock with time difference < 4 minutes (240s),
+      // they belong to this exact SAME pre-order (partial fills / concurrent executions).
+      const tradeSec = parseTradeSecondsFromMidnight(trade.trade_time, trade.trade_date);
+      for (const sibTrade of candidateTrades) {
+        if (sibTrade.id === trade.id || matchedTradeIds.has(sibTrade.id)) continue;
+        const sibSymbol = (sibTrade.symbol || '').toUpperCase().replace(/-(?:EQ|BE|SM|BZ|BL|ST)$/i, '');
+        if (sibSymbol === tradeSymbol) {
+          const sibSec = parseTradeSecondsFromMidnight(sibTrade.trade_time, sibTrade.trade_date);
+          const timeGapSec = Math.abs(tradeSec - sibSec);
+          if (timeGapSec < 240) {
+            // Less than 4 minutes difference -> cluster into the same pre-order!
+            const sibQty = Math.round(sibTrade.quantity || 0);
+            matchedTradeIds.add(sibTrade.id);
+            orderExecutedQty += sibQty;
+            matchingTradesForOrder.push({
+              id: `exec_${order.id}_${sibTrade.id}`,
+              order_id: order.id,
+              trade_id: sibTrade.id,
+              trade: sibTrade,
+              matched_quantity: sibQty,
+              confidence: execConf,
+              margin: 0.25,
+              reason: `Grouped execution (${timeGapSec}s gap < 4 min): ${sibTrade.symbol} Qty ${sibQty} @ ₹${sibTrade.price}.`,
+            });
+          }
+        }
+      }
     }
 
     // Determine execution status for this order

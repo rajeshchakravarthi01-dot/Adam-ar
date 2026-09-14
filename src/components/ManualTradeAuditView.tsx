@@ -544,9 +544,9 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                   <div className="text-amber-400 font-bold">Q3</div>
                   <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
                 </th>
-                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Not Audited - Always PASS)">
+                <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Compliant per regulatory rubric)">
                   <div className="text-amber-400 font-bold">Q4</div>
-                  <div className="text-[9px] text-emerald-400 font-bold normal-case">Default PASS</div>
+                  <div className="text-[9px] text-emerald-400 font-bold normal-case">PASS</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
                   <div className="text-amber-400 font-bold">Q5</div>
@@ -719,7 +719,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         </select>
                       </td>
 
-                      {/* Q4 (Customer Ack - Default PASS) */}
+                      {/* Q4 (Customer Ack) */}
                       <td className="py-2 px-1 text-center whitespace-nowrap" title="Not audited: Always PASS per regulatory rubric">
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                           <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />

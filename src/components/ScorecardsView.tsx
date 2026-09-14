@@ -17,9 +17,13 @@ import {
   Send,
   Download,
   FileSpreadsheet,
+  Volume2,
+  Play,
+  X,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { ScorecardRecord } from '../types';
+import { getStoredToken } from '../lib/api';
 import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface ScorecardsViewProps {
@@ -47,6 +51,12 @@ export const ScorecardsView: React.FC<ScorecardsViewProps> = ({
   const [sendingId, setSendingId] = useState<number | null>(null);
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [expandedTranscriptId, setExpandedTranscriptId] = useState<number | null>(null);
+  const [playingCallId, setPlayingCallId] = useState<number | null>(null);
+
+  const getAudioUrl = (callId: number) => {
+    const token = getStoredToken();
+    return `/api/calls/${callId}/audio${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  };
 
   const handleRunAll = async () => {
     if (!onRunAllAudits) return;
@@ -174,7 +184,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
             <td style="text-align: center;">${sc.q3_status === 'PASS' ? 'Yes' : 'No'}</td>
           </tr>
           <tr>
-            <td>4. Customer Acknowledge the same? (Default PASS - Not Audited)<br/><small>Evidence: "${sc.q4_evidence || 'Regulatory norm: Parameter not audited. Automatically awarded PASS.'}"</small></td>
+            <td>4. Customer Acknowledge the same?<br/><small>Evidence: "${sc.q4_evidence || 'Customer acknowledged pre-order instructions.'}"</small></td>
             <td style="text-align: center;">1</td>
             <td style="text-align: center;"></td>
             <td style="text-align: center;">Yes</td>
@@ -590,11 +600,11 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                         },
                         {
                           id: 'Q4',
-                          q: 'Customer Acknowledge the same? (Default PASS - Not Audited)',
+                          q: 'Customer Acknowledge the same?',
                           ans: 'PASS',
                           evidence: sc.q4_evidence && !/\b(?:no|cancel|stop|reject)\b/i.test(sc.q4_evidence)
                             ? sc.q4_evidence
-                            : 'Regulatory rubric: Parameter not audited. Automatically awarded PASS.',
+                            : 'Customer acknowledged pre-order instructions.',
                           fatal: false,
                         },
                         {
@@ -670,17 +680,37 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
 
                 {/* Card Action Controls */}
                 <div className="flex flex-wrap items-center justify-between gap-2 pt-1 print:hidden">
-                  <button
-                    onClick={() => setExpandedTranscriptId(expandedTranscriptId === sc.id ? null : sc.id)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
-                      expandedTranscriptId === sc.id
-                        ? 'border-amber-500 bg-amber-400 text-black font-bold'
-                        : 'border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800'
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    <span>{expandedTranscriptId === sc.id ? 'Hide Transcript' : 'Transcript & Evidence'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setExpandedTranscriptId(expandedTranscriptId === sc.id ? null : sc.id)}
+                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                        expandedTranscriptId === sc.id
+                          ? 'border-amber-500 bg-amber-400 text-black font-bold'
+                          : 'border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800'
+                      }`}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>{expandedTranscriptId === sc.id ? 'Hide Evidence' : 'Transcript & Evidence'}</span>
+                    </button>
+
+                    {(sc.call_id || sc.id) && (
+                      <button
+                        onClick={() => {
+                          setExpandedTranscriptId(sc.id);
+                          setPlayingCallId(playingCallId === (sc.call_id || sc.id) ? null : (sc.call_id || sc.id));
+                        }}
+                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                          playingCallId === (sc.call_id || sc.id)
+                            ? 'border-amber-500 bg-amber-400 text-black font-bold shadow-xs'
+                            : 'border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800'
+                        }`}
+                        title="Listen to call audio recording"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-amber-600" />
+                        <span>{playingCallId === (sc.call_id || sc.id) ? 'Listening' : 'Play Audio'}</span>
+                      </button>
+                    )}
+                  </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
@@ -724,7 +754,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                   </div>
                 </div>
 
-                {/* Collapsible Transcript & Evidence Viewer */}
+                {/* Collapsible Transcript, Evidence & Audio Player Viewer */}
                 {expandedTranscriptId === sc.id && (
                   <div className="mt-3 p-4 bg-neutral-950 rounded-xl border border-neutral-800 text-neutral-200 text-xs print:hidden space-y-3">
                     <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
@@ -735,6 +765,35 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                       <span className="text-[11px] text-neutral-400 font-mono">
                         Call Ref #{sc.call_id || sc.id}
                       </span>
+                    </div>
+
+                    {/* Integrated Call Audio Playback */}
+                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+                      <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                        <div className="w-8 h-8 rounded-lg bg-amber-400 text-black flex items-center justify-center font-bold shrink-0">
+                          <Volume2 className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white flex items-center gap-2">
+                            <span>Call Recording Playback</span>
+                            <span className="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/50">
+                              #{sc.call_id || sc.id}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-neutral-400">
+                            Client: <span className="text-amber-400 font-mono font-semibold">{sc.client || sc.client_code || '—'}</span> · Advisor: <span className="text-neutral-200 font-medium">{sc.caller_name || sc.dealer || '—'}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="w-full sm:w-auto flex items-center gap-2">
+                        <audio
+                          controls
+                          autoPlay={playingCallId === (sc.call_id || sc.id)}
+                          preload="metadata"
+                          src={getAudioUrl(sc.call_id || sc.id)}
+                          className="h-8 w-full sm:w-80 rounded-md accent-amber-400"
+                        />
+                      </div>
                     </div>
 
                     <div className="max-h-72 overflow-y-auto">

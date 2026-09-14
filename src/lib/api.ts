@@ -11,6 +11,7 @@ import type {
   SystemIntegrations,
   UserProfile,
   FailedJobItem,
+  TradePreOrdersSummary,
 } from '../types';
 
 export const AUTH_TOKEN_KEY = 'auditeq_auth_token';
@@ -117,6 +118,12 @@ export const api = {
   getCalls: (perPage = 100) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
   getCall: (id: number) => apiRequest<CallRecord & { segments?: any[]; orders?: any[]; executions?: any[] }>(`/api/calls/${id}`),
   getTrades: (perPage = 100) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
+  getPreOrdersSummary: () =>
+    apiRequest<{ ok: boolean; summary: TradePreOrdersSummary }>('/api/trades/pre-orders-summary'),
+  matchPreOrdersWithCalls: () =>
+    apiRequest<{ ok: boolean; summary: TradePreOrdersSummary; message: string }>('/api/trades/match-pre-orders-with-calls', {
+      method: 'POST',
+    }),
   getMatches: (perPage = 100) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
   getAudits: (perPage = 100) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),
   getScorecards: (perPage = 100) => apiRequest<ScorecardRecord[]>(`/api/scorecards?per_page=${perPage}`),

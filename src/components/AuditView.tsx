@@ -562,7 +562,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
               className="bg-neutral-50 border border-neutral-200 text-xs font-bold text-neutral-800 py-1.5 px-2.5 rounded-xl cursor-pointer"
             >
               <option value={50}>50</option>
-              <option value={100}>100 (Default)</option>
+              <option value={100}>100</option>
               <option value={200}>200</option>
               <option value={500}>500</option>
               <option value={1000}>1,000</option>

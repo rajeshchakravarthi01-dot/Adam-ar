@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { DashboardView } from './components/DashboardView';
@@ -40,6 +40,7 @@ import type {
   SystemIntegrations,
   UserProfile,
   AdamBeeTicketRecord,
+  TradePreOrdersSummary,
 } from './types';
 
 export function App() {
@@ -73,11 +74,14 @@ export function App() {
   const [integrations, setIntegrations] = useState<SystemIntegrations | null>(null);
   const [diagnostics, setDiagnostics] = useState<any | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [preOrdersSummary, setPreOrdersSummary] = useState<TradePreOrdersSummary | null>(null);
 
   // Auth State
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const isFetchingRef = useRef(false);
 
   const showToast = (text: string, type: 'success' | 'error' = 'success') => {
     setToastMessage({ text, type });
@@ -99,10 +103,15 @@ export function App() {
         clearStoredToken();
         setCurrentUser(null);
       }
-    } catch {
-      // Session unauthenticated or token invalid
-      clearStoredToken();
-      setCurrentUser(null);
+    } catch (err: any) {
+      // ONLY clear token if the server explicitly returned an HTTP 401 Unauthorized status.
+      // Network drops, dev server recompilation, or transient 500/502/503 errors must NEVER log the user out!
+      if (err?.status === 401) {
+        clearStoredToken();
+        setCurrentUser(null);
+      } else {
+        console.warn('[AuditEQ Session] Network or server busy during session check; session retained.');
+      }
     } finally {
       setIsCheckingAuth(false);
     }
@@ -110,7 +119,8 @@ export function App() {
 
   const fetchAllData = useCallback(async () => {
     const token = getStoredToken();
-    if (!token) return;
+    if (!token || isFetchingRef.current) return;
+    isFetchingRef.current = true;
 
     try {
       const [
@@ -126,6 +136,7 @@ export function App() {
         integrationsRes,
         diagRes,
         logsRes,
+        preOrdersRes,
       ] = await Promise.allSettled([
         api.getStats(),
         api.getCalls(100),
@@ -139,6 +150,7 @@ export function App() {
         api.getIntegrations(),
         api.getDiagnostics(),
         api.getLogs(100),
+        api.getPreOrdersSummary(),
       ]);
 
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -153,18 +165,32 @@ export function App() {
       if (integrationsRes.status === 'fulfilled') setIntegrations(integrationsRes.value);
       if (diagRes.status === 'fulfilled') setDiagnostics(diagRes.value);
       if (logsRes.status === 'fulfilled' && Array.isArray(logsRes.value)) setLogs(logsRes.value);
+      if (preOrdersRes.status === 'fulfilled' && preOrdersRes.value?.ok) {
+        setPreOrdersSummary(preOrdersRes.value.summary);
+      }
 
-      // Verify before logging out on 401
-      const firstRejected = [statsRes, callsRes, tradesRes].find((r) => r.status === 'rejected') as PromiseRejectedResult | undefined;
-      if (firstRejected && (firstRejected.reason as any)?.status === 401) {
-        const verifyRes = await api.verifySession().catch(() => null);
-        if (!verifyRes || !verifyRes.ok) {
-          clearStoredToken();
-          setCurrentUser(null);
+      // Verify before logging out on 401 - only when explicitly 401
+      const any401 = [statsRes, callsRes, tradesRes].some(
+        (r) => r.status === 'rejected' && (r.reason as any)?.status === 401
+      );
+      if (any401) {
+        try {
+          const verifyRes = await api.verifySession();
+          if (!verifyRes || !verifyRes.ok) {
+            clearStoredToken();
+            setCurrentUser(null);
+          }
+        } catch (vErr: any) {
+          if (vErr?.status === 401) {
+            clearStoredToken();
+            setCurrentUser(null);
+          }
         }
       }
     } catch (err) {
       console.error('Data fetch error:', err);
+    } finally {
+      isFetchingRef.current = false;
     }
   }, []);
 
@@ -179,10 +205,10 @@ export function App() {
     initialize();
 
     const interval = setInterval(() => {
-      if (getStoredToken()) {
+      if (getStoredToken() && !isFetchingRef.current) {
         fetchAllData();
       }
-    }, 4000);
+    }, 6000);
 
     return () => {
       active = false;
@@ -568,8 +594,12 @@ export function App() {
             {activeTab === 'trades' && (
               <TradesView
                 trades={trades}
+                preOrdersSummary={preOrdersSummary}
                 onUploadTrades={handleUploadTrades}
                 onRefreshTrades={fetchAllData}
+                onSelectCall={(_id) => {
+                  setActiveTab('calls');
+                }}
                 isLoading={isLoading}
               />
             )}

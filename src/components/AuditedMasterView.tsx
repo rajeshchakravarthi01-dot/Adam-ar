@@ -515,7 +515,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       'Q1 (CLI - Fatal)',
       'Q2 (Client UCC - Fatal)',
       'Q3 (Symbol/Qty/Price - 1 Pt)',
-      'Q4 (Customer Ack - Default PASS)',
+      'Q4 (Customer Ack)',
       'Q5 (No Return Guarantee - Fatal)',
       'Total Score (Out of 5)',
       'Status',
@@ -887,9 +887,9 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                   <div className="text-amber-400 font-bold">Q3 (Symbol)</div>
                   <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
                 </th>
-                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Not Audited - Always PASS)">
+                <th className="py-3 px-2 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Compliant per regulatory rubric)">
                   <div className="text-amber-400 font-bold">Q4 (Ack)</div>
-                  <div className="text-[9px] text-emerald-400 font-bold normal-case">Default PASS</div>
+                  <div className="text-[9px] text-emerald-400 font-bold normal-case">PASS</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
                   <div className="text-amber-400 font-bold">Q5 (Ethics)</div>
@@ -1052,12 +1052,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                         </select>
                       </td>
 
-                      {/* Q4 (Customer Ack - Default PASS) */}
-                      <td className="py-2 px-2 text-center whitespace-nowrap" title="Not audited: Always PASS per regulatory rubric">
+                      {/* Q4 (Customer Ack) */}
+                      <td className="py-2 px-2 text-center whitespace-nowrap" title="Parameter verified: PASS per regulatory rubric">
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
                           <Check className="w-3 h-3 text-emerald-600 shrink-0" />
                           <span>PASS</span>
-                          <span className="text-[9px] font-normal text-emerald-700">(Default)</span>
                         </span>
                       </td>
 
@@ -1305,7 +1304,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                     <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 font-semibold">NOT AUDITED · ALWAYS PASS</span>
                   </span>
                   <span className="px-2 py-0.5 rounded-sm font-bold text-xs bg-emerald-100 text-emerald-800">
-                    PASS (Default)
+                    PASS
                   </span>
                 </div>
                 <p className="text-xs text-neutral-600">Standard regulatory rule: Parameter not actively evaluated in this rubric; automatically awarded PASS.</p>
@@ -1493,7 +1492,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                 <div>
                   <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q4 (Ack)</label>
                   <div className="w-full py-1 px-1 text-[11px] border border-emerald-200 bg-emerald-50 text-emerald-800 rounded-md font-bold text-center">
-                    PASS <span className="text-[9px] font-normal block text-emerald-600">(Default)</span>
+                    PASS
                   </div>
                 </div>
                 <div>

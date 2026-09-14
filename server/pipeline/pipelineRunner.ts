@@ -40,7 +40,8 @@ export interface PipelineWorkerStatus {
 let isWorkerLoopActive = false;
 let isHeartbeatRunning = false;
 const activeProcessingCallIds = new Set<number>();
-const MAX_CONCURRENT_PIPELINE_WORKERS = 3;
+// Robust concurrency: 4 parallel workers prevents SQLite write lock contention and memory thrashing
+const MAX_CONCURRENT_PIPELINE_WORKERS = 4;
 let lastHeartbeatTime = new Date().toISOString();
 let totalProcessedCount = 0;
 let rateLimitPauseUntil = 0;
@@ -258,10 +259,19 @@ export async function runFullPipelineForCall(
       if (highRecallCandidate.isCandidate || hasCorroboratingTrade) {
         // RESCUE: Genuine trading activity corroborated by distributed speech evidence or matching trade record!
         console.log(`[Pipeline] Call #${callId} -> Rescued from ${classificationResult.classification} to PRE_ORDER (Candidate: ${highRecallCandidate.isCandidate}, TradeMatch: ${hasCorroboratingTrade})`);
+        const evidenceText = highRecallCandidate.evidence || `Corroborating trade #${tradeProbe.matched_trade_id} execution matched.`;
         classificationResult = {
           classification: 'PRE_ORDER',
           confidence: 0.95,
-          evidence: highRecallCandidate.evidence || `Corroborating trade #${tradeProbe.matched_trade_id} execution matched.`,
+          evidence: [
+            {
+              segment_id: 'seg_corroborated',
+              start: 0,
+              end: 0,
+              speaker: 'CLIENT',
+              text: evidenceText,
+            },
+          ],
           reason: highRecallCandidate.reason || `Corroborating trade #${tradeProbe.matched_trade_id} execution confirms order directive.`,
           model: 'pre-order-recall-rescuer',
         };
@@ -615,6 +625,27 @@ export async function stepAutonomousPipelineWorker(
     `).run(nowIso);
   }
 
+  // 1d. High-Speed Bulk Scrap Clearance:
+  // Instantly mark calls with duration < 6s as SCRAP without bottlenecking worker threads
+  try {
+    db.prepare(`
+      UPDATE calls SET
+        classification = 'SCRAP',
+        call_type = 'scrap',
+        status = 'scrap',
+        audit_status = 'EXCLUDED',
+        processing_status = 'COMPLETED',
+        pipeline_stage = 'SCRAP_FILTER',
+        current_gate = 'GATE_1',
+        gate_reason = 'Duration < 6s scrap threshold',
+        classification_reason = 'Call duration < 6s regulatory scrap threshold.',
+        updated_at = ?
+      WHERE (processing_status = 'IDLE' OR processing_status IS NULL OR status = 'pending' OR status = 'imported')
+        AND status NOT IN ('audited', 'scrap', 'regular', 'review')
+        AND duration_seconds > 0 AND duration_seconds < 6
+    `).run(nowIso);
+  } catch {}
+
   // Check concurrency limit
   if (activeProcessingCallIds.size >= MAX_CONCURRENT_PIPELINE_WORKERS) {
     return false;
@@ -743,17 +774,29 @@ export function start24x7WorkerSupervisor(
   console.log('[AuditEQ] 24/7 Autonomous Pipeline Supervisor initialized with Gemini 3.5 Transcribe protection & multi-worker concurrency.');
   ensureCallColumns(db);
 
+  let isTickRunning = false;
   setInterval(async () => {
     lastHeartbeatTime = new Date().toISOString();
+    if (isTickRunning) return;
+    isTickRunning = true;
     try {
-      const needed = MAX_CONCURRENT_PIPELINE_WORKERS - activeProcessingCallIds.size;
-      for (let i = 0; i < needed; i++) {
-        stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey).catch((err: any) => {
-          console.error('[Autonomous Worker Async Error]:', err?.message);
-        });
+      const needed = Math.max(0, MAX_CONCURRENT_PIPELINE_WORKERS - activeProcessingCallIds.size);
+      if (needed > 0) {
+        const promises: Promise<boolean>[] = [];
+        for (let i = 0; i < needed; i++) {
+          promises.push(
+            stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey).catch((err: any) => {
+              console.error('[Autonomous Worker Async Error]:', err?.message);
+              return false;
+            })
+          );
+        }
+        await Promise.allSettled(promises);
       }
     } catch (err: any) {
-      console.error('[Autonomous Supervisor Error]:', err.message);
+      console.error('[Autonomous Supervisor Error]:', err?.message);
+    } finally {
+      isTickRunning = false;
     }
   }, 1000);
 }

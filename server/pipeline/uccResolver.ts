@@ -17,7 +17,13 @@
 // =============================================================
 
 import type { DatabaseSync } from 'node:sqlite';
-import { normalizeSpokenNumbers, levenshteinDistance } from '../normalizer';
+import {
+  normalizeSpokenNumbers,
+  levenshteinDistance,
+  formatCleanClientCode,
+  isStrictValidClientCode,
+  VALID_CLIENT_PREFIXES,
+} from '../normalizer';
 
 export const INVALID_UCC_WORDS = new Set([
   'OKAY', 'OK', 'YES', 'NO', 'BUY', 'SELL', 'CALL', 'PUT', 'DONE', 'FINE', 
@@ -27,18 +33,20 @@ export const INVALID_UCC_WORDS = new Set([
   'LIMIT', 'CMP', 'NUMBER', 'PARTY'
 ]);
 
+/**
+ * Validates whether a candidate string is a valid client code (UCC).
+ * Regulatory Rule: Client IDs must strictly start with WIA, WIF, WIC, WID, WIG, WIE, FIA, or PWD.
+ * Random words or arbitrary non-matching text are strictly rejected.
+ */
 export function isValidUcc(candidate?: string | null): boolean {
   if (!candidate) return false;
+  const cleaned = formatCleanClientCode(candidate);
+  if (isStrictValidClientCode(cleaned)) return true;
   const squashed = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (squashed.length < 3 || squashed.length > 16) return false;
   if (INVALID_UCC_WORDS.has(squashed)) return false;
-  // If candidate is purely alphabetic, it must not be a dictionary word
-  // Indian UCCs are either numeric (4-10 digits) or alphanumeric with letters and digits (e.g. WIA12345)
+  // If candidate is a pure numeric account code (e.g. 5-8 digits verified against trade account number)
   if (/^\d{4,10}$/.test(squashed)) return true;
-  if (/^[A-Z]{1,5}\d{2,8}$/.test(squashed)) return true;
-  const hasDigit = /\d/.test(squashed);
-  const hasLetter = /[A-Z]/.test(squashed);
-  if (hasDigit && hasLetter && squashed.length >= 4) return true;
   return false;
 }
 
@@ -121,8 +129,10 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
   // Pattern 1: Explicit account context + alphanumeric code
   // e.g., "account number WIA 12345", "code is 12345", "UCC WIA12345"
   const contextPatterns = [
-    /\b(?:ucc|client\s+code|client\s+id|account\s+number|account\s+no|a\/c\s+no|client\s+no)\s*(?:is|hai|number|#|:)?\s*([a-zA-Z0-9\s\-._]{3,16})/gi,
-    /\b([a-zA-Z]{2,4}[\s\-._]*\d{3,8})\b/gi,
+    /\b(?:ucc|client\s+code|client\s+id|account\s+number|account\s+no|a\/c\s+no|client\s+no)\s*(?:is|hai|number|#|:)?\s*([a-zA-Z0-9\s\-._]{3,24})/gi,
+    /\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|VIA|VIF|VIC|VID|VIG|VIE)[\s\-._]*\d{2,10})\b/gi,
+    /\b((?:W\s+I\s+A|W\s+I\s+F|W\s+I\s+C|W\s+I\s+D|W\s+I\s+G|W\s+I\s+E|F\s+I\s+A|P\s+W\s+D|P\s+W|W\s+I)[\s\-._]*\d{2,10})\b/gi,
+    /\b(double\s+u\s+i\s+[a-z][\s\-._]*\d{2,10})\b/gi,
   ];
 
   for (const pat of contextPatterns) {
@@ -130,20 +140,25 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
     while ((match = pat.exec(normalizedSpoken)) !== null) {
       const rawText = match[0];
       const cleanCandidate = match[1] || match[0];
-      const squashed = cleanCandidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (squashed.length >= 4 && isValidUcc(squashed)) {
-        candidates.push({ rawText, cleanCandidate: squashed });
+      const cleaned = formatCleanClientCode(cleanCandidate);
+      if (cleaned && isStrictValidClientCode(cleaned)) {
+        candidates.push({ rawText, cleanCandidate: cleaned });
+      } else {
+        const squashed = cleanCandidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (squashed.length >= 4 && isValidUcc(squashed)) {
+          candidates.push({ rawText, cleanCandidate: squashed });
+        }
       }
     }
   }
 
-  // Also extract bare standard UCC patterns (e.g. WIA12345 or VIA12345) from raw transcript
-  const directUccMatch = transcript.match(/\b([A-Z]{2,4}[\s\-._]*\d{3,8})\b/gi);
+  // Also extract bare standard UCC patterns (e.g. WIA12345 or PWD12345) from raw transcript
+  const directUccMatch = transcript.match(/\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|VIA)[A-Z0-9\s\-._]{2,14})\b/gi);
   if (directUccMatch) {
     for (const m of directUccMatch) {
-      const squashed = m.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (squashed.length >= 4 && isValidUcc(squashed) && !candidates.some((c) => c.cleanCandidate === squashed)) {
-        candidates.push({ rawText: m, cleanCandidate: squashed });
+      const cleaned = formatCleanClientCode(m);
+      if (cleaned && isStrictValidClientCode(cleaned) && !candidates.some((c) => c.cleanCandidate === cleaned)) {
+        candidates.push({ rawText: m, cleanCandidate: cleaned });
       }
     }
   }
@@ -272,13 +287,14 @@ export function resolveUccWithAuthoritativeData(
   const matches = Array.from(matchedAuthoritative);
 
   if (matches.length === 1) {
+    const formatted = formatCleanClientCode(matches[0]) || matches[0];
     return {
       status: 'RESOLVED',
-      resolvedUcc: matches[0],
+      resolvedUcc: formatted,
       rawSpokenUcc: candidateText,
       confidence: 0.95,
       matchingCandidates: matches,
-      notes: `ASR-resolved "${candidateText}" to single authoritative client ${matches[0]}.`,
+      notes: `ASR-resolved "${candidateText}" to single authoritative client ${formatted}.`,
     };
   }
 

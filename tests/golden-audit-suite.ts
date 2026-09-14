@@ -20,6 +20,7 @@ import { classifyCallIntent } from '../server/classifier';
 import { ManualReviewSchema } from '../server/validation';
 import { computeSHA256, verifyArchiveIntegrity } from '../server/archive-service';
 import { renderScorecardEmailHtml } from '../server/email-service';
+import { calculatePreOrdersFromTrades } from '../server/pipeline/tradePreOrderClusterer';
 import type { CallRecord, TradeRecord, ScorecardRecord } from '../src/types';
 
 console.log('--- Starting AuditEQ v17.0.28 Golden Test Suite ---');
@@ -183,5 +184,84 @@ const html = renderScorecardEmailHtml([sampleScorecard], 'Rohit Sharma');
 assert.strictEqual(html.includes('AuditEQ Quality & Compliance Intelligence'), true);
 assert.strictEqual(html.includes('Rohit Sharma'), true);
 assert.strictEqual(html.includes('WIA46884'), true);
+
+// 8. Pre-Order 4-Minute Gap Clustering Engine Test
+console.log('Testing Pre-Order 4-Minute Gap Clustering Engine...');
+const testTrades: TradeRecord[] = [
+  // Client 1: WELSPUN partial fills within 1 minute (< 4m) -> Should cluster into 1 pre-order
+  {
+    id: 1,
+    external_id: 't-1',
+    client: 'WIG17232',
+    symbol: 'WELSPUNLIV-EQ',
+    side: 'BUY',
+    quantity: 300,
+    price: 152.40,
+    trade_date: '2026-08-31',
+    trade_time: '10:32:05',
+    created_at: '2026-08-31',
+  },
+  {
+    id: 2,
+    external_id: 't-2',
+    client: 'WIG17232',
+    symbol: 'WELSPUNLIV',
+    side: 'BUY',
+    quantity: 500,
+    price: 152.45,
+    trade_date: '2026-08-31',
+    trade_time: '10:32:15',
+    created_at: '2026-08-31',
+  },
+  {
+    id: 3,
+    external_id: 't-3',
+    client: 'WIG17232',
+    symbol: 'WELSPUNLIV',
+    side: 'BUY',
+    quantity: 200,
+    price: 152.35,
+    trade_date: '2026-08-31',
+    trade_time: '10:33:10',
+    created_at: '2026-08-31',
+  },
+  // Client 1: WELSPUN executed at 11:45:00 (72 minutes later, >= 4m) -> Should be 2nd pre-order
+  {
+    id: 4,
+    external_id: 't-4',
+    client: 'WIG17232',
+    symbol: 'WELSPUNLIV',
+    side: 'BUY',
+    quantity: 400,
+    price: 153.10,
+    trade_date: '2026-08-31',
+    trade_time: '11:45:00',
+    created_at: '2026-08-31',
+  },
+  // Client 2: RELIANCE 100 shares -> 1 pre-order
+  {
+    id: 5,
+    external_id: 't-5',
+    client: 'WIA46884',
+    symbol: 'RELIANCE',
+    side: 'BUY',
+    quantity: 100,
+    price: 2850.00,
+    trade_date: '2026-08-31',
+    trade_time: '14:10:00',
+    created_at: '2026-08-31',
+  },
+];
+
+const preOrderResult = calculatePreOrdersFromTrades(testTrades);
+console.log(`Pre-orders identified: ${preOrderResult.total_pre_orders}, unique clients: ${preOrderResult.total_unique_clients}`);
+assert.strictEqual(preOrderResult.total_unique_clients, 2, 'Should identify 2 unique clients');
+assert.strictEqual(preOrderResult.total_pre_orders, 3, 'Should identify exactly 3 pre-orders: 2 for WIG17232 (separated by >4m) and 1 for WIA46884');
+
+const wigClusters = preOrderResult.clusters.filter(c => c.client_code === 'WIG17232');
+assert.strictEqual(wigClusters.length, 2, 'Client WIG17232 must have 2 distinct pre-orders');
+assert.strictEqual(wigClusters[0].trade_count, 3, 'First pre-order must consolidate 3 partial fills within < 4 min');
+assert.strictEqual(wigClusters[0].total_quantity, 1000, 'First pre-order consolidated quantity must be 1000 shares');
+assert.strictEqual(wigClusters[1].trade_count, 1, 'Second pre-order must be the separated fill');
 
 console.log('✅ ALL GOLDEN VERIFICATION TESTS PASSED SUCCESSFULLY!');
