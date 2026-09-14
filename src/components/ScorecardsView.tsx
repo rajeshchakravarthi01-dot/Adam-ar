@@ -314,78 +314,81 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
 
   return (
     <div className="space-y-6">
-      {/* Header & Quick Action Banner - Classy Black & Yellow */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header & Quick Action Banner - Liquid Glass */}
+      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+          <h2 className="text-base font-bold text-white flex items-center gap-2.5 tracking-tight">
+            <span className="p-2 rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20">
               <Award className="w-4 h-4" />
             </span>
-            <span>Official Pre-Order Audit Scorecards ({filtered.length})</span>
+            <span>Official Pre-Order Audit Scorecards</span>
+            <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              {filtered.length}
+            </span>
           </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Standard offline pre-order verification scorecards with exact 5-mark evaluation and verbatim evidence.
+          <p className="text-xs text-slate-400 mt-1">
+            Offline pre-order verification scorecards with 5-point evaluation and verbatim speech evidence.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={downloadAllScorecardsExcel}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-xs text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
             title="Download all filtered scorecards in a unified Excel spreadsheet"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5" />
-            <span>Bulk Download (Excel)</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Bulk Export (Excel)</span>
           </button>
           {onRunAllAudits && (
             <button
               onClick={handleRunAll}
               disabled={isRunningAll || isLoading}
-              className="px-4 py-2 bg-black hover:bg-neutral-900 disabled:opacity-50 text-amber-400 font-bold rounded-xl shadow-xs text-xs transition-colors cursor-pointer flex items-center gap-1.5 border border-amber-400/30"
+              className="px-3.5 py-2 bg-teal-500/20 hover:bg-teal-500/30 disabled:opacity-50 text-teal-200 border border-teal-500/30 font-bold rounded-xl text-xs transition-all cursor-pointer flex items-center gap-1.5 shadow-xs active:scale-95"
             >
-              <Sparkles className={`w-3.5 h-3.5 ${isRunningAll ? 'animate-spin' : ''}`} />
-              <span>{isRunningAll ? 'Auditing Calls…' : 'Run Compliance Audits'}</span>
+              <Sparkles className={`w-3.5 h-3.5 text-teal-300 ${isRunningAll ? 'animate-spin' : ''}`} />
+              <span>{isRunningAll ? 'Auditing Calls…' : 'Run Audits'}</span>
             </button>
           )}
           {onNavigateToMail && (
             <button
               onClick={onNavigateToMail}
-              className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-bold rounded-xl border border-neutral-200 text-xs transition-colors cursor-pointer flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-300 font-bold rounded-xl border border-teal-500/20 text-xs transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <Mail className="w-3.5 h-3.5 text-amber-500" />
-              <span>1-Click Batch Email</span>
+              <Mail className="w-3.5 h-3.5 text-teal-400" />
+              <span>Batch Email</span>
             </button>
           )}
-          <div className="text-xs text-neutral-900 font-bold bg-amber-50 px-3.5 py-2 rounded-xl border border-amber-300">
-            {scorecards.length} Total Scorecards
+          <div className="text-xs text-teal-300 font-bold bg-teal-950/60 px-3.5 py-2 rounded-xl border border-teal-500/30">
+            {scorecards.length} Total
           </div>
         </div>
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-3 text-xs">
+      {/* Filter Toolbar - Liquid Glass */}
+      <div className="glass-panel p-4 sm:p-5 rounded-2xl space-y-3 text-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5">
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">Search Keywords</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Search Keywords</label>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Advisor, client, phone…"
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs text-white placeholder:text-slate-400 focus:border-teal-400 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">Advisor Name</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Advisor</label>
             <select
               value={advisorFilter}
               onChange={(e) => setAdvisorFilter(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-medium focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs font-medium text-white focus:border-teal-400 focus:outline-hidden transition-colors"
             >
-              <option value="">All Advisors</option>
+              <option value="" className="bg-slate-900 text-white">All Advisors</option>
               {uniqueAdvisors.map((adv) => (
-                <option key={adv} value={adv}>
+                <option key={adv} value={adv} className="bg-slate-900 text-white">
                   {adv}
                 </option>
               ))}
@@ -393,60 +396,60 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">From Date</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">From Date</label>
             <input
               type="date"
               value={fromDateFilter}
               onChange={(e) => setFromDateFilter(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs font-mono text-white focus:border-teal-400 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">To Date</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">To Date</label>
             <input
               type="date"
               value={toDateFilter}
               onChange={(e) => setToDateFilter(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs font-mono text-white focus:border-teal-400 focus:outline-hidden transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">Mark / Score</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Score</label>
             <select
               value={markFilter}
               onChange={(e) => setMarkFilter(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-medium focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs font-medium text-white focus:border-teal-400 focus:outline-hidden transition-colors"
             >
-              <option value="">All Marks (0-5)</option>
-              <option value="5">5 Marks (Perfect)</option>
-              <option value="4">4 Marks</option>
-              <option value="3">3 Marks</option>
-              <option value="2">2 Marks</option>
-              <option value="1">1 Mark</option>
-              <option value="0">0 Marks (Fatal Failure)</option>
+              <option value="" className="bg-slate-900 text-white">All Marks (0-5)</option>
+              <option value="5" className="bg-slate-900 text-white">5 Marks (Perfect)</option>
+              <option value="4" className="bg-slate-900 text-white">4 Marks</option>
+              <option value="3" className="bg-slate-900 text-white">3 Marks</option>
+              <option value="2" className="bg-slate-900 text-white">2 Marks</option>
+              <option value="1" className="bg-slate-900 text-white">1 Mark</option>
+              <option value="0" className="bg-slate-900 text-white">0 Marks (Fatal Failure)</option>
             </select>
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-neutral-700 mb-1">Audit Status</label>
+            <label className="block text-[11px] font-bold text-slate-300 mb-1">Audit Status</label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-3 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-medium focus:border-amber-400 focus:outline-none"
+              className="w-full px-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs font-medium text-white focus:border-teal-400 focus:outline-hidden transition-colors"
             >
-              <option value="all">All Scorecards</option>
-              <option value="compliant">Compliant Only (Pass)</option>
-              <option value="fatal">Fatal Deficient (0 Marks)</option>
+              <option value="all" className="bg-slate-900 text-white">All Scorecards</option>
+              <option value="compliant" className="bg-slate-900 text-white">Compliant (Pass)</option>
+              <option value="fatal" className="bg-slate-900 text-white">Fatal Deficient (0 Marks)</option>
             </select>
           </div>
         </div>
 
         {(fromDateFilter || toDateFilter || advisorFilter || search || markFilter) && (
-          <div className="flex items-center justify-between pt-2 border-t border-neutral-200 text-[11px]">
-            <span className="text-neutral-500">
-              Active filters applied. Showing <b>{filtered.length}</b> of <b>{scorecards.length}</b> scorecards.
+          <div className="flex items-center justify-between pt-2 border-t border-teal-500/20 text-[11px]">
+            <span className="text-slate-400">
+              Active filters: <b>{filtered.length}</b> of <b>{scorecards.length}</b> scorecards.
             </span>
             <button
               onClick={() => {
@@ -458,7 +461,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                 setMarkFilter('');
                 setStatusFilter('all');
               }}
-              className="text-amber-700 hover:text-black font-bold cursor-pointer underline"
+              className="text-teal-400 hover:text-teal-300 font-bold cursor-pointer underline"
             >
               Clear All Filters
             </button>
@@ -469,20 +472,20 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
       {/* Scorecards Grid */}
       <div className="space-y-6">
         {filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-neutral-200 p-10 text-center text-xs space-y-3">
-            <p className="text-neutral-500 font-medium">No scorecards match the specified criteria.</p>
-            <p className="text-neutral-400 max-w-md mx-auto">
-              If calls have been uploaded and transcribed, run compliance audits to generate the official scorecards.
+          <div className="glass-panel rounded-2xl p-10 text-center text-xs space-y-3">
+            <p className="text-slate-300 font-medium">No scorecards match the specified criteria.</p>
+            <p className="text-slate-400 max-w-md mx-auto">
+              Run compliance audits on ingested calls to generate official scorecards.
             </p>
             {onRunAllAudits && (
               <div className="pt-2">
                 <button
                   onClick={handleRunAll}
                   disabled={isRunningAll || isLoading}
-                  className="px-5 py-2.5 bg-black hover:bg-neutral-900 text-amber-400 font-bold rounded-xl shadow-xs transition-colors cursor-pointer inline-flex items-center gap-2 border border-amber-400/30"
+                  className="px-5 py-2.5 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black rounded-xl shadow-[0_0_15px_rgba(45,212,191,0.3)] transition-all cursor-pointer inline-flex items-center gap-2 active:scale-95"
                 >
                   <Sparkles className={`w-4 h-4 ${isRunningAll ? 'animate-spin' : ''}`} />
-                  <span>{isRunningAll ? 'Auditing Calls Now…' : 'Generate & Refresh Compliance Scorecards'}</span>
+                  <span>{isRunningAll ? 'Auditing Calls Now…' : 'Generate Compliance Scorecards'}</span>
                 </button>
               </div>
             )}
@@ -496,55 +499,55 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
               <div
                 key={sc.id}
                 id={`scorecard-print-${sc.id}`}
-                className="bg-white rounded-2xl border border-slate-300 shadow-md p-6 max-w-4xl mx-auto space-y-4 font-sans text-slate-900"
+                className="glass-panel p-5 sm:p-6 rounded-2xl max-w-4xl mx-auto space-y-4 font-sans border border-teal-500/20 transition-all hover:border-teal-500/40"
               >
-                {/* Official Card Header Title - Kept as official format per user request */}
-                <div className="bg-blue-600 text-white font-bold text-center py-2.5 px-4 rounded-t-lg text-sm sm:text-base tracking-wide uppercase shadow-xs">
+                {/* Official Card Header Title */}
+                <div className="bg-gradient-to-r from-teal-700 via-teal-600 to-cyan-700 text-white font-bold text-center py-2.5 px-4 rounded-t-xl text-sm sm:text-base tracking-wide uppercase shadow-sm">
                   Offline Pre Order Confirmation Call Audit Score Card
                 </div>
 
                 {/* Metadata 2x4 Table */}
-                <table className="w-full border-collapse border border-slate-400 text-xs">
+                <table className="w-full border-collapse border border-slate-700 text-xs">
                   <tbody>
                     <tr>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800 w-1/4">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
                         Caller Name
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 text-slate-900 font-medium w-1/4">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
                         {cleanCallerName(sc.caller_name) || '—'}
                       </td>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800 w-1/4">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300 w-1/4">
                         Team
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 text-slate-900 font-medium w-1/4">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white font-medium w-1/4">
                         {sc.team || '—'}
                       </td>
                     </tr>
                     <tr>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
                         Client ID
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 font-mono font-bold text-slate-900">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono font-bold text-teal-300">
                         {sc.client || '—'}
                       </td>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
                         Phone Number
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 font-mono text-slate-900">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 font-mono text-white">
                         {sc.trade_phone || sc.calling_number || '—'}
                       </td>
                     </tr>
                     <tr>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
                         Trade Date
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 text-slate-900">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
                         {sc.trade_date || sc.call_date || '—'}
                       </td>
-                      <th className="border border-slate-400 bg-slate-200/80 px-3 py-2 text-left font-semibold text-slate-800">
+                      <th className="border border-slate-700 bg-slate-900/90 px-3 py-2 text-left font-semibold text-slate-300">
                         Audit Date
                       </th>
-                      <td className="border border-slate-400 bg-stone-100/70 px-3 py-2 text-slate-900">
+                      <td className="border border-slate-700 bg-slate-900/50 px-3 py-2 text-white">
                         {sc.created_at?.slice(0, 10) || new Date().toISOString().slice(0, 10)}
                       </td>
                     </tr>
@@ -552,13 +555,13 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                 </table>
 
                 {/* 5-Mark Compliance Scorecard Table */}
-                <table className="w-full border-collapse border border-slate-400 text-xs">
-                  <thead className="bg-blue-900 text-white font-bold text-center">
+                <table className="w-full border-collapse border border-slate-700 text-xs">
+                  <thead className="bg-slate-950 text-teal-300 font-bold text-center border-b border-teal-500/20">
                     <tr>
-                      <th className="border border-slate-400 p-2.5 text-left w-3/5">PARAMETERS</th>
-                      <th className="border border-slate-400 p-2.5 w-16">Mark</th>
-                      <th className="border border-slate-400 p-2.5 w-20">Flag</th>
-                      <th className="border border-slate-400 p-2.5 w-24">Score</th>
+                      <th className="border border-slate-700 p-2.5 text-left w-3/5">PARAMETERS</th>
+                      <th className="border border-slate-700 p-2.5 w-16">Mark</th>
+                      <th className="border border-slate-700 p-2.5 w-20">Flag</th>
+                      <th className="border border-slate-700 p-2.5 w-24">Score</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -627,22 +630,22 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                           {rows.map((p) => {
                             const isPass = p.id === 'Q4' ? true : p.ans === 'PASS';
                             return (
-                              <tr key={p.id} className="hover:bg-slate-50/50">
-                                <td className={`border border-slate-400 px-3 py-2 ${p.fatal ? 'text-red-700 font-medium' : 'text-slate-800'}`}>
+                              <tr key={p.id} className="hover:bg-teal-500/5 transition-colors">
+                                <td className={`border border-slate-700 px-3 py-2 ${p.fatal ? 'text-rose-400 font-medium' : 'text-slate-200'}`}>
                                   <div>{p.q}</div>
                                   {p.evidence && (
-                                    <div className="text-[11px] text-slate-500 italic mt-0.5">
+                                    <div className="text-[11px] text-slate-400 italic mt-0.5">
                                       Evidence: "{p.evidence}"
                                     </div>
                                   )}
                                 </td>
-                                <td className="border border-slate-400 px-3 py-2 text-center font-mono font-bold text-slate-900">
+                                <td className="border border-slate-700 px-3 py-2 text-center font-mono font-bold text-white">
                                   {isPass ? '1' : '0'}
                                 </td>
-                                <td className="border border-slate-400 px-3 py-2 text-center font-bold text-rose-700">
+                                <td className="border border-slate-700 px-3 py-2 text-center font-bold text-rose-400">
                                   {p.fatal ? 'FATAL' : ''}
                                 </td>
-                                <td className="border border-slate-400 px-3 py-2 text-center font-bold text-slate-900">
+                                <td className="border border-slate-700 px-3 py-2 text-center font-bold text-white">
                                   {isPass ? 'Yes' : 'No'}
                                 </td>
                               </tr>
@@ -650,13 +653,13 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                           })}
 
                           {/* Total Row */}
-                          <tr className="bg-lime-100/80 font-bold text-slate-950">
-                            <td className="border border-slate-400 px-3 py-2 text-right">TOTAL</td>
-                            <td className="border border-slate-400 px-3 py-2 text-center font-mono text-sm">5</td>
-                            <td className="border border-slate-400 px-3 py-2 text-center font-mono text-base text-amber-800">
+                          <tr className="bg-teal-950/60 font-bold text-white border-t border-teal-500/30">
+                            <td className="border border-slate-700 px-3 py-2 text-right text-teal-300">TOTAL</td>
+                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-sm text-teal-300">5</td>
+                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-amber-300">
                               {displayStars}
                             </td>
-                            <td className="border border-slate-400 px-3 py-2 text-center font-mono text-base text-indigo-900">
+                            <td className="border border-slate-700 px-3 py-2 text-center font-mono text-base text-teal-300">
                               {calculatedScore}
                             </td>
                           </tr>
@@ -667,15 +670,15 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                 </table>
 
                 {/* Comment Box */}
-                <div className="border border-slate-400 bg-white p-3.5 rounded-b-lg text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="border border-slate-700 bg-slate-900/60 p-3.5 rounded-b-xl text-xs leading-relaxed flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <b className="text-slate-900 mr-2">Comment about the call:</b>
-                    <span className="text-slate-800">
+                    <b className="text-teal-300 mr-2">Comment about call:</b>
+                    <span className="text-slate-200">
                       {sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory Norm.'}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-500 font-medium shrink-0 print:hidden">
-                    ADAM-AR · FundsIndia Compliance Audit System
+                  <div className="text-[11px] text-slate-400 font-medium shrink-0 print:hidden">
+                    ADAM-AR v1.1
                   </div>
                 </div>
 
@@ -684,13 +687,13 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setExpandedTranscriptId(expandedTranscriptId === sc.id ? null : sc.id)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
                         expandedTranscriptId === sc.id
-                          ? 'border-amber-500 bg-amber-400 text-black font-bold'
-                          : 'border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800'
+                          ? 'border-teal-400 bg-teal-500/20 text-teal-200 shadow-xs'
+                          : 'border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300'
                       }`}
                     >
-                      <FileText className="w-3.5 h-3.5" />
+                      <FileText className="w-3.5 h-3.5 text-teal-400" />
                       <span>{expandedTranscriptId === sc.id ? 'Hide Evidence' : 'Transcript & Evidence'}</span>
                     </button>
 
@@ -700,15 +703,15 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                           setExpandedTranscriptId(sc.id);
                           setPlayingCallId(playingCallId === (sc.call_id || sc.id) ? null : (sc.call_id || sc.id));
                         }}
-                        className={`px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors ${
+                        className={`px-3 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
                           playingCallId === (sc.call_id || sc.id)
-                            ? 'border-amber-500 bg-amber-400 text-black font-bold shadow-xs'
-                            : 'border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800'
+                            ? 'border-teal-400 bg-teal-500/30 text-teal-200 font-bold shadow-xs'
+                            : 'border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300'
                         }`}
                         title="Listen to call audio recording"
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-amber-600" />
-                        <span>{playingCallId === (sc.call_id || sc.id) ? 'Listening' : 'Play Audio'}</span>
+                        <Volume2 className="w-3.5 h-3.5 text-teal-400" />
+                        <span>{playingCallId === (sc.call_id || sc.id) ? 'Playing' : 'Audio'}</span>
                       </button>
                     )}
                   </div>
@@ -716,40 +719,40 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                   <div className="flex items-center gap-2 flex-wrap">
                     <button
                       onClick={() => downloadScorecardWord(sc)}
-                      className="px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl border border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
                       title="Download Scorecard in Microsoft Word (.doc) format"
                     >
-                      <Download className="w-3.5 h-3.5 text-blue-600" />
+                      <Download className="w-3.5 h-3.5 text-cyan-400" />
                       <span>Word</span>
                     </button>
                     <button
                       onClick={() => downloadScorecardExcel(sc)}
-                      className="px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl border border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
                       title="Download Scorecard in Excel (.xlsx) format"
                     >
-                      <Download className="w-3.5 h-3.5 text-emerald-600" />
+                      <Download className="w-3.5 h-3.5 text-emerald-400" />
                       <span>Excel</span>
                     </button>
                     <button
                       onClick={() => copyScorecard(sc)}
-                      className="px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl border border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
                     >
-                      <Copy className="w-3.5 h-3.5 text-amber-500" />
+                      <Copy className="w-3.5 h-3.5 text-teal-400" />
                       <span>Copy</span>
                     </button>
                     <button
                       onClick={() => printScorecard(sc.id)}
-                      className="px-2.5 py-1.5 rounded-lg border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 text-neutral-800 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl border border-teal-500/20 bg-slate-900/70 hover:bg-slate-800 text-slate-300 text-xs font-semibold flex items-center gap-1 cursor-pointer transition-all"
                     >
-                      <Printer className="w-3.5 h-3.5 text-neutral-600" />
-                      <span>Print / PDF</span>
+                      <Printer className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Print</span>
                     </button>
                     <button
                       onClick={() => handleSendSingle(sc)}
                       disabled={sendingId === sc.id}
-                      className="px-3.5 py-1.5 rounded-lg bg-black hover:bg-neutral-900 text-amber-400 text-xs font-bold flex items-center gap-1 cursor-pointer border border-amber-400/30"
+                      className="px-3 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
                     >
-                      <Send className="w-3.5 h-3.5" />
+                      <Send className="w-3.5 h-3.5 text-teal-300" />
                       <span>{sendingId === sc.id ? 'Sending…' : 'Email'}</span>
                     </button>
                   </div>
@@ -757,32 +760,32 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
 
                 {/* Collapsible Transcript, Evidence & Audio Player Viewer */}
                 {expandedTranscriptId === sc.id && (
-                  <div className="mt-3 p-4 bg-neutral-950 rounded-xl border border-neutral-800 text-neutral-200 text-xs print:hidden space-y-3">
-                    <div className="flex items-center justify-between border-b border-neutral-800 pb-2">
-                      <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                  <div className="mt-3 p-4 bg-slate-950/90 rounded-2xl border border-teal-500/20 text-slate-200 text-xs print:hidden space-y-3">
+                    <div className="flex items-center justify-between border-b border-teal-500/20 pb-2">
+                      <div className="font-bold text-teal-300 flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Speech Transcript &amp; Pre-Order Highlight Analysis</span>
                       </div>
-                      <span className="text-[11px] text-neutral-400 font-mono">
+                      <span className="text-[11px] text-slate-400 font-mono">
                         Call Ref #{sc.call_id || sc.id}
                       </span>
                     </div>
 
                     {/* Integrated Call Audio Playback */}
-                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+                    <div className="p-3 bg-slate-900/80 rounded-xl border border-teal-500/20 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
                       <div className="flex items-center gap-2.5 w-full sm:w-auto">
-                        <div className="w-8 h-8 rounded-lg bg-amber-400 text-black flex items-center justify-center font-bold shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center font-bold shrink-0">
                           <Volume2 className="w-4 h-4" />
                         </div>
                         <div>
                           <div className="text-xs font-bold text-white flex items-center gap-2">
-                            <span>Call Recording Playback</span>
-                            <span className="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/50">
+                            <span>Call Recording</span>
+                            <span className="text-[10px] font-mono text-teal-300 bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-800/50">
                               #{sc.call_id || sc.id}
                             </span>
                           </div>
-                          <div className="text-[11px] text-neutral-400">
-                            Client: <span className="text-amber-400 font-mono font-semibold">{sc.client || sc.client_code || '—'}</span> · Advisor: <span className="text-neutral-200 font-medium">{cleanCallerName(sc.caller_name) || sc.dealer || '—'}</span>
+                          <div className="text-[11px] text-slate-400">
+                            Client: <span className="text-teal-300 font-mono font-semibold">{sc.client || sc.client_code || '—'}</span> · Advisor: <span className="text-slate-200 font-medium">{cleanCallerName(sc.caller_name) || sc.dealer || '—'}</span>
                           </div>
                         </div>
                       </div>
@@ -792,7 +795,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                           autoPlay={playingCallId === (sc.call_id || sc.id)}
                           preload="metadata"
                           src={getAudioUrl(sc.call_id || sc.id)}
-                          className="h-8 w-full sm:w-80 rounded-md accent-amber-400"
+                          className="h-8 w-full sm:w-80 rounded-md accent-teal-400"
                         />
                       </div>
                     </div>

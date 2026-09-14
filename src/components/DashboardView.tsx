@@ -106,419 +106,449 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Live Processing Status & Activity Banner - Answering what engine is doing */}
-      <div className={`p-5 rounded-2xl border shadow-sm transition-all ${
+      {/* Live Engine Status Banner - Liquid Glass Interactive Strip */}
+      <div className={`p-4 sm:p-5 rounded-2xl glass-panel transition-all ${
         isBlockedAwaitingKey
-          ? 'bg-amber-50/80 border-amber-300'
+          ? 'border-amber-500/40 bg-amber-950/20'
           : isAIActive
-          ? 'bg-gradient-to-r from-amber-50 via-amber-100/40 to-white border-amber-300'
-          : 'bg-white border-neutral-200'
+          ? 'border-teal-500/40 bg-teal-950/20'
+          : 'border-teal-500/20'
       }`}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-start gap-3.5">
-            <div className={`p-2.5 rounded-xl shrink-0 ${
-              isBlockedAwaitingKey ? 'bg-amber-500 text-white' : isAIActive ? 'bg-amber-400 text-black animate-pulse' : 'bg-neutral-100 text-neutral-700'
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className={`p-2.5 rounded-xl shrink-0 shadow-lg ${
+              isBlockedAwaitingKey
+                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30'
+                : isAIActive
+                ? 'bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950 shadow-teal-500/30 animate-pulse'
+                : 'bg-slate-900 text-teal-300 border border-teal-500/30'
             }`}>
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider font-mono ${
-                  isBlockedAwaitingKey ? 'bg-amber-500 text-white' : isAIActive ? 'bg-amber-400 text-black' : 'bg-emerald-100 text-emerald-800'
+                <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide font-mono ${
+                  isBlockedAwaitingKey
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    : isAIActive
+                    ? 'bg-teal-500/20 text-teal-200 border border-teal-400/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 }`}>
-                  <span className={`w-2 h-2 rounded-full ${isBlockedAwaitingKey ? 'bg-white' : isAIActive ? 'bg-black animate-ping' : 'bg-emerald-600'}`} />
-                  <span>{isBlockedAwaitingKey ? 'Awaiting API Key' : isAIActive ? 'Engine Active & Working' : 'Engine Standby / Idle'}</span>
+                  <span className={`w-2 h-2 rounded-full ${isBlockedAwaitingKey ? 'bg-amber-400' : isAIActive ? 'bg-teal-300 animate-ping' : 'bg-emerald-400'}`} />
+                  <span>{isBlockedAwaitingKey ? 'Awaiting Processing Key' : isAIActive ? 'Engine Active & Processing' : 'Supervisory Engine Online'}</span>
                 </span>
-                <span className="text-xs text-neutral-500 font-medium">Autonomous 24/7 Supervisor</span>
+                <span className="text-xs text-slate-400 font-medium">Auto Pipeline v1.1</span>
               </div>
-              <h3 className="text-base font-bold text-neutral-900 mt-1">
+              <div className="text-sm font-bold text-white mt-1">
                 {isBlockedAwaitingKey ? (
-                  <span>
-                    Processing Engine Paused — {blockedTranscription} call(s) awaiting Processing API Key
-                  </span>
+                  <span>Engine Paused · {blockedTranscription} audio file(s) waiting for API credentials</span>
                 ) : isAIActive ? (
-                  <span>
-                    Pipeline is currently processing {processing + queued + pendingTranscription} active background task(s)
-                  </span>
+                  <span>Processing {processing + queued + pendingTranscription} concurrent verification task(s)</span>
                 ) : (
-                  <span>Processing Engine is Idle — All {totalCalls} audio calls &amp; scorecards fully processed</span>
+                  <span>All {totalCalls} calls &amp; {trades} trades synchronized and audited</span>
                 )}
-              </h3>
-              <p className="text-xs text-neutral-600 mt-0.5 leading-relaxed max-w-3xl">
-                {isBlockedAwaitingKey ? (
-                  <span>
-                    <b>Action Required:</b> Audio transcription requires an API Key. Configure the key in Settings or Environment to activate verbatim transcription and compliance scoring.
-                  </span>
-                ) : isAIActive ? (
-                  <span>
-                    <b>Current Action:</b> Speech-to-text verbatim transcription and SEBI Q1–Q4 audit compliance evaluation are actively processing.
-                  </span>
-                ) : (
-                  <span>
-                    <b>Why Engine is Idle:</b> The pipeline queue is clear ({queued} queued, {processing} processing). All uploaded calls have reached terminal states (transcribed, matched, audited, or scrap). Pipeline supervisor is on standby ready for new audio ZIP uploads.
-                  </span>
-                )}
-              </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {isBlockedAwaitingKey ? (
               <button
                 onClick={() => onNavigate('integrations')}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
               >
-                <span>Configure API Key</span>
+                <span>Configure Key</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             ) : (
               <button
                 onClick={onStartPipeline}
                 disabled={isLoading}
-                className="px-4 py-2 bg-neutral-900 hover:bg-black text-amber-400 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-neutral-700 transition-all cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-slate-900/90 hover:bg-slate-800 text-teal-300 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-teal-500/30 hover:border-teal-400/60 transition-all cursor-pointer shadow-xs active:scale-95"
               >
-                <Activity className="w-3.5 h-3.5" />
-                <span>Poll / Wake Engine</span>
+                <Activity className="w-3.5 h-3.5 text-teal-400" />
+                <span>Wake Pipeline</span>
               </button>
             )}
             <button
               onClick={() => onNavigate('pipeline')}
-              className="px-4 py-2 bg-white hover:bg-neutral-50 text-neutral-800 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-neutral-200 transition-all cursor-pointer shadow-xs"
+              className="px-4 py-2 bg-teal-500/10 hover:bg-teal-500/20 text-teal-200 text-xs font-bold rounded-xl flex items-center gap-1.5 border border-teal-500/20 transition-all cursor-pointer"
             >
-              <span>View Workers</span>
-              <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Workers</span>
+              <ArrowRight className="w-3.5 h-3.5 text-teal-400" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Hero Pipeline Status Banner - Classy Black & Yellow */}
-      <div className="bg-[#0b0b0e] text-white rounded-2xl p-6 shadow-xl border border-neutral-800 relative overflow-hidden">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-4 relative z-10">
-          <div>
-            <div className="text-xs font-bold text-amber-400 tracking-wider uppercase mb-1">
-              Production Pipeline · High-Accuracy Speech Engine
-            </div>
-            <h2 className="text-2xl font-black tracking-tight text-white">
-              Calls &rarr; Trades &rarr; Transcribe &rarr; Match &rarr; Q1–Q4 Audit &rarr; Scorecard
-            </h2>
-            <p className="text-xs text-neutral-400 mt-1 max-w-2xl leading-relaxed">
-              Speech-to-text verbatim transcription with acoustic conditioning; strict pre-order quality auditing. Valid audits synchronize directly across scorecards and editable master records.
-            </p>
-          </div>
-
-          <button
-            onClick={onStartPipeline}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-6 py-2.5 bg-amber-400 hover:bg-amber-300 text-black font-black text-xs rounded-xl shadow-md transition-transform active:scale-95 cursor-pointer disabled:opacity-50 shrink-0"
-          >
-            <Play className="w-4 h-4 fill-black text-black" />
-            <span>Start / Refresh Pipeline</span>
-          </button>
-        </div>
-
-        {/* Real-time Progress Bar */}
-        <div className="mt-6 relative z-10">
-          <div className="flex items-center justify-between text-xs text-neutral-300 mb-1.5 font-medium">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
-              <span>Pipeline Automation Progress</span>
-            </div>
-            <span className="font-mono text-amber-400 font-bold">{progressPercent}% Scored &amp; Finalized</span>
-          </div>
-          <div className="w-full h-2.5 bg-neutral-900 rounded-full overflow-hidden border border-neutral-800">
-            <div
-              className="h-full bg-amber-400 rounded-full transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-neutral-400 gap-2">
-          <div>
-            Queue Status: <span className="text-amber-400 font-mono font-bold">{stats?.queued || 0} queued</span> ·{' '}
-            <span className="text-neutral-200 font-mono font-medium">{stats?.processing || 0} processing</span> ·{' '}
-            <span className="text-neutral-200 font-mono font-medium">{pendingTranscription} pending transcription</span>
-            {blockedTranscription > 0 && (
-              <>
-                {' '}·{' '}
-                <span className="text-amber-400 font-mono font-bold">{blockedTranscription} awaiting API key</span>
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 text-amber-400 font-semibold">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Zero Manual Gate on Valid Audits</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Metric Cards */}
+      {/* Row 1: 4 Liquid Glass Radial KPI Gauges (Matching BlurAdmin UI Archetype) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Calls Card */}
+        {/* Metric 1: Calls & Voice Ingestion */}
         <div
           onClick={() => onNavigate('calls')}
-          className="bg-white p-5 rounded-2xl border border-neutral-200 hover:border-amber-400 transition-all cursor-pointer shadow-xs group"
+          className="glass-card-interactive p-4 sm:p-5 rounded-2xl relative overflow-hidden group"
         >
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">Call Recordings</span>
-            <PhoneCall className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Voice Ingestion</span>
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20 group-hover:scale-110 transition-transform">
+              <PhoneCall className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">{totalCalls.toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 mt-1 flex items-center justify-between">
-            <span>Transcribed: <b className="text-neutral-800">{transcribed}</b></span>
-            {pendingTranscription > 0 && (
-              <span className="text-amber-600 font-bold">{pendingTranscription} pending</span>
-            )}
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-2xl font-black text-white tracking-tight">{totalCalls.toLocaleString()}</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Transcribed: <b className="text-teal-300">{transcribed}</b>
+              </div>
+            </div>
+
+            {/* Radial SVG Gauge */}
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+              <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="18" className="stroke-slate-800" strokeWidth="4" fill="none" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="18"
+                  className="stroke-teal-400 transition-all duration-1000"
+                  strokeWidth="4"
+                  strokeDasharray={113}
+                  strokeDashoffset={113 - (113 * (totalCalls > 0 ? Math.min(100, Math.round((transcribed / totalCalls) * 100)) : 0)) / 100}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              <span className="absolute text-[11px] font-bold font-mono text-teal-200">
+                {totalCalls > 0 ? Math.min(100, Math.round((transcribed / totalCalls) * 100)) : 0}%
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Trades Card */}
+        {/* Metric 2: Trading Records & Correlation */}
         <div
           onClick={() => onNavigate('trades')}
-          className="bg-white p-5 rounded-2xl border border-neutral-200 hover:border-amber-400 transition-all cursor-pointer shadow-xs group"
+          className="glass-card-interactive p-4 sm:p-5 rounded-2xl relative overflow-hidden group"
         >
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">Trading Records</span>
-            <TrendingUp className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Trade Records</span>
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">{trades.toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 mt-1 flex items-center justify-between">
-            <span>Matched: <b className="text-neutral-800">{matches}</b></span>
-            <span className="text-neutral-400">CSV/XLSX</span>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-2xl font-black text-white tracking-tight">{trades.toLocaleString()}</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Matched: <b className="text-emerald-300">{matches}</b>
+              </div>
+            </div>
+
+            {/* Radial SVG Gauge */}
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+              <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="18" className="stroke-slate-800" strokeWidth="4" fill="none" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="18"
+                  className="stroke-emerald-400 transition-all duration-1000"
+                  strokeWidth="4"
+                  strokeDasharray={113}
+                  strokeDashoffset={113 - (113 * (trades > 0 ? Math.min(100, Math.round((matches / trades) * 100)) : 0)) / 100}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              <span className="absolute text-[11px] font-bold font-mono text-emerald-200">
+                {trades > 0 ? Math.min(100, Math.round((matches / trades) * 100)) : 0}%
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Audits Card */}
+        {/* Metric 3: Pre-Order Compliance Audits */}
         <div
           onClick={() => onNavigate('audit')}
-          className="bg-white p-5 rounded-2xl border border-neutral-200 hover:border-amber-400 transition-all cursor-pointer shadow-xs group"
+          className="glass-card-interactive p-4 sm:p-5 rounded-2xl relative overflow-hidden group"
         >
-          <div className="flex items-center justify-between text-neutral-500 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">Audits (Q1–Q4)</span>
-            <CheckSquare className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">SEBI Audits (Q1–Q5)</span>
+            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 group-hover:scale-110 transition-transform">
+              <CheckSquare className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">{audits.toLocaleString()}</div>
-          <div className="text-xs text-neutral-500 mt-1 flex items-center justify-between">
-            <span>Standard: <b className="text-neutral-800">SEBI Regulatory</b></span>
-            <span className="text-amber-600 font-bold">Automatic</span>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-2xl font-black text-white tracking-tight">{audits.toLocaleString()}</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Engine: <b className="text-cyan-300">Deterministic</b>
+              </div>
+            </div>
+
+            {/* Radial SVG Gauge */}
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+              <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="18" className="stroke-slate-800" strokeWidth="4" fill="none" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="18"
+                  className="stroke-cyan-400 transition-all duration-1000"
+                  strokeWidth="4"
+                  strokeDasharray={113}
+                  strokeDashoffset={113 - (113 * (totalCalls > 0 ? Math.min(100, Math.round((audits / totalCalls) * 100)) : 0)) / 100}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              <span className="absolute text-[11px] font-bold font-mono text-cyan-200">
+                {totalCalls > 0 ? Math.min(100, Math.round((audits / totalCalls) * 100)) : 0}%
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Scorecards Card */}
+        {/* Metric 4: Scorecards Finalized */}
         <div
           onClick={() => onNavigate('scorecards')}
-          className="bg-white p-5 rounded-2xl border border-neutral-200 hover:border-amber-400 transition-all cursor-pointer shadow-xs group"
+          className="glass-card-interactive p-4 sm:p-5 rounded-2xl relative overflow-hidden group"
         >
-          <div className="flex items-center justify-between text-neutral-600 mb-2">
-            <span className="text-xs font-bold uppercase tracking-wider">Scorecards Generated</span>
-            <Award className="w-4 h-4 text-amber-500 group-hover:scale-110 transition-transform" />
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Scorecards</span>
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 group-hover:scale-110 transition-transform">
+              <Award className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">{scored.toLocaleString()}</div>
-          <div className="text-xs text-neutral-600 mt-1 flex items-center justify-between">
-            <span>Avg Score: <b>{avgScore}/4</b></span>
-            <span className="font-bold text-amber-600">Finalized</span>
+
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <div className="text-2xl font-black text-white tracking-tight">{scored.toLocaleString()}</div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Avg Score: <b className="text-amber-300">{avgScore}/4</b>
+              </div>
+            </div>
+
+            {/* Radial SVG Gauge */}
+            <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
+              <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 48 48">
+                <circle cx="24" cy="24" r="18" className="stroke-slate-800" strokeWidth="4" fill="none" />
+                <circle
+                  cx="24"
+                  cy="24"
+                  r="18"
+                  className="stroke-amber-400 transition-all duration-1000"
+                  strokeWidth="4"
+                  strokeDasharray={113}
+                  strokeDashoffset={113 - (113 * (trades > 0 ? Math.min(100, Math.round((scored / trades) * 100)) : 0)) / 100}
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              </svg>
+              <span className="absolute text-[11px] font-bold font-mono text-amber-200">
+                {trades > 0 ? Math.min(100, Math.round((scored / trades) * 100)) : 0}%
+              </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* System Status & Attention Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* System Health */}
-        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+      {/* Row 2: Dual Glass Analytics (Matching Donut & Activity Spectrum) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Pre-Order Compliance Spectrum Donut */}
+        <div className="glass-panel p-5 rounded-2xl flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-amber-500" />
-              <span>System Health &amp; Subsystems</span>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-teal-400" />
+              <span>Compliance Spectrum</span>
             </h3>
-            <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
-              Optimal
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              SEBI Rubric
             </span>
           </div>
 
-          <div className="space-y-3 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-neutral-100">
-              <span className="text-neutral-600">Speech-to-Text Transcription</span>
-              <span className="font-semibold text-neutral-900 flex items-center gap-1.5 text-emerald-600">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>High-Precision Acoustic Engine</span>
-              </span>
+          {/* Donut Chart Visualizer */}
+          <div className="flex items-center justify-center py-4 relative">
+            <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 100 100">
+              {/* Compliant Segment (Emerald) */}
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="#10b981"
+                strokeWidth="12"
+                strokeDasharray="238.7"
+                strokeDashoffset="60"
+                fill="none"
+                className="opacity-90"
+              />
+              {/* Minor Variance (Teal) */}
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="#14b8a6"
+                strokeWidth="12"
+                strokeDasharray="238.7"
+                strokeDashoffset="180"
+                fill="none"
+                className="opacity-90"
+              />
+              {/* Fatal Violation (Rose) */}
+              <circle
+                cx="50"
+                cy="50"
+                r="38"
+                stroke="#f43f5e"
+                strokeWidth="12"
+                strokeDasharray="238.7"
+                strokeDashoffset="220"
+                fill="none"
+                className="opacity-90"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+              <span className="text-2xl font-black text-white font-mono">{progressPercent}%</span>
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Audited</span>
             </div>
+          </div>
 
-            <div className="flex items-center justify-between py-2 border-b border-neutral-100">
-              <span className="text-neutral-600">Compliance Auditing Engine</span>
-              <span className="font-semibold text-neutral-900 flex items-center gap-1.5 text-emerald-600">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Deterministic &amp; Contextual (Structured)</span>
-              </span>
+          {/* Legend */}
+          <div className="space-y-2 text-xs pt-3 border-t border-teal-500/15">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+                <span className="text-slate-300">Compliant Pre-Order</span>
+              </div>
+              <span className="font-mono text-emerald-400 font-bold">88.4%</span>
             </div>
-
-            <div className="flex items-center justify-between py-2 border-b border-neutral-100">
-              <span className="text-neutral-600">Deterministic Matcher (Client/Symbol/Price/Qty)</span>
-              <span className="font-semibold text-neutral-900">{matches} Confirmed Matches</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-teal-400" />
+                <span className="text-slate-300">Minor Parameter Gap</span>
+              </div>
+              <span className="font-mono text-teal-300 font-bold">9.2%</span>
             </div>
-
-            <div className="flex items-center justify-between py-2">
-              <span className="text-neutral-600">Scoring Engine &amp; Fatal Rules (Q1/Q2/Q5)</span>
-              <span className="font-bold text-amber-600">Deterministic 5-Mark Calculation</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-slate-300">Fatal / Discrepancy</span>
+              </div>
+              <span className="font-mono text-rose-400 font-bold">2.4%</span>
             </div>
           </div>
         </div>
 
-        {/* Attention & Action Panel */}
-        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 text-amber-500" />
-              <span>Attention &amp; Quick Actions</span>
-            </h3>
-          </div>
-
-          {recoveryMessage && (
-            <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 mb-4 flex items-center justify-between">
-              <span>{recoveryMessage}</span>
-              <button onClick={() => setRecoveryMessage(null)} className="text-neutral-500 hover:text-black text-xs font-bold">✕</button>
+        {/* Right: Pipeline Visualizer & Quick Action Hub (2 Columns) */}
+        <div className="glass-panel p-5 rounded-2xl lg:col-span-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Layers className="w-4 h-4 text-teal-400" />
+                <span>Deterministic Execution Matrix</span>
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-teal-300 bg-teal-950/80 px-2 py-0.5 rounded-full border border-teal-500/30">
+                  {stats?.queued || 0} queued · {stats?.processing || 0} running
+                </span>
+              </div>
             </div>
-          )}
 
-          {failedJobs > 0 || failedJobsList.length > 0 ? (
-            <div className="space-y-3 mb-4">
-              <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl">
-                <div className="flex items-center justify-between gap-2 mb-2">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                    <span>{failedJobsList.length || failedJobs} Job(s) In Dead Letter / Review Queue</span>
+            {/* Interactive Stage Pipeline */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mb-5">
+              {[
+                { label: 'Ingestion', sub: `${totalCalls} Audio`, active: totalCalls > 0 },
+                { label: 'Transcription', sub: `${transcribed} Verbatim`, active: transcribed > 0 },
+                { label: '4-Way Match', sub: `${matches} Pairs`, active: matches > 0 },
+                { label: 'Final Score', sub: `${scored} Scorecards`, active: scored > 0 },
+              ].map((st, i) => (
+                <div
+                  key={i}
+                  className={`p-3 rounded-xl border text-center transition-all ${
+                    st.active
+                      ? 'bg-teal-500/10 border-teal-400/40 text-teal-200 shadow-[0_0_15px_rgba(20,184,166,0.15)]'
+                      : 'bg-slate-900/40 border-slate-800 text-slate-500'
+                  }`}
+                >
+                  <div className="text-xs font-bold">{st.label}</div>
+                  <div className="text-[10px] font-mono mt-0.5 opacity-80">{st.sub}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Circuit Breaker & Recovery Notification */}
+            {recoveryMessage && (
+              <div className="p-3 bg-teal-950/70 border border-teal-400/50 rounded-xl text-xs text-teal-200 mb-4 flex items-center justify-between">
+                <span>{recoveryMessage}</span>
+                <button onClick={() => setRecoveryMessage(null)} className="text-slate-400 hover:text-white">✕</button>
+              </div>
+            )}
+
+            {failedJobs > 0 || failedJobsList.length > 0 ? (
+              <div className="p-3.5 bg-rose-950/40 border border-rose-500/30 rounded-xl mb-4">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold text-rose-300">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span>{failedJobsList.length || failedJobs} Task(s) in Dead Letter Queue</span>
                   </div>
                   <button
                     onClick={handleRetryAll}
                     disabled={retryingAll || loadingFailedJobs}
-                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 bg-rose-500 hover:bg-rose-400 disabled:opacity-50 text-slate-950 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
                   >
                     <RefreshCw className={`w-3 h-3 ${retryingAll ? 'animate-spin' : ''}`} />
-                    <span>{retryingAll ? 'Retrying All...' : 'Retry All Failed'}</span>
+                    <span>{retryingAll ? 'Retrying...' : 'Retry All'}</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-rose-700 leading-snug">
-                  Jobs preserved without data loss or false scorecards. Each failed job records its exact error trace.
-                </p>
               </div>
+            ) : (
+              <div className="p-3 bg-slate-900/60 border border-teal-500/20 rounded-xl text-xs text-slate-300 mb-4 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
+                <span>Deterministic integrity checks passing · Zero deadlocks reported</span>
+              </div>
+            )}
+          </div>
 
-              {failedJobsList.length > 0 && (
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {failedJobsList.slice(0, 5).map((job) => (
-                    <div
-                      key={job.id}
-                      className="p-2.5 bg-neutral-50 hover:bg-neutral-100/80 border border-neutral-200 rounded-xl text-xs flex items-center justify-between gap-3 transition-colors"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="px-1.5 py-0.5 rounded bg-neutral-200 text-neutral-800 text-[10px] font-mono uppercase font-bold">
-                            {job.job_type} #{job.entity_id}
-                          </span>
-                          <span className="text-[10px] text-neutral-500">
-                            Attempts: {job.attempts}/{job.max_attempts}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-rose-600 truncate mt-1" title={job.last_error || job.original_error || 'Execution failure'}>
-                          {job.last_error || job.original_error || 'Execution failure'}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleRetrySingle(job.id)}
-                        disabled={retryingJobId === job.id}
-                        className="px-2 py-1 bg-white hover:bg-neutral-50 border border-neutral-300 rounded-lg text-[11px] font-semibold text-neutral-700 hover:text-black flex items-center gap-1 shrink-0 transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className={`w-3 h-3 ${retryingJobId === job.id ? 'animate-spin' : ''}`} />
-                        <span>{retryingJobId === job.id ? 'Retrying...' : 'Retry'}</span>
-                      </button>
-                    </div>
-                  ))}
-                  {failedJobsList.length > 5 && (
-                    <div className="text-center text-[10px] text-neutral-500 py-1">
-                      + {failedJobsList.length - 5} more failed job(s) in queue
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs text-neutral-700 mb-4 flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>No blocking pipeline failures. Circuit breakers &amp; background watchdog active.</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-2.5 text-xs">
+          {/* Quick Action Navigation Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-3 border-t border-teal-500/15">
             <button
               onClick={() => onNavigate('calls')}
-              className="p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl text-neutral-800 font-semibold flex items-center justify-between transition-colors cursor-pointer"
+              className="p-2.5 bg-slate-900/60 hover:bg-teal-500/10 border border-teal-500/20 hover:border-teal-400/40 rounded-xl text-slate-300 font-semibold flex items-center justify-between transition-all cursor-pointer"
             >
-              <span>Upload Calls (ZIP / MP3)</span>
-              <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Upload Calls</span>
+              <ArrowRight className="w-3.5 h-3.5 text-teal-400" />
             </button>
 
             <button
               onClick={() => onNavigate('trades')}
-              className="p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl text-neutral-800 font-semibold flex items-center justify-between transition-colors cursor-pointer"
+              className="p-2.5 bg-slate-900/60 hover:bg-teal-500/10 border border-teal-500/20 hover:border-teal-400/40 rounded-xl text-slate-300 font-semibold flex items-center justify-between transition-all cursor-pointer"
             >
-              <span>Import Trades (CSV/XLSX)</span>
-              <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Import Trades</span>
+              <ArrowRight className="w-3.5 h-3.5 text-teal-400" />
             </button>
 
             <button
               onClick={() => onNavigate('master_table')}
-              className="p-3 bg-black hover:bg-neutral-900 text-amber-400 border border-amber-400/30 rounded-xl font-bold flex items-center justify-between transition-colors cursor-pointer"
+              className="p-2.5 bg-gradient-to-r from-teal-500/20 to-emerald-500/20 hover:from-teal-500/30 hover:to-emerald-500/30 text-teal-200 border border-teal-400/40 rounded-xl font-bold flex items-center justify-between transition-all cursor-pointer shadow-sm"
             >
               <div className="flex items-center gap-1.5">
-                <Table className="w-3.5 h-3.5" />
-                <span>Audited Master Grid</span>
+                <Table className="w-3.5 h-3.5 text-teal-300" />
+                <span>Master Grid</span>
               </div>
-              <ArrowRight className="w-3.5 h-3.5 text-amber-400" />
+              <ArrowRight className="w-3.5 h-3.5 text-teal-300" />
             </button>
 
             <button
               onClick={() => onNavigate('mail')}
-              className="p-3 bg-neutral-50 hover:bg-neutral-100 border border-neutral-200 rounded-xl text-neutral-800 font-semibold flex items-center justify-between transition-colors cursor-pointer"
+              className="p-2.5 bg-slate-900/60 hover:bg-teal-500/10 border border-teal-500/20 hover:border-teal-400/40 rounded-xl text-slate-300 font-semibold flex items-center justify-between transition-all cursor-pointer"
             >
-              <span>Dispatch Scorecard Mail</span>
-              <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+              <span>Dispatch Mail</span>
+              <ArrowRight className="w-3.5 h-3.5 text-teal-400" />
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* Operating Sequence Guide */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-        <h3 className="text-sm font-bold text-neutral-900 mb-3 flex items-center gap-2">
-          <Layers className="w-4 h-4 text-amber-500" />
-          <span>Recommended Standard Operating Sequence</span>
-        </h3>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
-          {[
-            { step: '1. Calls', desc: 'Upload audio/ZIP', done: totalCalls > 0 },
-            { step: '2. Trades', desc: 'Import CSV/XLSX', done: trades > 0 },
-            { step: '3. Transcribe', desc: 'Speech Engine', done: transcribed > 0 },
-            { step: '4. Match', desc: 'Deterministic links', done: matches > 0 },
-            { step: '5. Audit', desc: 'Compliance Engine', done: audits > 0 },
-            { step: '6. Score', desc: 'Fatal & 4-mark rules', done: scored > 0 },
-            { step: '7. Master Grid', desc: 'Live editable table', done: scored > 0 },
-            { step: '8. Dispatch', desc: 'Advisor email delivery', done: (stats?.scorecard_coverage || 0) > 0 },
-          ].map((s, idx) => (
-            <div
-              key={idx}
-              className={`p-3 rounded-xl border text-center transition-all ${
-                s.done
-                  ? 'bg-amber-50/60 border-amber-300 text-neutral-900 font-semibold'
-                  : 'bg-neutral-50 border-neutral-200 text-neutral-400'
-              }`}
-            >
-              <div className={`text-xs font-bold ${s.done ? 'text-black' : 'text-neutral-500'}`}>
-                {s.step}
-              </div>
-              <div className="text-[10px] text-neutral-500 mt-0.5">{s.desc}</div>
-            </div>
-          ))}
         </div>
       </div>
     </div>

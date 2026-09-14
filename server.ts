@@ -2246,7 +2246,8 @@ function startPipelineWatchdog() {
         .prepare(`
           SELECT id FROM calls
           WHERE call_type = 'pre_order'
-            AND transcript IS NOT NULL AND length(trim(transcript)) >= 5
+            AND (transcript_status = 'VALID' OR length(trim(COALESCE(transcript, ''))) >= 15)
+            AND length(trim(COALESCE(transcript, ''))) >= 15
             AND id NOT IN (SELECT call_id FROM audits)
             AND id NOT IN (
               SELECT entity_id FROM jobs WHERE job_type = 'audit' AND status IN ('queued', 'processing')

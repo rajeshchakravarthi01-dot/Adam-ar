@@ -82,7 +82,7 @@ export function formatCleanClientCode(rawInput?: string | null): string {
     { pattern: /^(?:WIG|VIG|W1G|V1G)/, canonical: 'WIG' },
     { pattern: /^(?:WIE|VIE|W1E|V1E)/, canonical: 'WIE' },
     { pattern: /^(?:FIA)/, canonical: 'FIA' },
-    { pattern: /^(?:PWD)/, canonical: 'PWD' },
+    { pattern: /^(?:PWD|PVD|PW(?=\d))/, canonical: 'PWD' },
   ];
 
   for (const item of prefixMap) {

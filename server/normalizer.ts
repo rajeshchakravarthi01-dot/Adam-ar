@@ -598,9 +598,16 @@ export function matchClientCodeInTranscript(
   const normCode = normalizeClientCode(clientCode);
   if (!normCode) return { matched: false, score: 0 };
 
+  // Pre-normalize phonetic letters & spoken numbers directly on transcript
+  const phoneticNormalizedTranscript = transcript
+    .replace(/\bdouble\s*[-_]?\s*u\b/gi, 'w')
+    .replace(/\bdouble\s*[-_]?\s*you\b/gi, 'w')
+    .replace(/\bdhablu\b/gi, 'w')
+    .replace(/\bdablu\b/gi, 'w');
+
   const lowerTranscript = transcript.toLowerCase();
   const squashedTranscript = transcript.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const spokenNormalizedTranscript = normalizeSpokenNumbers(transcript);
+  const spokenNormalizedTranscript = normalizeSpokenNumbers(phoneticNormalizedTranscript);
   const squashedSpokenTranscript = spokenNormalizedTranscript.toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   // 1. Direct normalized substring check (raw and spoken-normalized)
@@ -671,6 +678,7 @@ export function matchClientCodeInTranscript(
       prefixVariants.push('(?:P\\s*W\\s*D|PWD|PW\\s*D|P\\s*WD)');
       prefixVariants.push('P[\\s\\-_.]*(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*D');
       prefixVariants.push('(?:P\\s*V\\s*D|PVD)');
+      prefixVariants.push('(?:P\\s*W|PW)(?=[\\s\\-_.:]*\\d)');
     } else if (rawPrefix.startsWith('W')) {
       const vPrefix = 'V' + rawPrefix.slice(1);
       prefixVariants.push(vPrefix.split('').join('[\\s\\-_.]*'));

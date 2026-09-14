@@ -273,7 +273,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
         color: 'E5E5E5',
         fontFace: 'Arial',
       });
-      slide1.addText(`Generated on: ${new Date().toLocaleDateString()} | Engine: ADAM-AR v4.3 Pro`, {
+      slide1.addText(`Generated on: ${new Date().toLocaleDateString()} | Engine: ADAM-AR v1.1 Pro`, {
         x: 0.8,
         y: 3.6,
         w: 8.5,
@@ -450,20 +450,20 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
 
   return (
     <div className="space-y-6">
-      {/* Reports Header Banner - Classy Black & Yellow */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Reports Header Banner - Liquid Glass */}
+      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20">
               <BarChart3 className="w-4 h-4" />
             </span>
-            <h2 className="text-base font-bold text-neutral-900">Executive Quality &amp; Call Analytics</h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200">
-              Audit Standard Norms
+            <h2 className="text-base font-bold text-white tracking-tight">Executive Quality &amp; Call Analytics</h2>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              SEBI Framework v1.1
             </span>
           </div>
-          <p className="text-xs text-neutral-500 mt-1">
-            Deep statistical audit breakdown: Call categorization distributions, 5-point parameter failure rates, dealer risk matrix, and daily quality trajectory.
+          <p className="text-xs text-slate-400 mt-1">
+            Statistical audit breakdown: distributions, parameter rates, risk matrix, and trajectory.
           </p>
         </div>
 
@@ -471,40 +471,40 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
           <button
             onClick={fetchAnalytics}
             disabled={isFetchingAnalytics}
-            className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-neutral-200 transition-colors cursor-pointer"
+            className="px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 border border-teal-500/20 transition-all cursor-pointer"
             title="Refresh analytics metrics"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetchingAnalytics ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isFetchingAnalytics ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
 
           <button
             onClick={handleExportExcel}
             disabled={isExporting}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            className="px-3.5 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
             title="Download formatted multi-sheet Excel report"
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-white" />
-            <span>{isExporting ? 'Generating...' : 'Export Excel (.XLSX)'}</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{isExporting ? 'Generating...' : 'Excel (.XLSX)'}</span>
           </button>
 
           <button
             onClick={handleExportPPT}
             disabled={isExporting}
-            className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-amber-400 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer border border-neutral-700"
+            className="px-3.5 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/30 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
             title="Download executive PowerPoint presentation deck"
           >
-            <FileText className="w-3.5 h-3.5 text-amber-400" />
-            <span>{isExporting ? 'Generating...' : 'Export PPT (.PPTX)'}</span>
+            <FileText className="w-3.5 h-3.5 text-teal-300" />
+            <span>{isExporting ? 'Generating...' : 'PPT (.PPTX)'}</span>
           </button>
 
           <button
             onClick={handleExportCSV}
             disabled={isExporting}
-            className="px-3 py-2 bg-amber-400 hover:bg-amber-300 text-black rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+            className="px-3 py-2 bg-slate-900/80 hover:bg-slate-800 text-teal-300 border border-teal-500/20 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             title="Export raw CSV data"
           >
-            <Download className="w-3.5 h-3.5 text-black" />
+            <Download className="w-3.5 h-3.5 text-teal-400" />
             <span>CSV</span>
           </button>
         </div>
@@ -513,94 +513,102 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
       {/* Top 4 KPI Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Audits */}
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="flex items-center justify-between text-neutral-500 text-xs mb-2">
-            <span className="font-semibold text-neutral-700">Total Audited Orders</span>
-            <ShieldCheck className="w-4 h-4 text-amber-500" />
+        <div className="glass-card-interactive p-4 sm:p-5 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+            <span className="font-semibold text-slate-300">Audited Orders</span>
+            <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">{total}</div>
-          <div className="text-[11px] text-neutral-400 mt-1 flex items-center gap-1">
-            <span>Pre-order calls audited against trade books</span>
+          <div className="text-2xl font-black text-white tracking-tight">{total}</div>
+          <div className="text-[11px] text-slate-400 mt-1">
+            Reconciled against official trade books
           </div>
         </div>
 
         {/* Overall Compliance Rate */}
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="flex items-center justify-between text-neutral-500 text-xs mb-2">
-            <span className="font-semibold text-neutral-700">Audit Compliance Rate</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+        <div className="glass-card-interactive p-4 sm:p-5 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+            <span className="font-semibold text-slate-300">Compliance Rate</span>
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">
+          <div className="text-2xl font-black text-white tracking-tight">
             {analytics?.complianceRate ?? 0}%
           </div>
-          <div className="text-[11px] text-emerald-700 font-medium mt-1">
-            {analytics?.compliantCount || 0} compliant out of {total}
+          <div className="text-[11px] text-emerald-400 font-medium mt-1">
+            {analytics?.compliantCount || 0} compliant of {total}
           </div>
         </div>
 
         {/* Fatal Non-Compliance */}
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="flex items-center justify-between text-neutral-500 text-xs mb-2">
-            <span className="font-semibold text-neutral-700">Fatal Violations</span>
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
+        <div className="glass-card-interactive p-4 sm:p-5 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+            <span className="font-semibold text-slate-300">Fatal Violations</span>
+            <div className="p-1.5 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900">
+          <div className="text-2xl font-black text-white tracking-tight">
             {analytics?.fatalCount || 0}
           </div>
-          <div className="text-[11px] text-rose-700 font-medium mt-1">
-            {total > 0 ? Math.round(((analytics?.fatalCount || 0) / total) * 100) : 0}% of all audited orders
+          <div className="text-[11px] text-rose-400 font-medium mt-1">
+            {total > 0 ? Math.round(((analytics?.fatalCount || 0) / total) * 100) : 0}% failure rate
           </div>
         </div>
 
         {/* Average Audit Score */}
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="flex items-center justify-between text-neutral-500 text-xs mb-2">
-            <span className="font-semibold text-neutral-700">Average Quality Rating</span>
-            <Award className="w-4 h-4 text-amber-500" />
+        <div className="glass-card-interactive p-4 sm:p-5 rounded-2xl">
+          <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
+            <span className="font-semibold text-slate-300">Quality Rating</span>
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">
+              <Award className="w-4 h-4" />
+            </div>
           </div>
-          <div className="text-2xl font-black text-neutral-900 flex items-baseline gap-1">
+          <div className="text-2xl font-black text-white tracking-tight flex items-baseline gap-1">
             <span>{analytics?.avgScore ?? 0}</span>
-            <span className="text-xs text-neutral-400 font-normal">/ 5.0 pts</span>
+            <span className="text-xs text-slate-400 font-normal">/ 5.0</span>
           </div>
-          <div className="text-[11px] text-neutral-400 mt-1">
-            Regulatory standard threshold &ge; 4.0
+          <div className="text-[11px] text-slate-400 mt-1">
+            Regulatory target threshold &ge; 4.0
           </div>
         </div>
       </div>
 
       {/* Call Categorization & Ingestion Breakdown Card */}
       {classification && (
-        <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+        <div className="glass-panel p-5 rounded-2xl space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-amber-500" />
-                <span>Call Categorization &amp; Volume Pipeline</span>
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Tag className="w-4 h-4 text-teal-400" />
+                <span>Call Volume &amp; Ingestion Spectrum</span>
               </h3>
-              <p className="text-xs text-neutral-500 mt-0.5">
-                Distribution of all {classification.total} imported recordings across Pre-Order, Regular Advisory, and Short Scrap Calls
+              <p className="text-xs text-slate-400 mt-0.5">
+                Breakdown of {classification.total} imported recordings across order, advisory, and scrap calls
               </p>
             </div>
-            <span className="text-xs font-mono font-bold text-neutral-800 bg-neutral-100 px-3 py-1 rounded-lg border border-neutral-200">
+            <span className="text-xs font-mono font-bold text-teal-300 bg-teal-950/80 px-3 py-1 rounded-full border border-teal-500/30">
               Total Ingested: {classification.total}
             </span>
           </div>
 
           {/* Categorization Visual Bar */}
-          <div className="h-3 w-full bg-neutral-100 rounded-full overflow-hidden flex">
+          <div className="h-3 w-full bg-slate-900 rounded-full overflow-hidden flex border border-teal-500/20">
             <div
               style={{ width: `${classification.preOrderPct}%` }}
-              className="bg-amber-400 transition-all"
+              className="bg-teal-400 transition-all shadow-[0_0_8px_rgba(45,212,191,0.5)]"
               title={`Pre-Order Calls: ${classification.preOrder} (${classification.preOrderPct}%)`}
             />
             <div
               style={{ width: `${classification.regularPct}%` }}
-              className="bg-neutral-700 transition-all"
+              className="bg-slate-600 transition-all"
               title={`Regular Advisory Calls: ${classification.regular} (${classification.regularPct}%)`}
             />
             <div
               style={{ width: `${classification.scrapPct}%` }}
-              className="bg-rose-500 transition-all"
+              className="bg-rose-500 transition-all shadow-[0_0_8px_rgba(244,63,94,0.5)]"
               title={`Scrap Calls (<=6s): ${classification.scrap} (${classification.scrapPct}%)`}
             />
           </div>
@@ -608,61 +616,61 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
           {/* 3 Detailed Categorization Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
             {/* Pre-Order */}
-            <div className="p-3.5 rounded-xl border border-amber-300 bg-amber-50/40 space-y-1.5">
+            <div className="p-3.5 rounded-xl border border-teal-500/30 bg-teal-950/30 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-                  <span>Pre-Order Calls (Audited)</span>
+                <span className="text-xs font-bold text-teal-200 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_6px_rgba(45,212,191,0.8)]" />
+                  <span>Pre-Order Calls</span>
                 </span>
-                <span className="text-xs font-extrabold text-amber-900 font-mono">
+                <span className="text-xs font-extrabold text-teal-300 font-mono">
                   {classification.preOrder} ({classification.preOrderPct}%)
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-600">
-                Advisor talking about buying or selling stock. Evaluated for client identity, script name, quantity, and price.
+              <p className="text-[11px] text-slate-300">
+                Audited for client identity, script name, quantity, and price confirmation.
               </p>
-              <div className="text-[11px] text-amber-900 font-semibold flex items-center gap-1 pt-1 border-t border-amber-200/60">
-                <Clock className="w-3 h-3 text-amber-600" />
+              <div className="text-[11px] text-teal-300 font-semibold flex items-center gap-1 pt-1 border-t border-teal-500/20">
+                <Clock className="w-3 h-3 text-teal-400" />
                 <span>Avg Duration: {formatSeconds(classification.avgDurationPreOrder)}</span>
               </div>
             </div>
 
             {/* Regular */}
-            <div className="p-3.5 rounded-xl border border-neutral-300 bg-neutral-50 space-y-1.5">
+            <div className="p-3.5 rounded-xl border border-slate-700 bg-slate-900/40 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-neutral-700" />
+                <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
                   <span>Regular Advisory Calls</span>
                 </span>
-                <span className="text-xs font-extrabold text-neutral-900 font-mono">
+                <span className="text-xs font-extrabold text-slate-300 font-mono">
                   {classification.regular} ({classification.regularPct}%)
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-600">
-                General stock recommendations, market commentary, portfolio review, or query resolution with no trade confirmation.
+              <p className="text-[11px] text-slate-400">
+                General recommendations and portfolio discussions with no trade instruction.
               </p>
-              <div className="text-[11px] text-neutral-700 font-semibold flex items-center gap-1 pt-1 border-t border-neutral-200">
-                <Clock className="w-3 h-3 text-neutral-500" />
+              <div className="text-[11px] text-slate-400 font-semibold flex items-center gap-1 pt-1 border-t border-slate-700/60">
+                <Clock className="w-3 h-3 text-slate-400" />
                 <span>Avg Duration: {formatSeconds(classification.avgDurationRegular)}</span>
               </div>
             </div>
 
             {/* Scrap */}
-            <div className="p-3.5 rounded-xl border border-rose-300 bg-rose-50/40 space-y-1.5">
+            <div className="p-3.5 rounded-xl border border-rose-500/30 bg-rose-950/30 space-y-1.5">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-rose-950 flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+                <span className="text-xs font-bold text-rose-300 flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]" />
                   <span>Scrap Calls (&le; 6s)</span>
                 </span>
-                <span className="text-xs font-extrabold text-rose-900 font-mono">
+                <span className="text-xs font-extrabold text-rose-300 font-mono">
                   {classification.scrap} ({classification.scrapPct}%)
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-600">
-                Voicemails, ringing timeouts, and immediate disconnects under 5 to 6 seconds duration. Automatically filtered out.
+              <p className="text-[11px] text-slate-300">
+                Voicemails, ringing timeouts, and brief disconnects under 6 seconds.
               </p>
-              <div className="text-[11px] text-rose-900 font-semibold flex items-center gap-1 pt-1 border-t border-rose-200/60">
-                <Clock className="w-3 h-3 text-rose-500" />
+              <div className="text-[11px] text-rose-300 font-semibold flex items-center gap-1 pt-1 border-t border-rose-500/20">
+                <Clock className="w-3 h-3 text-rose-400" />
                 <span>Avg Duration: {formatSeconds(classification.avgDurationScrap)}</span>
               </div>
             </div>
@@ -671,99 +679,99 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
       )}
 
       {/* 5-Point Parameter Failure Pareto Section */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+      <div className="glass-panel p-5 rounded-2xl space-y-4">
         <div>
-          <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-            <AlertOctagon className="w-4 h-4 text-amber-500" />
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4 text-teal-400" />
             <span>Audit Standard 5-Point Parameter Evaluation</span>
           </h3>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Detailed pass / fail audit breakdown across all mandatory quality checkpoints
+          <p className="text-xs text-slate-400 mt-0.5">
+            Pass / fail audit breakdown across mandatory checkpoints
           </p>
         </div>
 
         {qStats && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Q1 */}
-            <div className="p-3 rounded-xl border border-neutral-200 bg-white space-y-2">
+            <div className="p-3.5 rounded-xl border border-teal-500/20 bg-slate-900/50 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-900">Q1: CLI Registered Match</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                <span className="text-xs font-bold text-white">Q1: CLI Match</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   FATAL
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-500 leading-tight">
-                Mandate: Pre-order call MUST be received on registered client mobile number.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Mandate: Call received on registered client mobile number.
               </p>
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-100 font-medium">
-                <span className="text-emerald-700">Pass: {qStats.q1.pass} ({calculatePct(qStats.q1.pass, total)}%)</span>
-                <span className="text-rose-700 font-bold">Fail: {qStats.q1.fail}</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800 font-medium">
+                <span className="text-emerald-400">Pass: {qStats.q1.pass} ({calculatePct(qStats.q1.pass, total)}%)</span>
+                <span className="text-rose-400 font-bold">Fail: {qStats.q1.fail}</span>
               </div>
-              <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                <div style={{ width: `${calculatePct(qStats.q1.pass, total)}%` }} className="bg-emerald-500" />
+              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div style={{ width: `${calculatePct(qStats.q1.pass, total)}%` }} className="bg-emerald-400" />
                 <div style={{ width: `${calculatePct(qStats.q1.fail, total)}%` }} className="bg-rose-500" />
               </div>
             </div>
 
             {/* Q2 */}
-            <div className="p-3 rounded-xl border border-neutral-200 bg-white space-y-2">
+            <div className="p-3.5 rounded-xl border border-teal-500/20 bg-slate-900/50 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-900">Q2: Client UCC Stated</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                <span className="text-xs font-bold text-white">Q2: Client UCC</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   FATAL
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-500 leading-tight">
-                Mandate: Client Unique Client Code (UCC) explicitly verified before order placement.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Mandate: Unique Client Code explicitly confirmed before order.
               </p>
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-100 font-medium">
-                <span className="text-emerald-700">Pass: {qStats.q2.pass} ({calculatePct(qStats.q2.pass, total)}%)</span>
-                <span className="text-rose-700 font-bold">Fail: {qStats.q2.fail}</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800 font-medium">
+                <span className="text-emerald-400">Pass: {qStats.q2.pass} ({calculatePct(qStats.q2.pass, total)}%)</span>
+                <span className="text-rose-400 font-bold">Fail: {qStats.q2.fail}</span>
               </div>
-              <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                <div style={{ width: `${calculatePct(qStats.q2.pass, total)}%` }} className="bg-emerald-500" />
+              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div style={{ width: `${calculatePct(qStats.q2.pass, total)}%` }} className="bg-emerald-400" />
                 <div style={{ width: `${calculatePct(qStats.q2.fail, total)}%` }} className="bg-rose-500" />
               </div>
             </div>
 
             {/* Q3 */}
-            <div className="p-3 rounded-xl border border-neutral-200 bg-white space-y-2">
+            <div className="p-3.5 rounded-xl border border-teal-500/20 bg-slate-900/50 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-900">Q3: Script / Qty / Price</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
+                <span className="text-xs font-bold text-white">Q3: Script / Qty / Price</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">
                   1 PT
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-500 leading-tight">
-                Stock name, buy/sell quantity, and price/CMP clearly stated &amp; confirmed.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Stock name, quantity, and price/CMP confirmed.
               </p>
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-100 font-medium">
-                <span className="text-emerald-700">Pass: {qStats.q3.pass} ({calculatePct(qStats.q3.pass, total)}%)</span>
-                <span className="text-amber-700 font-bold">Fail: {qStats.q3.fail}</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800 font-medium">
+                <span className="text-emerald-400">Pass: {qStats.q3.pass} ({calculatePct(qStats.q3.pass, total)}%)</span>
+                <span className="text-teal-400 font-bold">Fail: {qStats.q3.fail}</span>
               </div>
-              <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                <div style={{ width: `${calculatePct(qStats.q3.pass, total)}%` }} className="bg-emerald-500" />
-                <div style={{ width: `${calculatePct(qStats.q3.fail, total)}%` }} className="bg-amber-500" />
+              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div style={{ width: `${calculatePct(qStats.q3.pass, total)}%` }} className="bg-emerald-400" />
+                <div style={{ width: `${calculatePct(qStats.q3.fail, total)}%` }} className="bg-teal-400" />
               </div>
             </div>
 
             {/* Q5 */}
-            <div className="p-3 rounded-xl border border-neutral-200 bg-white space-y-2">
+            <div className="p-3.5 rounded-xl border border-teal-500/20 bg-slate-900/50 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-neutral-900">Q5: No Assured Guarantees</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                <span className="text-xs font-bold text-white">Q5: Conduct Standard</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
                   FATAL
                 </span>
               </div>
-              <p className="text-[11px] text-neutral-500 leading-tight">
-                Code of Conduct: No false promises, assured returns, or misleading profit guarantees.
+              <p className="text-[11px] text-slate-400 leading-tight">
+                Code of Conduct: No false promises or assured return guarantees.
               </p>
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-neutral-100 font-medium">
-                <span className="text-emerald-700">Pass: {qStats.q5.pass} ({calculatePct(qStats.q5.pass, total)}%)</span>
-                <span className="text-rose-700 font-bold">Fail: {qStats.q5.fail}</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-800 font-medium">
+                <span className="text-emerald-400">Pass: {qStats.q5.pass} ({calculatePct(qStats.q5.pass, total)}%)</span>
+                <span className="text-rose-400 font-bold">Fail: {qStats.q5.fail}</span>
               </div>
-              <div className="h-1.5 w-full bg-neutral-100 rounded-full overflow-hidden flex">
-                <div style={{ width: `${calculatePct(qStats.q5.pass, total)}%` }} className="bg-emerald-500" />
+              <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden flex">
+                <div style={{ width: `${calculatePct(qStats.q5.pass, total)}%` }} className="bg-emerald-400" />
                 <div style={{ width: `${calculatePct(qStats.q5.fail, total)}%` }} className="bg-rose-500" />
               </div>
             </div>
@@ -772,77 +780,77 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
       </div>
 
       {/* Advisor Performance & Risk Matrix */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-teal-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <Users className="w-4 h-4 text-amber-500" />
-              <span>Advisor Compliance &amp; Risk Ranking Matrix</span>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Users className="w-4 h-4 text-teal-400" />
+              <span>Advisor Compliance &amp; Risk Ranking</span>
             </h3>
-            <p className="text-xs text-neutral-500">Rollup by advisor name / dealer ID with automated risk categorization</p>
+            <p className="text-xs text-slate-400">Rollup by advisor name with automated risk rating</p>
           </div>
 
           <div className="relative w-full sm:w-64">
-            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={advisorSearch}
               onChange={(e) => setAdvisorSearch(e.target.value)}
               placeholder="Filter advisors…"
-              className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 placeholder:text-neutral-400 focus:outline-hidden focus:border-amber-400"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-900/70 border border-teal-500/20 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-hidden focus:border-teal-400 transition-colors"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#111115] text-neutral-200 font-semibold border-b border-neutral-800 text-[11px] uppercase tracking-wider">
+            <thead className="bg-slate-950/80 text-slate-300 font-semibold border-b border-teal-500/20 text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="py-2.5 px-3">Advisor / Caller Name</th>
-                <th className="py-2.5 px-3 text-center">Total Audited Calls</th>
-                <th className="py-2.5 px-3 text-center">Avg Rating (0-5)</th>
-                <th className="py-2.5 px-3 text-center">Compliant (Score 4-5)</th>
-                <th className="py-2.5 px-3 text-center">Fatal Violations</th>
-                <th className="py-2.5 px-3 text-center">Compliance Rate</th>
-                <th className="py-2.5 px-3 text-right">Risk Disposition</th>
+                <th className="py-3 px-3.5">Advisor / Caller</th>
+                <th className="py-3 px-3.5 text-center">Audited Calls</th>
+                <th className="py-3 px-3.5 text-center">Avg Rating (0-5)</th>
+                <th className="py-3 px-3.5 text-center">Compliant</th>
+                <th className="py-3 px-3.5 text-center">Violations</th>
+                <th className="py-3 px-3.5 text-center">Compliance Rate</th>
+                <th className="py-3 px-3.5 text-right">Risk Level</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-teal-500/10 text-slate-300">
               {filteredAdvisors.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-neutral-400">
+                  <td colSpan={7} className="py-8 text-center text-slate-500">
                     No advisor audit data found.
                   </td>
                 </tr>
               ) : (
                 filteredAdvisors.map((adv) => (
-                  <tr key={adv.name} className="hover:bg-amber-50/20 transition-colors">
-                    <td className="py-2.5 px-3 font-semibold text-neutral-900">{adv.name}</td>
-                    <td className="py-2.5 px-3 text-center font-mono">{adv.totalCalls}</td>
-                    <td className="py-2.5 px-3 text-center font-bold">
+                  <tr key={adv.name} className="hover:bg-teal-500/5 transition-colors">
+                    <td className="py-3 px-3.5 font-semibold text-white">{adv.name}</td>
+                    <td className="py-3 px-3.5 text-center font-mono">{adv.totalCalls}</td>
+                    <td className="py-3 px-3.5 text-center font-bold">
                       <span
-                        className={`px-2 py-0.5 rounded-md ${
+                        className={`px-2 py-0.5 rounded-full font-mono text-[11px] ${
                           adv.avgScore >= 4.5
-                            ? 'bg-emerald-100 text-emerald-900'
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : adv.avgScore >= 3.5
-                            ? 'bg-amber-100 text-amber-900'
-                            : 'bg-rose-100 text-rose-900'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                         }`}
                       >
                         {adv.avgScore} / 5
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono text-emerald-700 font-bold">{adv.passCount}</td>
-                    <td className="py-2.5 px-3 text-center font-mono text-rose-700 font-bold">{adv.fatalCount}</td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold">{adv.complianceRate}%</td>
-                    <td className="py-2.5 px-3 text-right">
+                    <td className="py-3 px-3.5 text-center font-mono text-emerald-400 font-bold">{adv.passCount}</td>
+                    <td className="py-3 px-3.5 text-center font-mono text-rose-400 font-bold">{adv.fatalCount}</td>
+                    <td className="py-3 px-3.5 text-center font-mono font-bold text-white">{adv.complianceRate}%</td>
+                    <td className="py-3 px-3.5 text-right">
                       <span
                         className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                           adv.riskLevel === 'HIGH'
-                            ? 'bg-rose-600 text-white'
+                            ? 'bg-rose-500 text-slate-950 font-black'
                             : adv.riskLevel === 'MEDIUM'
-                            ? 'bg-amber-400 text-black'
-                            : 'bg-emerald-600 text-white'
+                            ? 'bg-amber-400 text-slate-950 font-black'
+                            : 'bg-emerald-500 text-slate-950 font-black'
                         }`}
                       >
                         {adv.riskLevel} RISK
@@ -853,28 +861,6 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Compliance Officer RCA Guidance Section */}
-      <div className="bg-neutral-950 text-neutral-200 p-5 rounded-2xl border border-neutral-800 space-y-3">
-        <div className="flex items-center gap-2 text-amber-400 font-bold text-xs">
-          <ShieldCheck className="w-4 h-4" />
-          <span>Quality Audit Action Protocol (Root Cause Analysis)</span>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-neutral-300">
-          <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 space-y-1">
-            <div className="font-bold text-white">CLI Discrepancies (Q1 Failures)</div>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
-              When calls arrive from unregistered customer numbers, advisor must halt trade execution until client sends confirmation via authenticated mobile app or registered email.
-            </p>
-          </div>
-          <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 space-y-1">
-            <div className="font-bold text-white">Missing UCC / Trade Pricing (Q2/Q3)</div>
-            <p className="text-[11px] text-neutral-400 leading-relaxed">
-              Ensure all advisors repeat exact script, quantity, and limit/market price before sending orders to trading terminal. Automated scorecards notify team leads on score &lt; 4.
-            </p>
-          </div>
         </div>
       </div>
     </div>

@@ -381,89 +381,97 @@ export function App() {
     showToast(`AdamBee captured ticket #${harvested.ticketId} for UCC ${harvested.clientId || 'Client'}!`);
   };
 
-  // Header Titles Map
+  // Header Titles Map (Concise, high-impact labels)
   const tabTitles: Record<ActiveTab, { title: string; subtitle: string }> = {
     dashboard: {
       title: 'Operations Dashboard',
-      subtitle: 'Real-time overview of call ingestion, acoustic transcription, trade matching, and compliance scoring.',
+      subtitle: 'Real-time call ingestion, trade correlation & compliance telemetry',
     },
     adambee: {
-      title: 'AdamBee Screen & CRM Ticket Auditor',
-      subtitle: 'Autonomous crawler and ticket analyzer: Harvest page elements, UCC codes, and customer support tickets across browser screens.',
+      title: 'AdamBee Ticket Auditor',
+      subtitle: 'Screen element harvesting & ticket reconciliation',
     },
     tata: {
-      title: 'Tata Teleservices Enterprise Telephony',
-      subtitle: 'Direct manual integration with Tata Smartflo cloud telephony gateway and manual call sync on demand.',
+      title: 'Smartflo Telephony Gateway',
+      subtitle: 'Direct cloud telephony audio synchronization',
     },
     calls: {
-      title: 'Call Recordings & Audio Ingestion',
-      subtitle: 'Upload multi-file audio recordings or ZIP files with Smartflo CSV/JSON metadata matching.',
+      title: 'Call Recordings & Audio',
+      subtitle: 'Multi-file audio ingestion & acoustic transcription',
     },
     trades: {
-      title: 'Executed Trading Records',
-      subtitle: 'Import executed daily trades from CSV, XLSX, or TXT formats with automatic column normalization.',
+      title: 'Executed Trades',
+      subtitle: 'Daily trade repository & column normalization',
     },
     matching: {
-      title: 'Deterministic Matching Engine',
-      subtitle: 'Correlate trades to call recordings using 4 primary anchors (Client Code, Symbol, Price, Quantity).',
+      title: 'Trade Correlation Engine',
+      subtitle: 'Deterministic 4-anchor matching (UCC, Symbol, Price, Qty)',
     },
     audit: {
-      title: 'Regulatory Compliance Auditing (Q1–Q4)',
-      subtitle: 'Review structured compliance determinations with fatal rules and verbatim transcript evidence.',
+      title: 'Compliance Audits (Q1–Q5)',
+      subtitle: 'Deterministic scoring with verbatim transcript citations',
     },
     pipeline: {
-      title: 'Production Pipeline Automation',
-      subtitle: 'Step-by-step parallel pipeline state from audio upload to finalized audit scorecards.',
+      title: 'Pipeline Automation',
+      subtitle: 'End-to-end multi-pass execution status',
     },
     master_table: {
       title: 'Audited Master Grid',
-      subtitle: 'Complete pre-order audit master sheet with live inline editing, sorting, and manual record adjustments.',
+      subtitle: 'Pre-order audit records with live inline editing',
     },
     manual_trade_audit: {
-      title: 'Missing Call Reconciliation & Mail Audit',
-      subtitle: 'Audit trades that lack phone recordings via client email/mail confirmation, update parameters, and publish directly to scorecards.',
+      title: 'Missing Call & Mail Audit',
+      subtitle: 'Non-voice trade confirmation & scorecard generation',
     },
     scorecards: {
-      title: 'Official Quality Audit Scorecards',
-      subtitle: 'Real call-level scorecards with 4-mark calculation, fatal zero rules, formatted copy, and export.',
+      title: 'Quality Scorecards',
+      subtitle: 'Official 4-mark scorecards with fatal check rules',
     },
     mail: {
-      title: 'Advisor Scorecard Mail Dispatch',
-      subtitle: 'Deliver quality audit scorecards to mapped advisors individually or in filtered batches.',
+      title: 'Scorecard Dispatch',
+      subtitle: 'Advisor scorecard email delivery & dispatch log',
     },
     reports: {
-      title: 'Historical Reports & Archives',
-      subtitle: 'Verified period archives and full historical scorecard exports in CSV format.',
+      title: 'Historical Reports',
+      subtitle: 'Audit archives, batch exports & compliance metrics',
     },
     integrations: {
-      title: 'Gateway & Engine Settings',
-      subtitle: 'Configure speech recognition, compliance models, advisor email mapping, and rubric.',
+      title: 'Engine Settings',
+      subtitle: 'ASR models, advisor routing & compliance thresholds',
     },
     diagnostics: {
-      title: 'System Diagnostics & Health',
-      subtitle: 'REST route verification, database tables status, processing engine connectivity, and worker state.',
+      title: 'System Diagnostics',
+      subtitle: 'Subsystem health, API status & worker telemetry',
     },
     logs: {
-      title: 'System & Worker Event Logs',
-      subtitle: 'Real-time chronological events stream for transcription, matching, and scoring operations.',
+      title: 'Execution Logs',
+      subtitle: 'Real-time chronological events stream',
     },
     admin: {
-      title: 'Enterprise Admin & Backend Controls',
-      subtitle: 'Manage team user credentials, cloud database hosting connections, parallel worker concurrency, and 1-click database purges.',
+      title: 'Administration',
+      subtitle: 'User access control & system administration',
     },
     maintenance: {
-      title: 'Archive & Clear Workspace',
-      subtitle: 'Safely create immutable archive bundles and clear operational live data for clean batch processing.',
+      title: 'Workspace Maintenance',
+      subtitle: 'Workspace purge & immutable archive creation',
     },
   };
 
   // 1. Session verification check loading screen
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen bg-neutral-950 flex flex-col items-center justify-center text-white">
-        <div className="w-10 h-10 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mb-4" />
-        <div className="text-sm font-semibold tracking-wide text-neutral-300">
-          Initializing ADAM-AR Compliance Security...
+      <div className="min-h-screen ambient-mesh-bg flex flex-col items-center justify-center text-white">
+        <div className="relative mb-4">
+          <div className="w-12 h-12 border-3 border-teal-500/20 border-t-teal-400 rounded-full animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-4 h-4 rounded-full bg-teal-400/40 animate-ping" />
+          </div>
+        </div>
+        <div className="text-xs font-bold uppercase tracking-widest text-teal-300">
+          ADAM-AR v1.1
+        </div>
+        <div className="text-xs text-slate-400 mt-1">
+          Initializing Liquid Glass Security Engine...
         </div>
       </div>
     );
@@ -483,7 +491,7 @@ export function App() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-100 text-slate-900 font-sans antialiased">
+    <div className="flex min-h-screen ambient-mesh-bg text-slate-100 font-sans antialiased selection:bg-teal-500/30 selection:text-teal-200">
       {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
@@ -527,20 +535,21 @@ export function App() {
 
         {/* Global Toast Notification */}
         {toastMessage && (
-          <div className="fixed bottom-5 right-5 z-50 animate-bounce">
+          <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-5 duration-300">
             <div
-              className={`px-4 py-2.5 rounded-xl shadow-lg border text-xs font-semibold flex items-center gap-2 ${
+              className={`px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-xl border text-xs font-semibold flex items-center gap-2.5 ${
                 toastMessage.type === 'error'
-                  ? 'bg-rose-900 text-white border-rose-700'
-                  : 'bg-slate-900 text-white border-slate-700'
+                  ? 'bg-rose-950/80 text-rose-200 border-rose-500/40 shadow-rose-950/50'
+                  : 'bg-slate-900/90 text-teal-200 border-teal-500/40 shadow-black/60'
               }`}
             >
+              <div className={`w-2 h-2 rounded-full ${toastMessage.type === 'error' ? 'bg-rose-400' : 'bg-teal-400'} animate-pulse`} />
               <span>{toastMessage.text}</span>
             </div>
           </div>
         )}
 
-        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-5 sm:p-7 max-w-7xl w-full mx-auto">
           <ErrorBoundary fallbackTitle="View Recovery">
             {activeTab === 'dashboard' && (
               <DashboardView
@@ -707,15 +716,15 @@ export function App() {
         </main>
 
         {/* Global Application Footer */}
-        <footer className="mt-auto border-t border-slate-200 bg-white/90 backdrop-blur-xs py-3.5 px-6 text-xs text-slate-500">
+        <footer className="mt-auto border-t border-teal-500/15 bg-slate-950/60 backdrop-blur-xl py-3.5 px-6 text-xs text-slate-400">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 max-w-7xl mx-auto">
             <div className="flex items-center gap-2">
-              <span className="font-bold text-slate-900 tracking-wider">ADAM-AR</span>
-              <span className="text-slate-300">|</span>
-              <span className="text-slate-600">Pre-Order Voice Quality &amp; Multi-Pass Audit Engine</span>
+              <span className="font-bold text-teal-300 tracking-wider">ADAM-AR v1.1</span>
+              <span className="text-teal-500/30">|</span>
+              <span className="text-slate-400">Pre-Order Voice Quality &amp; Multi-Pass Audit Engine</span>
             </div>
-            <div className="text-neutral-700 font-medium">
-              Developed and designed by <span className="text-amber-500 font-bold">TAJ</span>
+            <div className="text-slate-400 font-medium">
+              Developed and designed by <span className="text-teal-300 font-bold">TAJ</span>
             </div>
           </div>
         </footer>

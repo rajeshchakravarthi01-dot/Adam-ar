@@ -402,25 +402,25 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
       )}
 
       {/* Header Banner */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+            <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30">
               <MailCheck className="w-4 h-4" />
             </span>
-            <h2 className="text-base font-bold text-neutral-900">
+            <h2 className="text-base font-bold text-slate-100">
               Manual Trade Audit (Missing Call / Mail Confirmation)
             </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200">
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 border border-teal-500/20">
               {trades.length} Executed Trades
             </span>
             {pendingCount > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                 {pendingCount} Pending Mail Audit
               </span>
             )}
           </div>
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="text-xs text-slate-400 mt-1">
             Reconcile executed trades that have missing telephony call recordings. Enter authorized client email
             confirmation references, adjust rubric criteria (Q1–Q5), and publish directly to Scorecards.
           </p>
@@ -442,19 +442,19 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingPdfs}
-            className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+            className="px-3.5 py-2 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 text-teal-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-teal-500/30 transition-all cursor-pointer"
           >
-            <UploadCloud className={`w-3.5 h-3.5 text-amber-400 ${isUploadingPdfs ? 'animate-bounce' : ''}`} />
+            <UploadCloud className={`w-3.5 h-3.5 text-teal-300 ${isUploadingPdfs ? 'animate-bounce' : ''}`} />
             <span>{isUploadingPdfs ? 'Processing PDFs...' : 'Upload Mail / PDF Confirmations'}</span>
           </button>
 
           <button
             onClick={handleAutoResolveReviews}
             disabled={isResolvingReviews}
-            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-200 transition-colors cursor-pointer"
+            className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-500/20 transition-colors cursor-pointer"
             title="Auto-resolve calls in Review Required state"
           >
-            <Sparkles className={`w-3.5 h-3.5 text-emerald-600 ${isResolvingReviews ? 'animate-spin' : ''}`} />
+            <Sparkles className={`w-3.5 h-3.5 text-emerald-400 ${isResolvingReviews ? 'animate-spin' : ''}`} />
             <span>{isResolvingReviews ? 'Resolving...' : 'Auto-Resolve Reviews'}</span>
           </button>
 
@@ -462,7 +462,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
             <button
               onClick={handleBulkApprovePending}
               disabled={isBulkSubmitting}
-              className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-lg shadow-teal-500/20 cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{isBulkSubmitting ? 'Auditing...' : `Approve & Publish All (${pendingCount})`}</span>
@@ -471,16 +471,16 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
 
           <button
             onClick={exportCSV}
-            className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-neutral-200 transition-colors cursor-pointer"
+            className="px-3 py-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-neutral-600" />
+            <Download className="w-3.5 h-3.5 text-slate-400" />
             <span>Export CSV</span>
           </button>
 
           <button
             onClick={fetchMissingTrades}
             disabled={isLoading}
-            className="p-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl border border-neutral-200 cursor-pointer"
+            className="p-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 rounded-xl border border-slate-700 cursor-pointer"
             title="Refresh list"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -502,22 +502,22 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         }}
         className={`border-2 border-dashed rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
           isDragOver
-            ? 'border-amber-500 bg-amber-50/50'
-            : 'border-neutral-300 hover:border-neutral-400 bg-neutral-50/50'
+            ? 'border-teal-400 bg-teal-500/10'
+            : 'border-slate-700 hover:border-teal-500/40 bg-slate-900/40 backdrop-blur-md'
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 border border-teal-500/30">
             <FileUp className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
+            <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
               <span>Automatic Mail / PDF Trade Audit Upload</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-900">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
                 SEBI Matching Rules
               </span>
             </div>
-            <p className="text-[11px] text-neutral-600 mt-0.5">
+            <p className="text-[11px] text-slate-400 mt-0.5">
               Drag and drop client confirmation PDFs or email exports (.pdf, .eml, .txt). Matches stock name,
               quantity, and price. If CMP (Current Market Price) is mentioned, price is automatically accepted.
             </p>
@@ -529,9 +529,9 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingPdfs}
-            className="px-3.5 py-1.5 bg-white hover:bg-neutral-100 text-neutral-900 font-bold text-xs rounded-xl border border-neutral-300 shadow-xs cursor-pointer flex items-center gap-1.5"
+            className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
           >
-            <UploadCloud className="w-3.5 h-3.5 text-neutral-700" />
+            <UploadCloud className="w-3.5 h-3.5 text-teal-400" />
             <span>Select PDF Files</span>
           </button>
         </div>
@@ -590,62 +590,62 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
+        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
               Total Trades Missing Calls
             </div>
-            <div className="text-xl font-bold text-neutral-900 mt-0.5">{trades.length}</div>
+            <div className="text-xl font-bold text-slate-100 mt-0.5">{trades.length}</div>
           </div>
-          <div className="p-2.5 rounded-xl bg-neutral-100 text-neutral-700">
+          <div className="p-2.5 rounded-xl bg-slate-800/80 text-teal-400 border border-teal-500/20">
             <Layers className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
+        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
+            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
               Pending Mail Audit
             </div>
-            <div className="text-xl font-bold text-amber-600 mt-0.5">{pendingCount}</div>
+            <div className="text-xl font-bold text-amber-400 mt-0.5">{pendingCount}</div>
           </div>
-          <div className="p-2.5 rounded-xl bg-amber-50 text-amber-600 border border-amber-200">
+          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
             <Clock className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex items-center justify-between">
+        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-medium text-neutral-500 uppercase tracking-wider">
-              Audited & Sent to Scorecards
+            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+              Audited &amp; Sent to Scorecards
             </div>
-            <div className="text-xl font-bold text-emerald-600 mt-0.5">{auditedCount}</div>
+            <div className="text-xl font-bold text-emerald-400 mt-0.5">{auditedCount}</div>
           </div>
-          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200">
+          <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             <CheckCircle2 className="w-5 h-5" />
           </div>
         </div>
       </div>
 
       {/* Filters Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="glass-panel p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
-          <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by Trade ID, Client UCC, Symbol, Advisor..."
-            className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-hidden focus:border-amber-400"
+            className="w-full pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-500 focus:outline-hidden focus:border-teal-400"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs text-neutral-500 whitespace-nowrap">Filter Status:</span>
+          <span className="text-xs text-slate-400 whitespace-nowrap">Filter Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+            className="px-2.5 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
           >
             <option value="ALL">All ({trades.length})</option>
             <option value="PENDING">Pending Audit ({pendingCount})</option>
@@ -655,121 +655,121 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+      <div className="glass-panel rounded-xl overflow-hidden border border-teal-500/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#111115] text-neutral-200 text-[11px] uppercase tracking-wider font-semibold border-b border-neutral-800">
+            <thead className="bg-slate-950/80 text-teal-300 text-[11px] uppercase tracking-wider font-semibold border-b border-teal-500/20">
               <tr>
                 <th
                   onClick={() => toggleSort('id')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 text-amber-400 select-none whitespace-nowrap"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 text-teal-400 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade #</span>
                     {sortField === 'id' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('client')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[110px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[110px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Client UCC</span>
                     {sortField === 'client' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('advisor_name')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[130px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[130px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Advisor</span>
                     {sortField === 'advisor_name' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('trade_date')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[100px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[100px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade Date</span>
                     {sortField === 'trade_date' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 whitespace-nowrap min-w-[110px]">Phone CLI</th>
                 <th
                   onClick={() => toggleSort('symbol')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[130px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[130px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade Details</span>
                     {sortField === 'symbol' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 min-w-[240px]">Mail Confirmation Ref / Proof</th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q1: Registered Number / Authorised (Fatal)">
-                  <div className="text-amber-400 font-bold">Q1</div>
+                  <div className="text-teal-300 font-bold">Q1</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q2: Client UCC explicitly stated (Fatal)">
-                  <div className="text-amber-400 font-bold">Q2</div>
+                  <div className="text-teal-300 font-bold">Q2</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed (1 Pt)">
-                  <div className="text-amber-400 font-bold">Q3</div>
-                  <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
+                  <div className="text-teal-300 font-bold">Q3</div>
+                  <div className="text-[9px] text-slate-400 normal-case">1 Pt</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Compliant per regulatory rubric)">
-                  <div className="text-amber-400 font-bold">Q4</div>
+                  <div className="text-teal-300 font-bold">Q4</div>
                   <div className="text-[9px] text-emerald-400 font-bold normal-case">PASS</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
-                  <div className="text-amber-400 font-bold">Q5</div>
+                  <div className="text-teal-300 font-bold">Q5</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th
                   onClick={() => toggleSort('score')}
-                  className="py-3 px-2 text-center cursor-pointer hover:text-amber-400 select-none whitespace-nowrap"
+                  className="py-3 px-2 text-center cursor-pointer hover:text-teal-200 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center justify-center gap-1">
                     <span>Score</span>
                     {sortField === 'score' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-neutral-600" />
+                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 text-right whitespace-nowrap min-w-[140px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-slate-800/40 text-slate-200">
               {filteredTrades.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-neutral-400">
-                    <Mail className="w-8 h-8 mx-auto text-neutral-300 mb-2" />
-                    <div className="text-sm font-semibold text-neutral-600">No Missing Call Trades Found</div>
-                    <div className="text-xs text-neutral-400 mt-0.5">
+                  <td colSpan={14} className="py-12 text-center text-slate-400">
+                    <Mail className="w-8 h-8 mx-auto text-slate-600 mb-2" />
+                    <div className="text-sm font-semibold text-slate-300">No Missing Call Trades Found</div>
+                    <div className="text-xs text-slate-500 mt-0.5">
                       All uploaded trades currently have linked audio call recordings or no trades match filters.
                     </div>
                   </td>
@@ -784,24 +784,24 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                   return (
                     <tr
                       key={t.id}
-                      className={`transition-colors hover:bg-neutral-50/60 ${
+                      className={`transition-colors hover:bg-teal-500/5 ${
                         isSuccess
-                          ? 'bg-emerald-50/30'
+                          ? 'bg-emerald-500/10'
                           : isFatal
-                          ? 'border-l-4 border-l-red-600'
-                          : 'border-l-4 border-l-amber-400'
+                          ? 'border-l-4 border-l-rose-500'
+                          : 'border-l-4 border-l-amber-500'
                       }`}
                     >
                       {/* Trade ID */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-amber-700 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-400 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <span>#{t.id}</span>
                           {t.side && (
                             <span
                               className={`text-[9px] font-bold px-1 py-0.2 rounded-xs uppercase ${
                                 t.side.toUpperCase() === 'BUY'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-rose-100 text-rose-800'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                               }`}
                             >
                               {t.side}
@@ -816,7 +816,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.client}
                           onChange={(e) => handleCellChange(t, 'client', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs font-mono font-bold text-neutral-900 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono font-bold text-teal-300 focus:outline-hidden"
                         />
                       </td>
 
@@ -826,12 +826,12 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.caller_name}
                           onChange={(e) => handleCellChange(t, 'caller_name', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs text-neutral-800 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
                       {/* Trade Date */}
-                      <td className="py-2 px-3 text-neutral-600 whitespace-nowrap font-mono text-[11px]">
+                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap font-mono text-[11px]">
                         {t.trade_date ? String(t.trade_date).slice(0, 10) : '—'}
                       </td>
 
@@ -841,14 +841,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.phone}
                           onChange={(e) => handleCellChange(t, 'phone', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs font-mono text-neutral-700 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono text-slate-300 focus:outline-hidden"
                         />
                       </td>
 
                       {/* Trade Details */}
                       <td className="py-2 px-3 whitespace-nowrap">
-                        <div className="font-semibold text-neutral-900">{t.symbol || '—'}</div>
-                        <div className="text-[11px] text-neutral-500 font-mono">
+                        <div className="font-semibold text-slate-100">{t.symbol || '—'}</div>
+                        <div className="text-[11px] text-slate-400 font-mono">
                           {t.quantity || 0} qty @ ₹{t.price || 0}
                         </div>
                       </td>
@@ -861,7 +861,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                             value={state.mail_reference}
                             onChange={(e) => handleCellChange(t, 'mail_reference', e.target.value)}
                             placeholder="e.g. Email from client@fundsindia.com on 2026-09-07..."
-                            className="w-full px-2 py-1 bg-neutral-50 hover:bg-white focus:bg-white border border-neutral-200 focus:border-amber-400 rounded-md text-xs text-neutral-900 focus:outline-hidden"
+                            className="w-full px-2 py-1 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-950 border border-slate-700/80 focus:border-teal-400 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-hidden"
                           />
                         </div>
                       </td>
@@ -871,14 +871,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         <select
                           value={state.q1_status}
                           onChange={(e) => handleCellChange(t, 'q1_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-md border cursor-pointer ${
                             state.q1_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -887,14 +887,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         <select
                           value={state.q2_status}
                           onChange={(e) => handleCellChange(t, 'q2_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-md border cursor-pointer ${
                             state.q2_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -903,21 +903,21 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         <select
                           value={state.q3_status}
                           onChange={(e) => handleCellChange(t, 'q3_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-md border cursor-pointer ${
                             state.q3_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
                       {/* Q4 (Customer Ack) */}
                       <td className="py-2 px-1 text-center whitespace-nowrap" title="Not audited: Always PASS per regulatory rubric">
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-sm text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                          <Check className="w-2.5 h-2.5 text-emerald-600 shrink-0" />
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          <Check className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
                           <span>PASS</span>
                         </span>
                       </td>
@@ -927,14 +927,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         <select
                           value={state.q5_status}
                           onChange={(e) => handleCellChange(t, 'q5_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1 py-0.5 rounded-md border cursor-pointer ${
                             state.q5_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -943,10 +943,10 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                         <span
                           className={`inline-block font-mono font-bold text-xs px-2 py-0.5 rounded-full ${
                             state.score === 5
-                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                               : state.score === 4
-                              ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                              : 'bg-rose-100 text-rose-900 border border-rose-300 font-black'
+                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black'
                           }`}
                         >
                           {state.score}/5
@@ -956,17 +956,17 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                       {/* Actions */}
                       <td className="py-2 px-3 text-right whitespace-nowrap">
                         {isSuccess ? (
-                          <div className="inline-flex items-center gap-1.5 text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Audited & Published</span>
+                          <div className="inline-flex items-center gap-1.5 text-xs text-emerald-300 font-bold bg-emerald-500/20 px-2.5 py-1 rounded-lg border border-emerald-500/30">
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Audited &amp; Published</span>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleAuditSingle(t)}
                             disabled={isSubmitting}
-                            className="px-3 py-1.5 bg-neutral-900 hover:bg-black text-amber-400 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-teal-500/20 disabled:opacity-50"
                           >
-                            <Send className="w-3 h-3 text-amber-400" />
+                            <Send className="w-3 h-3 text-slate-950" />
                             <span>{isSubmitting ? 'Sending...' : 'Audit & Send'}</span>
                           </button>
                         )}

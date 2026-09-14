@@ -577,15 +577,15 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
         </div>
       )}
 
-      {/* Header Banner - High-contrast Black & Yellow */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header Banner - Liquid Glass styling */}
+      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
-              <Table className="w-4 h-4" />
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-teal-500/15 text-teal-300 border border-teal-500/30">
+              <Table className="w-4 h-4 text-teal-400" />
             </span>
-            <h2 className="text-base font-bold text-neutral-900">Audited Master Grid</h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-neutral-100 text-neutral-800 border border-neutral-200">
+            <h2 className="text-base font-bold text-white tracking-tight">Audited Master Grid</h2>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20">
               {filteredAndSortedScorecards.length} Records
             </span>
             {dirtyRowIds.length > 0 && (
@@ -594,8 +594,8 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
               </span>
             )}
           </div>
-          <p className="text-xs text-neutral-500 mt-1">
-            Complete pre-order audit master sheet. Live inline cell editing, automated 5-parameter scoring, sorting, and manual record adjustments.
+          <p className="text-xs text-slate-400 mt-1">
+            Pre-order audit master sheet with live inline cell editing, automated 5-parameter scoring, and manual adjustments.
           </p>
         </div>
 
@@ -604,33 +604,33 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <button
               onClick={handleSaveAllDirty}
               disabled={isBulkSaving}
-              className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>{isBulkSaving ? 'Saving...' : `Save All Changes (${dirtyRowIds.length})`}</span>
+              <span>{isBulkSaving ? 'Saving...' : `Save All (${dirtyRowIds.length})`}</span>
             </button>
           )}
 
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3 py-2 bg-neutral-900 hover:bg-black text-white font-medium text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="px-3 py-2 bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 font-medium text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
+            <Plus className="w-3.5 h-3.5 text-teal-400" />
             <span>Add Entry</span>
           </button>
 
           <button
             onClick={exportTableCSV}
-            className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-neutral-200 transition-colors cursor-pointer"
+            className="px-3 py-2 bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700/50 transition-colors cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-neutral-600" />
+            <Download className="w-3.5 h-3.5 text-slate-400" />
             <span>Export CSV</span>
           </button>
 
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="p-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl border border-neutral-200 cursor-pointer"
+              className="p-2 bg-slate-900/60 hover:bg-slate-800/80 text-slate-300 rounded-xl border border-slate-700/50 cursor-pointer"
               title="Refresh grid data"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -641,18 +641,18 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
       {/* Empty State Banner with Auto-Auditing Trigger */}
       {scorecards.length === 0 && (
-        <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-6 text-center text-neutral-200">
-          <ShieldCheck className="w-10 h-10 text-amber-400 mx-auto mb-3" />
+        <div className="glass-panel p-8 text-center text-slate-200">
+          <ShieldCheck className="w-10 h-10 text-teal-400 mx-auto mb-3" />
           <h3 className="text-base font-bold text-white">No Audited Scorecards Found</h3>
-          <p className="text-xs text-neutral-400 max-w-lg mx-auto mt-1 mb-4">
-            Upload recordings in the Ingest Recordings tab, or run automated audits to correlate calls with trade data and populate this master table.
+          <p className="text-xs text-slate-400 max-w-lg mx-auto mt-1 mb-4">
+            Upload recordings in Ingest Recordings or run automated audits to populate this master grid.
           </p>
           {onRunAllAudits && (
             <button
               onClick={onRunAllAudits}
-              className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-black font-bold text-xs rounded-xl inline-flex items-center gap-2 cursor-pointer transition-colors shadow-xs"
+              className="px-4 py-2 bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 font-bold text-xs rounded-xl inline-flex items-center gap-2 cursor-pointer transition-colors shadow-md"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-4 h-4 text-teal-400" />
               <span>Run Automated Audits Now</span>
             </button>
           )}
@@ -660,17 +660,17 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       )}
 
       {/* Filters & Control Bar */}
-      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs space-y-3">
+      <div className="glass-panel p-4 rounded-xl space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
           {/* Search */}
           <div className="lg:col-span-2 relative">
-            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search advisor, client code, phone, remarks…"
-              className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-900 placeholder:text-neutral-400 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+              placeholder="Search advisor, client code, phone..."
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-950/60 border border-teal-500/20 rounded-lg text-xs text-slate-200 placeholder:text-slate-500 focus:outline-hidden focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30"
             />
           </div>
 
@@ -679,11 +679,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <select
               value={advisorFilter}
               onChange={(e) => setAdvisorFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+              className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-teal-500/20 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
             >
-              <option value="ALL">All Advisors ({advisorsList.length})</option>
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Advisors ({advisorsList.length})</option>
               {advisorsList.map((adv) => (
-                <option key={adv} value={adv}>
+                <option key={adv} value={adv} className="bg-slate-900 text-slate-200">
                   {adv}
                 </option>
               ))}
@@ -695,11 +695,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <select
               value={teamFilter}
               onChange={(e) => setTeamFilter(e.target.value)}
-              className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+              className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-teal-500/20 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
             >
-              <option value="ALL">All Teams ({teamsList.length})</option>
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Teams ({teamsList.length})</option>
               {teamsList.map((t) => (
-                <option key={t} value={t}>
+                <option key={t} value={t} className="bg-slate-900 text-slate-200">
                   {t}
                 </option>
               ))}
@@ -711,12 +711,12 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <select
               value={dispositionFilter}
               onChange={(e) => setDispositionFilter(e.target.value as any)}
-              className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+              className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-teal-500/20 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
             >
-              <option value="ALL">All Dispositions</option>
-              <option value="COMPLIANT">Compliant Only (Score 4-5)</option>
-              <option value="FATAL">Fatal Violations (Score 0)</option>
-              <option value="REVIEW">Needs Review</option>
+              <option value="ALL" className="bg-slate-900 text-slate-200">All Dispositions</option>
+              <option value="COMPLIANT" className="bg-slate-900 text-slate-200">Compliant (Score 4-5)</option>
+              <option value="FATAL" className="bg-slate-900 text-slate-200">Fatal Violations (Score 0)</option>
+              <option value="REVIEW" className="bg-slate-900 text-slate-200">Needs Review</option>
             </select>
           </div>
 
@@ -728,38 +728,38 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                 setPageSize(Number(e.target.value));
                 setCurrentPage(1);
               }}
-              className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 font-medium focus:outline-hidden focus:border-amber-400"
+              className="w-full px-2.5 py-1.5 bg-slate-950/60 border border-teal-500/20 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
             >
-              <option value={25}>Show 25 rows</option>
-              <option value={50}>Show 50 rows</option>
-              <option value={100}>Show 100 rows</option>
-              <option value={9999}>Show All ({scorecards.length})</option>
+              <option value={25} className="bg-slate-900 text-slate-200">25 rows</option>
+              <option value={50} className="bg-slate-900 text-slate-200">50 rows</option>
+              <option value={100} className="bg-slate-900 text-slate-200">100 rows</option>
+              <option value={9999} className="bg-slate-900 text-slate-200">Show All ({scorecards.length})</option>
             </select>
           </div>
         </div>
 
         {/* Date Range Sub-Bar */}
-        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-neutral-100 text-xs text-neutral-600">
-          <span className="font-semibold text-neutral-700 flex items-center gap-1">
-            <Calendar className="w-3.5 h-3.5 text-amber-500" />
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-800/60 text-xs text-slate-400">
+          <span className="font-semibold text-slate-300 flex items-center gap-1">
+            <Calendar className="w-3.5 h-3.5 text-teal-400" />
             <span>Date Range:</span>
           </span>
           <div className="flex items-center gap-1.5">
-            <label className="text-[11px] text-neutral-500">From:</label>
+            <label className="text-[11px] text-slate-500">From:</label>
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="px-2 py-1 bg-neutral-50 border border-neutral-200 rounded-md text-xs"
+              className="px-2 py-1 bg-slate-950/60 border border-teal-500/20 rounded-md text-xs text-slate-200"
             />
           </div>
           <div className="flex items-center gap-1.5">
-            <label className="text-[11px] text-neutral-500">To:</label>
+            <label className="text-[11px] text-slate-500">To:</label>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="px-2 py-1 bg-neutral-50 border border-neutral-200 rounded-md text-xs"
+              className="px-2 py-1 bg-slate-950/60 border border-teal-500/20 rounded-md text-xs text-slate-200"
             />
           </div>
           {(dateFrom || dateTo || searchTerm || advisorFilter !== 'ALL' || teamFilter !== 'ALL' || dispositionFilter !== 'ALL') && (
@@ -772,7 +772,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                 setDateFrom('');
                 setDateTo('');
               }}
-              className="text-[11px] text-amber-600 hover:text-amber-800 font-bold ml-auto cursor-pointer flex items-center gap-1"
+              className="text-[11px] text-teal-400 hover:text-teal-300 font-bold ml-auto cursor-pointer flex items-center gap-1"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset All Filters</span>
@@ -808,111 +808,111 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       )}
 
       {/* Main Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+      <div className="glass-panel rounded-xl overflow-hidden border border-teal-500/20">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-[#111115] text-neutral-200 text-[11px] uppercase tracking-wider font-semibold border-b border-neutral-800">
+            <thead className="bg-slate-950/80 text-teal-300 text-[11px] uppercase tracking-wider font-semibold border-b border-teal-500/20">
               <tr>
                 <th
                   onClick={() => toggleSort('id')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 text-amber-400 select-none whitespace-nowrap"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 text-teal-400 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     <span>#</span>
-                    {sortField === 'id' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'id' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('caller_name')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[140px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[140px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Caller Name</span>
-                    {sortField === 'caller_name' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'caller_name' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('client')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[100px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[100px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Client ID</span>
-                    {sortField === 'client' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'client' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('trade_date')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[110px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[110px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade Date</span>
-                    {sortField === 'trade_date' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'trade_date' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('team')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[100px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[100px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Team</span>
-                    {sortField === 'team' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'team' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('phone')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[120px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[120px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Phone Number</span>
-                    {sortField === 'phone' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'phone' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('audit_date')}
-                  className="py-3 px-3 cursor-pointer hover:text-amber-400 select-none whitespace-nowrap min-w-[110px]"
+                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[110px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Audit Date</span>
-                    {sortField === 'audit_date' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'audit_date' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q1: Registered Number / CLI match (Fatal)">
-                  <div className="text-amber-400 font-bold">Q1 (CLI)</div>
+                  <div className="text-teal-300 font-bold">Q1 (CLI)</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q2: Client UCC explicitly stated (Fatal)">
-                  <div className="text-amber-400 font-bold">Q2 (UCC)</div>
+                  <div className="text-teal-300 font-bold">Q2 (UCC)</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed (1 pt)">
-                  <div className="text-amber-400 font-bold">Q3 (Symbol)</div>
-                  <div className="text-[9px] text-neutral-300 normal-case">1 Pt</div>
+                  <div className="text-teal-300 font-bold">Q3 (Symbol)</div>
+                  <div className="text-[9px] text-slate-400 normal-case">1 Pt</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Compliant per regulatory rubric)">
-                  <div className="text-amber-400 font-bold">Q4 (Ack)</div>
+                  <div className="text-teal-300 font-bold">Q4 (Ack)</div>
                   <div className="text-[9px] text-emerald-400 font-bold normal-case">PASS</div>
                 </th>
                 <th className="py-3 px-2 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
-                  <div className="text-amber-400 font-bold">Q5 (Ethics)</div>
+                  <div className="text-teal-300 font-bold">Q5 (Ethics)</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th
                   onClick={() => toggleSort('score')}
-                  className="py-3 px-3 text-center cursor-pointer hover:text-amber-400 select-none whitespace-nowrap"
+                  className="py-3 px-3 text-center cursor-pointer hover:text-teal-200 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center justify-center gap-1">
                     <span>Score</span>
-                    {sortField === 'score' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-neutral-600" />}
+                    {sortField === 'score' ? (sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />) : <ChevronsUpDown className="w-3 h-3 text-slate-500" />}
                   </div>
                 </th>
                 <th className="py-3 px-3 min-w-[200px]">Remarks / Feedback</th>
                 <th className="py-3 px-3 text-right whitespace-nowrap">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-slate-800/40 text-slate-200">
               {paginatedScorecards.length === 0 ? (
                 <tr>
-                  <td colSpan={15} className="py-12 text-center text-neutral-400">
+                  <td colSpan={15} className="py-12 text-center text-slate-400">
                     No matching audit records found. Try adjusting your search or filters.
                   </td>
                 </tr>
@@ -927,18 +927,18 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                   return (
                     <tr
                       key={sc.id}
-                      className={`transition-colors ${isDirty ? 'bg-amber-50/50' : 'hover:bg-neutral-50/60'} ${isFatal ? 'border-l-4 border-l-red-600' : 'border-l-4 border-l-transparent'}`}
+                      className={`transition-colors ${isDirty ? 'bg-amber-500/10' : 'hover:bg-teal-500/5'} ${isFatal ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-transparent'}`}
                     >
                       {/* ID */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-amber-700 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-400 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           {sc.call_id ? (
                             <button
                               onClick={() => setAudioPreviewCallId(sc.call_id)}
-                              className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-200 rounded-sm cursor-pointer"
+                              className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-sm cursor-pointer"
                               title="Listen to call audio"
                             >
-                              <Play className="w-3 h-3 fill-current text-amber-500" />
+                              <Play className="w-3 h-3 fill-current text-teal-400" />
                             </button>
                           ) : null}
                           <span>#{sc.id}</span>
@@ -951,7 +951,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="text"
                           value={state.caller_name}
                           onChange={(e) => handleCellChange(sc, 'caller_name', e.target.value)}
-                          className="w-full px-2 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs text-neutral-900 font-medium focus:outline-hidden"
+                          className="w-full px-2 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs text-slate-100 font-medium focus:outline-hidden"
                         />
                       </td>
 
@@ -961,7 +961,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="text"
                           value={state.client}
                           onChange={(e) => handleCellChange(sc, 'client', e.target.value)}
-                          className="w-full px-2 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs font-mono font-bold text-neutral-900 focus:outline-hidden"
+                          className="w-full px-2 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono font-bold text-teal-300 focus:outline-hidden"
                         />
                       </td>
 
@@ -971,7 +971,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="date"
                           value={state.trade_date}
                           onChange={(e) => handleCellChange(sc, 'trade_date', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-[11px] text-neutral-800 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-[11px] text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
@@ -981,7 +981,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="text"
                           value={state.team}
                           onChange={(e) => handleCellChange(sc, 'team', e.target.value)}
-                          className="w-full px-2 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs text-neutral-800 focus:outline-hidden"
+                          className="w-full px-2 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
@@ -991,7 +991,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="text"
                           value={state.phone}
                           onChange={(e) => handleCellChange(sc, 'phone', e.target.value)}
-                          className="w-full px-2 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs font-mono text-neutral-800 focus:outline-hidden"
+                          className="w-full px-2 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
@@ -1001,7 +1001,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="date"
                           value={state.audit_date}
                           onChange={(e) => handleCellChange(sc, 'audit_date', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-[11px] text-neutral-800 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-[11px] text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
@@ -1010,14 +1010,14 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                         <select
                           value={state.q1_status}
                           onChange={(e) => handleCellChange(sc, 'q1_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-md border cursor-pointer ${
                             state.q1_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-black'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL (Fatal)</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL (Fatal)</option>
                         </select>
                       </td>
 
@@ -1026,14 +1026,14 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                         <select
                           value={state.q2_status}
                           onChange={(e) => handleCellChange(sc, 'q2_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-md border cursor-pointer ${
                             state.q2_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-black'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL (Fatal)</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL (Fatal)</option>
                         </select>
                       </td>
 
@@ -1042,21 +1042,21 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                         <select
                           value={state.q3_status}
                           onChange={(e) => handleCellChange(sc, 'q3_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-md border cursor-pointer ${
                             state.q3_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-amber-100 text-amber-900 border-amber-400'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL (-1)</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-amber-300">FAIL (-1)</option>
                         </select>
                       </td>
 
                       {/* Q4 (Customer Ack) */}
                       <td className="py-2 px-2 text-center whitespace-nowrap" title="Parameter verified: PASS per regulatory rubric">
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-sm text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                          <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          <Check className="w-3 h-3 text-emerald-400 shrink-0" />
                           <span>PASS</span>
                         </span>
                       </td>
@@ -1066,26 +1066,26 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                         <select
                           value={state.q5_status}
                           onChange={(e) => handleCellChange(sc, 'q5_status', e.target.value)}
-                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-sm border cursor-pointer ${
+                          className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-md border cursor-pointer ${
                             state.q5_status === 'PASS'
-                              ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                              : 'bg-rose-100 text-rose-900 border-rose-400 font-black'
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/40 font-black'
                           }`}
                         >
-                          <option value="PASS">PASS</option>
-                          <option value="FAIL">FAIL (Fatal)</option>
+                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL (Fatal)</option>
                         </select>
                       </td>
 
                       {/* Score */}
                       <td className="py-2 px-3 text-center whitespace-nowrap">
                         <span
-                          className={`inline-block px-2 py-0.5 rounded-md font-bold text-xs ${
+                          className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs ${
                             state.score === 5
-                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                               : state.score >= 4
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : 'bg-rose-100 text-rose-900 border border-rose-300 font-extrabold'
+                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                              : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-extrabold'
                           }`}
                         >
                           {state.score} / 5
@@ -1098,7 +1098,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           type="text"
                           value={state.feedback}
                           onChange={(e) => handleCellChange(sc, 'feedback', e.target.value)}
-                          className="w-full px-2 py-1 bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-neutral-300 focus:border-amber-400 rounded-sm text-xs text-neutral-800 focus:outline-hidden"
+                          className="w-full px-2 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs text-slate-200 focus:outline-hidden"
                         />
                       </td>
 
@@ -1110,14 +1110,14 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                               <button
                                 onClick={() => handleSaveRow(sc)}
                                 disabled={isSavingThis}
-                                className="p-1 bg-amber-400 hover:bg-amber-500 text-black rounded-md cursor-pointer transition-colors shadow-2xs"
+                                className="p-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-md cursor-pointer transition-colors shadow-sm"
                                 title="Save changes to this row"
                               >
                                 <Save className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleResetRow(sc)}
-                                className="p-1 bg-neutral-200 hover:bg-neutral-300 text-neutral-700 rounded-md cursor-pointer"
+                                className="p-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-md cursor-pointer"
                                 title="Discard inline edits"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
@@ -1126,14 +1126,14 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           )}
 
                           {isSuccessThis && (
-                            <span className="text-emerald-700 text-xs font-bold flex items-center gap-0.5">
+                            <span className="text-emerald-400 text-xs font-bold flex items-center gap-0.5">
                               <Check className="w-3.5 h-3.5" />
                             </span>
                           )}
 
                           <button
                             onClick={() => setActiveModalItem(sc)}
-                            className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-200 rounded-md cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-white hover:bg-slate-800 rounded-md cursor-pointer transition-colors"
                             title="View full audit evidence details"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
@@ -1142,7 +1142,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           <button
                             onClick={() => handleDelete(sc.id)}
                             disabled={deletingId === sc.id}
-                            className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+                            className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md cursor-pointer transition-colors"
                             title="Delete this audit record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1158,10 +1158,10 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
         </div>
 
         {/* Pagination Bar */}
-        <div className="p-3 bg-neutral-50 border-t border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-neutral-600">
+        <div className="p-3 bg-slate-950/60 border-t border-slate-800/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
           <div>
-            Showing <span className="font-bold text-neutral-900">{paginatedScorecards.length}</span> of{' '}
-            <span className="font-bold text-neutral-900">{filteredAndSortedScorecards.length}</span> filtered audits (Total:{' '}
+            Showing <span className="font-bold text-slate-200">{paginatedScorecards.length}</span> of{' '}
+            <span className="font-bold text-slate-200">{filteredAndSortedScorecards.length}</span> filtered audits (Total:{' '}
             {scorecards.length})
           </div>
 
@@ -1169,17 +1169,17 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <button
               onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
               disabled={currentPage === 1}
-              className="px-2.5 py-1 bg-white border border-neutral-200 rounded-md hover:bg-neutral-100 disabled:opacity-40 cursor-pointer font-medium"
+              className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-md hover:bg-slate-800 disabled:opacity-40 cursor-pointer font-medium text-slate-300"
             >
               Previous
             </button>
-            <span className="px-2 py-1 font-mono text-neutral-800 font-bold">
+            <span className="px-2 py-1 font-mono text-slate-300 font-bold">
               Page {currentPage} of {totalPages}
             </span>
             <button
               onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage >= totalPages}
-              className="px-2.5 py-1 bg-white border border-neutral-200 rounded-md hover:bg-neutral-100 disabled:opacity-40 cursor-pointer font-medium"
+              disabled={currentPage === totalPages}
+              className="px-2.5 py-1 bg-slate-900 border border-slate-700 rounded-md hover:bg-slate-800 disabled:opacity-40 cursor-pointer font-medium text-slate-300"
             >
               Next
             </button>
@@ -1194,61 +1194,61 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
       {/* Modal: Full Audit Evidence Detail */}
       {activeModalItem && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-neutral-300 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="glass-panel-glow max-w-2xl w-full max-h-[90vh] overflow-y-auto rounded-2xl p-6 space-y-4 border border-teal-500/30 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <div>
-                <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-                  <span className="p-1 rounded-md bg-amber-400 text-black">
+                <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                  <span className="p-1 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30">
                     <ShieldCheck className="w-4 h-4" />
                   </span>
                   <span>Compliance Audit Details · Record #{activeModalItem.id}</span>
                 </h3>
-                <p className="text-xs text-neutral-500">
+                <p className="text-xs text-slate-400">
                   Advisor: {cleanCallerName(activeModalItem.caller_name) || '—'} · Client: {activeModalItem.client_code || activeModalItem.client || '—'}
                 </p>
               </div>
               <button
                 onClick={() => setActiveModalItem(null)}
-                className="p-1.5 text-neutral-400 hover:text-black rounded-lg cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
+            <div className="grid grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-xl border border-teal-500/20 text-xs">
               <div>
-                <span className="text-neutral-500">Trade Phone / CLI:</span>
-                <span className="font-mono font-bold text-neutral-900 ml-1.5">
+                <span className="text-slate-400">Trade Phone / CLI:</span>
+                <span className="font-mono font-bold text-teal-300 ml-1.5">
                   {activeModalItem.calling_number || activeModalItem.trade_phone || '—'}
                 </span>
               </div>
               <div>
-                <span className="text-neutral-500">Registered Mobile:</span>
-                <span className="font-mono font-bold text-neutral-900 ml-1.5">
+                <span className="text-slate-400">Registered Mobile:</span>
+                <span className="font-mono font-bold text-teal-300 ml-1.5">
                   {activeModalItem.registered_number || '—'}
                 </span>
               </div>
               <div>
-                <span className="text-neutral-500">Trade Date:</span>
-                <span className="font-medium text-neutral-900 ml-1.5">{activeModalItem.trade_date || '—'}</span>
+                <span className="text-slate-400">Trade Date:</span>
+                <span className="font-medium text-slate-200 ml-1.5">{activeModalItem.trade_date || '—'}</span>
               </div>
               <div>
-                <span className="text-neutral-500">Team:</span>
-                <span className="font-medium text-neutral-900 ml-1.5">{activeModalItem.team || '—'}</span>
+                <span className="text-slate-400">Team:</span>
+                <span className="font-medium text-slate-200 ml-1.5">{activeModalItem.team || '—'}</span>
               </div>
             </div>
 
             {/* Audio Stream for Verification */}
             {activeModalItem.call_id ? (
-              <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 text-white flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="p-3 bg-slate-950/80 rounded-xl border border-teal-500/20 text-white flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-amber-400 text-black shrink-0">
+                  <div className="p-1.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 shrink-0">
                     <Volume2 className="w-4 h-4" />
                   </div>
                   <div>
                     <div className="text-xs font-bold text-white">Audio Stream · Call #{activeModalItem.call_id}</div>
-                    <div className="text-[10px] text-neutral-400">Verifying live pre-order conversation &amp; spoken facts</div>
+                    <div className="text-[10px] text-slate-400">Verifying live pre-order conversation &amp; spoken facts</div>
                   </div>
                 </div>
                 <audio controls src={getAudioUrl(activeModalItem.call_id)} className="h-8 w-full sm:w-64" />
@@ -1257,81 +1257,81 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
             {/* 5 Parameters Full Evidence */}
             <div className="space-y-2.5">
-              <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider">Audit Evidence Log</h4>
+              <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider">Audit Evidence Log</h4>
               
-              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+              <div className="p-3 rounded-lg border border-slate-800/80 bg-slate-900/40 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5">
-                    <span>Q1: Registered Number / CLI Verification</span>
-                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                    <span className="text-slate-200">Q1: Registered Number / CLI Verification</span>
+                    <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded border border-rose-500/20 font-bold">FATAL</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q1_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q1_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
                     {activeModalItem.q1_status}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-600">{activeModalItem.q1_evidence || 'No specific evidence notes recorded.'}</p>
+                <p className="text-xs text-slate-400">{activeModalItem.q1_evidence || 'No specific evidence notes recorded.'}</p>
               </div>
 
-              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+              <div className="p-3 rounded-lg border border-slate-800/80 bg-slate-900/40 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5">
-                    <span>Q2: Client Identity &amp; UCC Spoken</span>
-                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                    <span className="text-slate-200">Q2: Client Identity &amp; UCC Spoken</span>
+                    <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded border border-rose-500/20 font-bold">FATAL</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q2_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q2_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
                     {activeModalItem.q2_status}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-600">{activeModalItem.q2_evidence || 'No specific evidence notes recorded.'}</p>
+                <p className="text-xs text-slate-400">{activeModalItem.q2_evidence || 'No specific evidence notes recorded.'}</p>
               </div>
 
-              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+              <div className="p-3 rounded-lg border border-slate-800/80 bg-slate-900/40 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5">
-                    <span>Q3: Stock Symbol, Quantity &amp; Execution Price</span>
-                    <span className="text-[10px] text-neutral-600 bg-neutral-100 px-1 py-0.5 rounded border border-neutral-200 font-semibold">1 PT</span>
+                    <span className="text-slate-200">Q3: Stock Symbol, Quantity &amp; Execution Price</span>
+                    <span className="text-[10px] text-slate-400 bg-slate-800/60 px-1 py-0.5 rounded border border-slate-700/60 font-semibold">1 PT</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
                     {activeModalItem.q3_status}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-600">{activeModalItem.q3_evidence || 'No specific evidence notes recorded.'}</p>
+                <p className="text-xs text-slate-400">{activeModalItem.q3_evidence || 'No specific evidence notes recorded.'}</p>
               </div>
 
-              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+              <div className="p-3 rounded-lg border border-slate-800/80 bg-slate-900/40 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5">
-                    <span>Q4: Customer Order Acknowledgement</span>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 font-semibold">NOT AUDITED · ALWAYS PASS</span>
+                    <span className="text-slate-200">Q4: Customer Order Acknowledgement</span>
+                    <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1 py-0.5 rounded border border-emerald-500/20 font-semibold">NOT AUDITED · ALWAYS PASS</span>
                   </span>
-                  <span className="px-2 py-0.5 rounded-sm font-bold text-xs bg-emerald-100 text-emerald-800">
+                  <span className="px-2 py-0.5 rounded-md font-bold text-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                     PASS
                   </span>
                 </div>
-                <p className="text-xs text-neutral-600">Standard regulatory rule: Parameter not actively evaluated in this rubric; automatically awarded PASS.</p>
+                <p className="text-xs text-slate-400">Standard regulatory rule: Parameter not actively evaluated in this rubric; automatically awarded PASS.</p>
               </div>
 
-              <div className="p-3 rounded-lg border border-neutral-200 bg-white space-y-1">
+              <div className="p-3 rounded-lg border border-slate-800/80 bg-slate-900/40 space-y-1">
                 <div className="flex items-center justify-between text-xs font-bold">
                   <span className="flex items-center gap-1.5">
-                    <span>Q5: Ethical Standards (No Return / Profit Guarantee)</span>
-                    <span className="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded border border-rose-200 font-bold">FATAL</span>
+                    <span className="text-slate-200">Q5: Ethical Standards (No Return / Profit Guarantee)</span>
+                    <span className="text-[10px] text-rose-400 bg-rose-500/10 px-1 py-0.5 rounded border border-rose-500/20 font-bold">FATAL</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-sm font-bold text-xs ${activeModalItem.q5_status === 'PASS' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q5_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'}`}>
                     {activeModalItem.q5_status}
                   </span>
                 </div>
-                <p className="text-xs text-neutral-600">{activeModalItem.q5_evidence || 'No specific evidence notes recorded.'}</p>
+                <p className="text-xs text-slate-400">{activeModalItem.q5_evidence || 'No specific evidence notes recorded.'}</p>
               </div>
             </div>
 
-            <div className="p-3 bg-neutral-900 text-white rounded-xl flex items-center justify-between">
+            <div className="p-3 bg-slate-950/80 text-white rounded-xl border border-teal-500/20 flex items-center justify-between">
               <div>
-                <div className="text-xs text-neutral-400">Official Evaluation Rating</div>
-                <div className="text-sm font-bold text-amber-400">Score: {activeModalItem.score} / 5 Points</div>
+                <div className="text-xs text-slate-400">Official Evaluation Rating</div>
+                <div className="text-sm font-bold text-teal-300">Score: {activeModalItem.score} / 5 Points</div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-neutral-400">Audit Status</div>
+                <div className="text-xs text-slate-400">Audit Status</div>
                 <div className={`text-xs font-bold ${activeModalItem.score >= 4 ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {activeModalItem.score >= 4 ? 'AUDIT COMPLIANT' : 'AUDIT DEFICIENT'}
                 </div>
@@ -1340,10 +1340,10 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
             {/* Highlighting Analysis Section */}
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-1.5">
+              <h4 className="text-xs font-bold text-teal-400 uppercase tracking-wider mb-1.5">
                 Speech Transcript &amp; Audit Evidence Highlights
               </h4>
-              <div className="p-3.5 bg-neutral-950 text-neutral-200 font-mono text-xs rounded-xl border border-neutral-800 max-h-64 overflow-y-auto">
+              <div className="p-3.5 bg-slate-950/90 text-slate-200 font-mono text-xs rounded-xl border border-teal-500/20 max-h-64 overflow-y-auto">
                 <TranscriptHighlighter
                   transcript={activeModalItem.transcript || ''}
                   clientCode={activeModalItem.client_code || activeModalItem.client}
@@ -1357,7 +1357,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setActiveModalItem(null)}
-                className="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-900 font-bold text-xs rounded-xl cursor-pointer"
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl cursor-pointer transition-colors border border-slate-700"
               >
                 Close
               </button>
@@ -1368,18 +1368,18 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
 
       {/* Modal: Create New Audit Entry */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-neutral-300 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
-              <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-                <span className="p-1 rounded-md bg-amber-400 text-black">
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+          <div className="glass-panel-glow max-w-lg w-full rounded-2xl border border-teal-500/30 p-6 space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                <span className="p-1 rounded-md bg-teal-500/20 text-teal-300 border border-teal-500/30">
                   <Plus className="w-4 h-4" />
                 </span>
                 <span>Add Manual Audit Record</span>
               </h3>
               <button
                 onClick={() => setShowCreateModal(false)}
-                className="p-1.5 text-neutral-400 hover:text-black rounded-lg cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800/60 cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1388,120 +1388,120 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <form onSubmit={handleCreateSubmit} className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Caller / Advisor Name *</label>
+                  <label className="block text-slate-300 font-medium mb-1">Caller / Advisor Name *</label>
                   <input
                     type="text"
                     required
                     value={newRecord.caller_name}
                     onChange={(e) => setNewRecord({ ...newRecord, caller_name: e.target.value })}
                     placeholder="e.g. Ramesh Kumar"
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden"
                   />
                 </div>
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Client ID / UCC *</label>
+                  <label className="block text-slate-300 font-medium mb-1">Client ID / UCC *</label>
                   <input
                     type="text"
                     required
                     value={newRecord.client}
                     onChange={(e) => setNewRecord({ ...newRecord, client: e.target.value })}
                     placeholder="e.g. CLI001"
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Trade Date</label>
+                  <label className="block text-slate-300 font-medium mb-1">Trade Date</label>
                   <input
                     type="date"
                     value={newRecord.trade_date}
                     onChange={(e) => setNewRecord({ ...newRecord, trade_date: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs text-slate-100 focus:outline-hidden"
                   />
                 </div>
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Phone Number</label>
+                  <label className="block text-slate-300 font-medium mb-1">Phone Number</label>
                   <input
                     type="text"
                     value={newRecord.phone}
                     onChange={(e) => setNewRecord({ ...newRecord, phone: e.target.value })}
                     placeholder="e.g. 9876543210"
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Team</label>
+                  <label className="block text-slate-300 font-medium mb-1">Team</label>
                   <input
                     type="text"
                     value={newRecord.team}
                     onChange={(e) => setNewRecord({ ...newRecord, team: e.target.value })}
                     placeholder="e.g. Equities North"
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs text-slate-100 placeholder-slate-500 focus:outline-hidden"
                   />
                 </div>
                 <div>
-                  <label className="block text-neutral-600 font-medium mb-1">Audit Date</label>
+                  <label className="block text-slate-300 font-medium mb-1">Audit Date</label>
                   <input
                     type="date"
                     value={newRecord.audit_date}
                     onChange={(e) => setNewRecord({ ...newRecord, audit_date: e.target.value })}
-                    className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs text-slate-100 focus:outline-hidden"
                   />
                 </div>
               </div>
 
               {/* Status Selectors */}
-              <div className="grid grid-cols-5 gap-2 pt-2 border-t border-neutral-100">
+              <div className="grid grid-cols-5 gap-2 pt-2 border-t border-slate-800/80">
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q1 (CLI) <span className="text-rose-600 font-bold">Fatal</span></label>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Q1 (CLI) <span className="text-rose-400 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q1_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q1_status: e.target.value })}
-                    className="w-full py-1 text-xs border rounded-md"
+                    className="w-full py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-200"
                   >
                     <option value="PASS">PASS</option>
                     <option value="FAIL">FAIL (Fatal)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q2 (UCC) <span className="text-rose-600 font-bold">Fatal</span></label>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Q2 (UCC) <span className="text-rose-400 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q2_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q2_status: e.target.value })}
-                    className="w-full py-1 text-xs border rounded-md"
+                    className="w-full py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-200"
                   >
                     <option value="PASS">PASS</option>
                     <option value="FAIL">FAIL (Fatal)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q3 (Symbol) <span className="text-neutral-500 font-semibold">1 Pt</span></label>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Q3 (Symbol) <span className="text-slate-400 font-semibold">1 Pt</span></label>
                   <select
                     value={newRecord.q3_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q3_status: e.target.value })}
-                    className="w-full py-1 text-xs border rounded-md"
+                    className="w-full py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-200"
                   >
                     <option value="PASS">PASS</option>
                     <option value="FAIL">FAIL (-1)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q4 (Ack)</label>
-                  <div className="w-full py-1 px-1 text-[11px] border border-emerald-200 bg-emerald-50 text-emerald-800 rounded-md font-bold text-center">
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Q4 (Ack)</label>
+                  <div className="w-full py-1 px-1 text-[11px] border border-emerald-500/30 bg-emerald-500/20 text-emerald-300 rounded-md font-bold text-center">
                     PASS
                   </div>
                 </div>
                 <div>
-                  <label className="block text-[10px] text-neutral-600 font-bold mb-1">Q5 (Ethics) <span className="text-rose-600 font-bold">Fatal</span></label>
+                  <label className="block text-[10px] text-slate-400 font-bold mb-1">Q5 (Ethics) <span className="text-rose-400 font-bold">Fatal</span></label>
                   <select
                     value={newRecord.q5_status}
                     onChange={(e) => setNewRecord({ ...newRecord, q5_status: e.target.value })}
-                    className="w-full py-1 text-xs border rounded-md"
+                    className="w-full py-1 text-xs bg-slate-900 border border-slate-700 rounded-md text-slate-200"
                   >
                     <option value="PASS">PASS</option>
                     <option value="FAIL">FAIL (Fatal)</option>
@@ -1510,26 +1510,26 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-neutral-600 font-medium mb-1">Audit Feedback / Comment</label>
+                <label className="block text-slate-300 font-medium mb-1">Audit Feedback / Comment</label>
                 <input
                   type="text"
                   value={newRecord.feedback}
                   onChange={(e) => setNewRecord({ ...newRecord, feedback: e.target.value })}
-                  className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                  className="w-full px-2.5 py-1.5 bg-slate-900/80 border border-slate-700 focus:border-teal-400 rounded-lg text-xs text-slate-100 focus:outline-hidden"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-neutral-200">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-3.5 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl cursor-pointer"
+                  className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-amber-400 hover:bg-amber-500 text-black font-bold rounded-xl cursor-pointer shadow-xs"
+                  className="px-4 py-1.5 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold rounded-xl cursor-pointer shadow-lg shadow-teal-500/20 transition-all"
                 >
                   Insert Record
                 </button>
