@@ -90,15 +90,16 @@ export async function stage3TranscribeCall(
     throw new Error(`Audio recording file missing from disk: ${audioPath || 'NO_PATH'}`);
   }
 
-  const activeGroqKey = groqApiKey || process.env.GROQ_API_KEY;
+  const activeGroqKey = (groqApiKey || process.env.GROQ_API_KEY || '').trim();
+  const activeGeminiKey = (_geminiApiKey || process.env.GEMINI_API_KEY || '').trim();
 
-  if (!activeGroqKey || !activeGroqKey.trim()) {
-    throw new Error('AWAITING_API_KEY: GROQ_API_KEY is required for Groq Whisper audio transcription.');
+  if (!activeGroqKey && !activeGeminiKey) {
+    throw new Error('AWAITING_API_KEY: Either GEMINI_API_KEY or GROQ_API_KEY is required for audio speech recognition.');
   }
 
   let asrResult;
   try {
-    asrResult = await transcribeAudioFile(audioPath, activeGroqKey.trim());
+    asrResult = await transcribeAudioFile(audioPath, activeGroqKey, activeGeminiKey);
   } catch (err: any) {
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     db.prepare(`
@@ -141,6 +142,7 @@ export async function stage3TranscribeCall(
       transcript_raw = ?,
       transcript_model = ?,
       transcript_status = 'VALID',
+      failure_reason = NULL,
       duration_seconds = CASE WHEN duration_seconds > 0 THEN duration_seconds ELSE ? END,
       updated_at = ?
     WHERE id = ?

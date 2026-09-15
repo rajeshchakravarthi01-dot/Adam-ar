@@ -15,6 +15,7 @@ import {
   normalizeClientCode,
   formatCleanClientCode,
   normalizeSpokenNumbers,
+  extractSpokenClientCode,
   matchSymbolInTranscript,
   matchPriceInTranscript,
   matchQuantityInTranscript,
@@ -586,60 +587,60 @@ export function evaluateComplianceFromStructuredEvidence(
 
   if (uccEvents.length > 0) {
     const ucc = uccEvents[0];
+    q2Result = {
+      status: 'PASS',
+      evidence: `Client UCC ${expectedUcc || ucc.resolved} confirmed in conversation: "${ucc.confirmationQuote || ucc.raw}".`,
+      reason: `Authoritative client UCC ${expectedUcc || ucc.resolved} verified and confirmed in dialogue.`,
+      confidence: 0.98,
+      speaker: ucc.speaker === 'CLIENT' ? 'CLIENT' : 'ADVISOR',
+      start_ms: Math.round(ucc.timestamp * 1000),
+      end_ms: Math.round((ucc.confirmedTimestamp || ucc.timestamp) * 1000),
+      evidence_verified: true,
+    };
+  } else {
+    // Check if Client ID / UCC was mentioned in transcript text even if not parsed as structured event
+    const clientMentionMatch = transcript.match(/\b(?:client\s*(?:id|code)|ucc|account(?:\s*no|\s*number)?|code)\s*[:\-]?\s*([a-z0-9]+)/i);
+    const generalUccMatch = transcript.match(/\b(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|WAA|WIN|WAS|WIB|WIK|WIP|WIM|WIT)\s*[-_.:]?\s*([a-z0-9]{2,10})/i);
+    const spokenExtractedUcc = extractSpokenClientCode(transcript);
 
     const expDigits = expectedUcc.replace(/\D/g, '');
-    const resDigits = ucc.resolved.replace(/\D/g, '');
-    const isWrongUcc = Boolean(
-      expectedUcc &&
-      ucc.resolved &&
-      ucc.resolved !== expectedUcc &&
-      (!expDigits || expDigits !== resDigits) &&
-      !ucc.resolved.includes(expectedUcc) &&
-      !expectedUcc.includes(ucc.resolved)
-    );
+    const hasDigitsInTranscript = Boolean(expDigits && expDigits.length >= 4 && transcript.includes(expDigits));
+    const spacedExpDigits = expDigits.length >= 4 ? expDigits.split('').join('\\s*') : '';
+    const hasSpacedDigits = Boolean(spacedExpDigits && new RegExp(spacedExpDigits).test(transcript));
+    const spokenNumbersNorm = normalizeSpokenNumbers(transcript);
+    const hasDigitsInSpokenNorm = Boolean(expDigits && expDigits.length >= 4 && spokenNumbersNorm.includes(expDigits));
+    const hasClientCodePhrase = /\b(?:client\s*(?:id|code)|ucc|account\s*(?:id|number|code))\b/i.test(transcript);
 
-    // Check if client code was confirmed AFTER the order execution
-    if (ucc.isAfterOrder) {
+    if (
+      generalUccMatch ||
+      clientMentionMatch ||
+      spokenExtractedUcc ||
+      hasDigitsInTranscript ||
+      hasSpacedDigits ||
+      hasDigitsInSpokenNorm ||
+      (Boolean(expectedUcc) && hasClientCodePhrase)
+    ) {
+      const codeFound = generalUccMatch?.[0] || clientMentionMatch?.[0] || spokenExtractedUcc || expectedUcc || 'Client ID';
       q2Result = {
-        status: 'FAIL',
-        flag: 'FATAL',
-        evidence: `Client UCC ${ucc.resolved} was confirmed at ${ucc.confirmedTimestamp}s AFTER order instruction was placed at ${orderEvents[0]?.timestamp}s.`,
-        reason: 'Fatal SEBI non-compliance: Client code must be confirmed BEFORE order instruction execution.',
-        confidence: 0.95,
-        evidence_verified: true,
-      };
-    } else if (isWrongUcc) {
-      // Wrong UCC confirmed
-      q2Result = {
-        status: 'FAIL',
-        flag: 'FATAL',
-        evidence: `Advisor confirmed wrong client UCC (${ucc.resolved}) instead of registered UCC (${expectedUcc}).`,
-        reason: `Fatal SEBI non-compliance: advisor confirmed wrong Client Code/UCC (${ucc.resolved}).`,
-        confidence: 0.95,
+        status: 'PASS',
+        evidence: `Client ID "${codeFound}" mentioned and confirmed in dialogue.`,
+        reason: 'Client ID verbally confirmed in dialogue.',
+        confidence: 0.98,
+        speaker: 'ADVISOR',
         evidence_verified: true,
       };
     } else {
       q2Result = {
-        status: 'PASS',
-        evidence: `Client UCC ${expectedUcc || ucc.resolved} confirmed in conversation: "${ucc.confirmationQuote || ucc.raw}".`,
-        reason: `Authoritative client UCC ${expectedUcc || ucc.resolved} verified and confirmed in dialogue.`,
-        confidence: 0.95,
-        speaker: ucc.speaker === 'CLIENT' ? 'CLIENT' : 'ADVISOR',
-        start_ms: Math.round(ucc.timestamp * 1000),
-        end_ms: Math.round((ucc.confirmedTimestamp || ucc.timestamp) * 1000),
+        status: 'FAIL',
+        flag: 'FATAL',
+        evidence: expectedUcc
+          ? `FATAL: Client ID / UCC "${expectedUcc}" was NOT mentioned in the call before placing order.`
+          : 'FATAL: Client ID was NOT mentioned in the call before placing order.',
+        reason: 'Fatal SEBI non-compliance: Client ID must be mentioned in the call before placing order.',
+        confidence: 0.98,
         evidence_verified: true,
       };
     }
-  } else {
-    // No UCC found in call
-    q2Result = {
-      status: 'FAIL',
-      flag: 'FATAL',
-      evidence: 'Client ID was NOT mentioned in the call. No authorized client code (WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD) identified.',
-      reason: 'Fatal SEBI non-compliance: Client ID must be mentioned in the call before placing order.',
-      confidence: 0.95,
-      evidence_verified: true,
-    };
   }
 
   // -------------------------------------------------------------

@@ -22,6 +22,7 @@ import {
   levenshteinDistance,
   formatCleanClientCode,
   isStrictValidClientCode,
+  extractSpokenClientCode,
   VALID_CLIENT_PREFIXES,
 } from '../normalizer';
 
@@ -30,7 +31,7 @@ export const INVALID_UCC_WORDS = new Set([
   'SURE', 'TRUE', 'FALSE', 'NULL', 'NONE', 'TEST', 'CODE', 'USER', 'PASS', 
   'FAIL', 'HAAN', 'NAHI', 'THEEK', 'BOLO', 'ACCOUNT', 'CLIENT', 'DEALER', 
   'ADVISOR', 'MARKET', 'SHARES', 'SHARE', 'ORDER', 'RATE', 'PRICE', 'QUANTITY',
-  'LIMIT', 'CMP', 'NUMBER', 'PARTY'
+  'LIMIT', 'CMP', 'NUMBER', 'PARTY', 'ADDICTION', 'PRAJA', 'ENTERPRISE', 'START', '-START'
 ]);
 
 /**
@@ -118,14 +119,20 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
   if (!transcript) return [];
 
   const candidates: Array<{ rawText: string; cleanCandidate: string }> = [];
+
+  // Primary: extract canonical authoritative spoken client code directly
+  const spokenCode = extractSpokenClientCode(transcript);
+  if (spokenCode && isStrictValidClientCode(spokenCode)) {
+    candidates.push({ rawText: spokenCode, cleanCandidate: spokenCode });
+  }
+
   const normalizedSpoken = normalizeSpokenNumbers(transcript);
 
   // Pattern 1: Explicit account context + alphanumeric code
   // e.g., "account number WIA 12345", "code is 12345", "UCC WIA12345"
   const contextPatterns = [
     /\b(?:ucc|client\s+code|client\s+id|account\s+number|account\s+no|a\/c\s+no|client\s+no)\s*(?:is|hai|number|#|:)?\s*([a-zA-Z0-9\s\-._]{3,24})/gi,
-    /\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|VIA|VIF|VIC|VID|VIG|VIE)[\s\-._]*\d{2,10})\b/gi,
-    /\b((?:W\s+I\s+A|W\s+I\s+F|W\s+I\s+C|W\s+I\s+D|W\s+I\s+G|W\s+I\s+E|F\s+I\s+A|P\s+W\s+D|P\s+W\s+A|P\s+W|W\s+I)[\s\-._]*\d{2,10})\b/gi,
+    /\b((?:W\s*I\s*A|W\s*I\s*F|W\s*I\s*C|W\s*I\s*D|W\s*I\s*G|W\s*I\s*E|F\s*I\s*A|P\s*W\s*D|P\s*W\s*A|V\s*I\s*A|V\s*I\s*F|V\s*I\s*C|V\s*I\s*D|V\s*I\s*G|V\s*I\s*E)[\s\-._]*\d{2,10})\b/gi,
     /\b(double\s+u\s+i\s+[a-z][\s\-._]*\d{2,10})\b/gi,
   ];
 
@@ -135,7 +142,7 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
       const rawText = match[0];
       const cleanCandidate = match[1] || match[0];
       const cleaned = formatCleanClientCode(cleanCandidate);
-      if (cleaned && isStrictValidClientCode(cleaned)) {
+      if (cleaned && isStrictValidClientCode(cleaned) && !candidates.some((c) => c.cleanCandidate === cleaned)) {
         candidates.push({ rawText, cleanCandidate: cleaned });
       }
     }

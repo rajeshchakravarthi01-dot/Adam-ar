@@ -18,6 +18,7 @@ export const VALID_CLIENT_PREFIXES = [
   'FIA',
   'PWD',
   'PWA',
+  'WAA',
 ] as const;
 
 export type ValidClientPrefix = typeof VALID_CLIENT_PREFIXES[number];
@@ -85,13 +86,14 @@ export function formatCleanClientCode(rawInput?: string | null): string {
     { pattern: /^(?:FIA)/, canonical: 'FIA' },
     { pattern: /^(?:PWD|PVD|PW(?=\d))/, canonical: 'PWD' },
     { pattern: /^(?:PWA)/, canonical: 'PWA' },
+    { pattern: /^(?:WAA|WAS)/, canonical: 'WAA' },
   ];
 
   for (const item of prefixMap) {
     const match = squashed.match(item.pattern);
     if (match) {
       const remaining = squashed.slice(match[0].length);
-      const digitMatch = remaining.match(/^(\d{2,10})/);
+      const digitMatch = remaining.match(/^(\d{1,10})/);
       if (digitMatch) {
         return `${item.canonical}${digitMatch[1]}`;
       }
@@ -102,7 +104,7 @@ export function formatCleanClientCode(rawInput?: string | null): string {
   for (const p of VALID_CLIENT_PREFIXES) {
     if (squashed.startsWith(p)) {
       const digits = squashed.slice(p.length).replace(/\D/g, '');
-      if (digits.length >= 2) {
+      if (digits.length >= 1) {
         return `${p}${digits}`;
       }
     }
@@ -118,20 +120,44 @@ export function formatCleanClientCode(rawInput?: string | null): string {
 export function isStrictValidClientCode(code?: string | null): boolean {
   if (!code) return false;
   const clean = formatCleanClientCode(code);
-  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA)\d{2,10}$/.test(clean);
+  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|WAA)\d{1,10}$/.test(clean);
 }
 
 /**
  * Cleans advisor / dealer / caller names by stripping phone numbers in parentheses or brackets.
+ * Also strictly rejects placeholder strings like "-START", "START", "Advisor", "Caller", "Dealer", "Agent", etc.
  * e.g., "Ajeet kumar pandey (+9042565871)" -> "Ajeet kumar pandey"
- *       "Ajeetkumar Bharthidasan (8106365245)" -> "Ajeetkumar Bharthidasan"
+ *       "-START" -> ""
+ *       "Advisor" -> ""
  */
 export function cleanCallerName(name: string | null | undefined): string {
   if (!name) return '';
   const str = String(name).trim();
+  const lower = str.toLowerCase().replace(/^[ \-_:]+/, '').trim();
+  if (
+    !lower ||
+    lower === 'start' ||
+    lower === '-start' ||
+    lower === 'advisor' ||
+    lower === 'caller' ||
+    lower === 'agent' ||
+    lower === 'dealer' ||
+    lower === 'admin' ||
+    lower === 'test' ||
+    lower === 'unknown' ||
+    lower === 'null' ||
+    lower === 'undefined' ||
+    lower === 'na' ||
+    lower === 'n/a' ||
+    lower === '—' ||
+    lower === '-' ||
+    lower === 'none'
+  ) {
+    return '';
+  }
   const cleaned = str
     .replace(/\s*[\(\[]\s*\+?[\d\s-]{7,15}\s*[\)\]]\s*$/i, '')
     .replace(/\s*[\(\[]\s*ext\s*\d+\s*[\)\]]\s*$/i, '')
     .trim();
-  return cleaned || str;
+  return cleaned || '';
 }

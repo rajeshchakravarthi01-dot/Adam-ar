@@ -203,11 +203,11 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reviewData),
     }),
-  sendScorecard: (scorecardId: number, to?: string) =>
+  sendScorecard: (scorecardId: number, to?: string, cc?: string) =>
     apiRequest<{ ok: boolean; message: string }>(`/api/scorecards/${scorecardId}/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ to }),
+      body: JSON.stringify({ to, cc }),
     }),
   updateScorecard: (scorecardId: number, updateData: Partial<ScorecardRecord> & { phone?: string; audit_date?: string; feedback?: string }) =>
     apiRequest<{ ok: boolean; scorecard: ScorecardRecord; message: string }>(`/api/scorecards/${scorecardId}`, {

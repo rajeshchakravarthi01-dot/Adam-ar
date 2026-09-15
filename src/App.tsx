@@ -286,8 +286,8 @@ export function App() {
     showToast(`Audit #${auditId} updated & finalized.`);
   };
 
-  const handleSendScorecard = async (scorecardId: number, toEmail?: string) => {
-    await api.sendScorecard(scorecardId, toEmail);
+  const handleSendScorecard = async (scorecardId: number, toEmail?: string, ccEmail?: string) => {
+    await api.sendScorecard(scorecardId, toEmail, ccEmail);
     await fetchAllData();
     showToast(`Scorecard #${scorecardId} dispatched to ${toEmail || 'advisor'}.`);
   };

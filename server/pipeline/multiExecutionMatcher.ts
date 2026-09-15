@@ -26,8 +26,11 @@ import {
   normalizeSpokenNumbers,
   normalizeOrderSide,
   matchSymbolInTranscript,
+  extractSpokenClientCode,
+  isStrictValidClientCode,
   SYMBOL_ALIASES,
 } from '../normalizer';
+import { isValidUcc } from './uccResolver';
 import { parseTradeSecondsFromMidnight } from './tradePreOrderClusterer';
 
 export interface ExtractedCallOrder {
@@ -138,14 +141,16 @@ export function extractOrdersFromTranscript(
 
   // If specific symbols detected, construct order objects around each symbol context
   if (deduplicatedSymbols.length > 0) {
+    const isSingleSymbol = deduplicatedSymbols.length === 1;
+
     for (let orderIndex = 0; orderIndex < deduplicatedSymbols.length; orderIndex++) {
       const symInfo = deduplicatedSymbols[orderIndex];
       const prevEnd = orderIndex > 0 ? (deduplicatedSymbols[orderIndex - 1].index + deduplicatedSymbols[orderIndex - 1].rawText.length) : 0;
       const nextStart = orderIndex < deduplicatedSymbols.length - 1 ? deduplicatedSymbols[orderIndex + 1].index : transcript.length;
 
-      // Bound window cleanly around this order's symbol
-      const start = Math.max(prevEnd, symInfo.index - 80);
-      const end = Math.min(nextStart, symInfo.index + symInfo.rawText.length + 80);
+      // Bound window cleanly around this order's symbol (if single symbol in call, span entire transcript)
+      const start = isSingleSymbol ? 0 : Math.max(prevEnd, symInfo.index - 350);
+      const end = isSingleSymbol ? transcript.length : Math.min(nextStart, symInfo.index + symInfo.rawText.length + 350);
       const windowText = transcript.slice(start, end);
       const windowSpoken = normalizedSpoken.slice(start, end);
 
@@ -174,20 +179,25 @@ export function extractOrdersFromTranscript(
         }
       }
 
-      // Determine Price Type
+      // Determine Price Type (CMP vs Limit)
       let priceType: 'CMP' | 'LIMIT' | 'MARKET' = 'MARKET';
       let limitPrice: number | null = null;
       let rawPrice: string | null = null;
 
-      if (/\b(?:cmp|current\s+market\s+price|market\s+price|at\s+market|market\s+pe|rate\s+pe)\b/i.test(windowText)) {
+      const cmpPattern = /\b(?:cmp|current\s+market\s+price|market\s+price|market\s+rate|at\s+market|market\s+pe|rate\s+pe|bhav\s+pe|bhav\s+par|current\s+bhav|live\s+rate|jo\s+bhi\s+chal\s+raha\s+hai|market\s+me)\b/i;
+      if (cmpPattern.test(windowText) || (isSingleSymbol && cmpPattern.test(transcript))) {
         priceType = 'CMP';
         rawPrice = 'CMP';
       } else {
-        const priceMatch = windowSpoken.match(/\b(?:price|rate|at|rs\.?|inr|bhav|@)\s*[:\-]?\s*(\d+(?:\.\d{1,2})?)\b/i);
+        const priceMatch = windowSpoken.match(/\b(?:price|rate|at|rs\.?|inr|bhav|@)\s*[:\-]?\s*(\d+(?:\.\d{1,2})?)\b/i)
+          || (isSingleSymbol ? normalizedSpoken.match(/\b(?:price|rate|at|rs\.?|inr|bhav|@)\s*[:\-]?\s*(\d+(?:\.\d{1,2})?)\b/i) : null);
         if (priceMatch) {
           limitPrice = parseFloat(priceMatch[1]);
           rawPrice = priceMatch[1];
           priceType = 'LIMIT';
+        } else if (cmpPattern.test(transcript)) {
+          priceType = 'CMP';
+          rawPrice = 'CMP';
         }
       }
 
@@ -208,6 +218,20 @@ export function extractOrdersFromTranscript(
             minExplicitDist = dist;
             quantity = parsed;
             rawQuantity = valStr;
+          }
+        }
+      }
+
+      // If no explicit keyword in window, scan full dialogue if single symbol or still missing
+      if (!quantity) {
+        let fullEqMatch;
+        while ((fullEqMatch = explicitQtyRegex.exec(normalizedSpoken)) !== null) {
+          const valStr = fullEqMatch[1] || fullEqMatch[2];
+          const parsed = parseInt(valStr, 10);
+          if (parsed > 0 && parsed !== limitPrice) {
+            quantity = parsed;
+            rawQuantity = valStr;
+            break;
           }
         }
       }
@@ -312,7 +336,16 @@ export function stage5MultiExecutionMatch(
   const extractedOrders = extractOrdersFromTranscript(callId, transcript);
 
   // 2. Identify Client Filter Criteria
-  const clientUcc = normalizeClientCode(call.client_code || call.client);
+  let clientUcc = normalizeClientCode(call.client_code || call.client);
+  if (!clientUcc && transcript) {
+    const spoken = extractSpokenClientCode(transcript);
+    if (spoken && isValidUcc(spoken)) {
+      clientUcc = spoken;
+      try {
+        db.prepare('UPDATE calls SET client_code = ? WHERE id = ?').run(clientUcc, callId);
+      } catch {}
+    }
+  }
   const callerPhone = normalizePhoneNumber(call.calling_number || call.phone_number || '');
 
   // Optimized targeted SQL query using indexes instead of full table scan
@@ -337,9 +370,8 @@ export function stage5MultiExecutionMatch(
         ORDER BY id ASC
       `).all(callerPhone, callerPhone) as unknown as TradeRecord[];
     } else {
-      candidateTrades = db.prepare(`
-        SELECT * FROM trades ORDER BY id DESC LIMIT 50
-      `).all() as unknown as TradeRecord[];
+      // Do NOT match arbitrary trades from unrelated clients if no UCC or phone is identified
+      candidateTrades = [];
     }
   } catch {
     candidateTrades = [];

@@ -29,7 +29,7 @@ import { TranscriptHighlighter } from './TranscriptHighlighter';
 
 interface ScorecardsViewProps {
   scorecards: ScorecardRecord[];
-  onSendScorecard: (scorecardId: number, toEmail?: string) => Promise<void>;
+  onSendScorecard: (scorecardId: number, toEmail?: string, ccEmail?: string) => Promise<void>;
   isLoading: boolean;
   onNavigateToMail?: () => void;
   onRunAllAudits?: () => Promise<void>;
@@ -53,6 +53,24 @@ export const ScorecardsView: React.FC<ScorecardsViewProps> = ({
   const [isRunningAll, setIsRunningAll] = useState(false);
   const [expandedTranscriptId, setExpandedTranscriptId] = useState<number | null>(null);
   const [playingCallId, setPlayingCallId] = useState<number | null>(null);
+
+  // In-app Send Scorecard Modal State
+  const [sendModalScorecard, setSendModalScorecard] = useState<ScorecardRecord | null>(null);
+  const [sendToEmail, setSendToEmail] = useState('');
+  const [sendCcEmail, setSendCcEmail] = useState('');
+  const [sendSubject, setSendSubject] = useState('');
+  const [sendModalLoading, setSendModalLoading] = useState(false);
+  const [sendModalError, setSendModalError] = useState<string | null>(null);
+
+  // In-app Toast Banner Notification State
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast((curr) => (curr?.message === message ? null : curr));
+    }, 4500);
+  };
 
   const getAudioUrl = (callId: number) => {
     const token = getStoredToken();
@@ -124,7 +142,7 @@ TOTAL\t5\t${stars}\t${isFatal ? '0' : sc.score}
 Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory Norm.'}`;
 
     navigator.clipboard.writeText(plainText);
-    alert(`Scorecard #${sc.id} copied to clipboard!`);
+    showToast(`Scorecard #${sc.id} copied to clipboard!`, 'success');
   };
 
   const downloadScorecardWord = (sc: ScorecardRecord) => {
@@ -251,7 +269,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
 
   const downloadAllScorecardsExcel = () => {
     if (filtered.length === 0) {
-      alert('No scorecards to download.');
+      showToast('No scorecards match the active filters to download.', 'info');
       return;
     }
     const data = filtered.map((sc) => {
@@ -286,23 +304,39 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'All_Scorecards');
     XLSX.writeFile(wb, `ADAM_AR_All_Scorecards_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast('Exported all filtered scorecards to Excel.', 'success');
   };
 
-  const handleSendSingle = async (sc: ScorecardRecord) => {
-    const targetEmail = prompt(
-      `Send Scorecard #${sc.id} to Advisor Email:`,
-      `${sc.caller_name ? sc.caller_name.toLowerCase().replace(/[^a-z0-9]/g, '.') : 'advisor'}@auditeq.com`
-    );
-    if (!targetEmail) return;
+  const openSendModal = (sc: ScorecardRecord) => {
+    const isFatal = sc.is_fatal || sc.q1_status === 'FAIL' || sc.q2_status === 'FAIL' || sc.q5_status === 'FAIL';
+    const advisorMail = sc.caller_name
+      ? `${sc.caller_name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@auditeq.com`
+      : 'advisor@auditeq.com';
+    setSendToEmail(advisorMail);
+    setSendCcEmail(isFatal ? 'sambath.s@fundsindia.com' : 'compliance@auditeq.com');
+    setSendSubject(`AuditEQ Scorecard #${sc.id} — ${sc.client || 'Client'} (${isFatal ? 'FATAL' : `${sc.score}/5`})`);
+    setSendModalError(null);
+    setSendModalScorecard(sc);
+  };
 
-    setSendingId(sc.id);
+  const handleConfirmSendModal = async () => {
+    if (!sendModalScorecard) return;
+    if (!sendToEmail.trim()) {
+      setSendModalError('Please enter a recipient email address.');
+      return;
+    }
+
+    setSendModalLoading(true);
+    setSendModalError(null);
     try {
-      await onSendScorecard(sc.id, targetEmail);
-      alert(`Scorecard #${sc.id} sent successfully to ${targetEmail}!`);
+      await onSendScorecard(sendModalScorecard.id, sendToEmail.trim(), sendCcEmail.trim() || undefined);
+      showToast(`Scorecard #${sendModalScorecard.id} dispatched successfully to ${sendToEmail.trim()}!`, 'success');
+      setSendModalScorecard(null);
     } catch (err: unknown) {
-      alert(`Send failed: ${(err as Error).message}`);
+      const msg = (err as Error).message || 'Failed to dispatch scorecard email.';
+      setSendModalError(msg);
     } finally {
-      setSendingId(null);
+      setSendModalLoading(false);
     }
   };
 
@@ -748,12 +782,12 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
                       <span>Print</span>
                     </button>
                     <button
-                      onClick={() => handleSendSingle(sc)}
-                      disabled={sendingId === sc.id}
+                      onClick={() => openSendModal(sc)}
                       className="px-3 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-200 border border-teal-500/30 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                      title="Send this official scorecard via Email"
                     >
                       <Send className="w-3.5 h-3.5 text-teal-300" />
-                      <span>{sendingId === sc.id ? 'Sending…' : 'Email'}</span>
+                      <span>Email</span>
                     </button>
                   </div>
                 </div>
@@ -816,6 +850,166 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
           })
         )}
       </div>
+
+      {/* In-App Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200">
+          <div
+            className={`px-4 py-3 rounded-xl shadow-2xl border flex items-center gap-2.5 text-xs font-semibold backdrop-blur-md ${
+              toast.type === 'success'
+                ? 'bg-emerald-950/90 border-emerald-500/40 text-emerald-200'
+                : toast.type === 'error'
+                ? 'bg-rose-950/90 border-rose-500/40 text-rose-200'
+                : 'bg-slate-900/90 border-teal-500/30 text-teal-200'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : toast.type === 'error' ? (
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+            ) : (
+              <Sparkles className="w-4 h-4 text-teal-400 shrink-0" />
+            )}
+            <span>{toast.message}</span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-2 text-slate-400 hover:text-white p-0.5 rounded cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Send Scorecard Modal */}
+      {sendModalScorecard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg bg-slate-900 border border-teal-500/30 rounded-2xl shadow-2xl p-6 text-white space-y-4">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-teal-500/20 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                  <Send className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Send Pre-Order Audit Scorecard</h3>
+                  <p className="text-xs text-slate-400">
+                    Scorecard #{sendModalScorecard.id} · Client {sendModalScorecard.client || '—'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSendModalScorecard(null)}
+                disabled={sendModalLoading}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Scorecard Quick Summary */}
+            <div className="p-3 bg-slate-950/60 rounded-xl border border-teal-500/10 grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Advisor</span>
+                <span className="font-semibold text-slate-200 truncate block">
+                  {cleanCallerName(sendModalScorecard.caller_name) || 'Advisor'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Score</span>
+                <span
+                  className={`font-bold block ${
+                    sendModalScorecard.is_fatal || sendModalScorecard.score === 0
+                      ? 'text-rose-400'
+                      : 'text-emerald-400'
+                  }`}
+                >
+                  {sendModalScorecard.is_fatal ? 'FATAL (0/5)' : `${sendModalScorecard.score}/5 PASS`}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase tracking-wider">Audit Date</span>
+                <span className="font-semibold text-slate-200 block">
+                  {sendModalScorecard.created_at ? sendModalScorecard.created_at.slice(0, 10) : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Form Fields */}
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Recipient Email (Advisor / Team) *</label>
+                <input
+                  type="email"
+                  value={sendToEmail}
+                  onChange={(e) => setSendToEmail(e.target.value)}
+                  placeholder="advisor@fundsindia.com"
+                  className="w-full px-3 py-2 bg-slate-950/80 border border-teal-500/30 rounded-xl text-slate-200 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">CC Recipient(s)</label>
+                <input
+                  type="text"
+                  value={sendCcEmail}
+                  onChange={(e) => setSendCcEmail(e.target.value)}
+                  placeholder="compliance@auditeq.com, sambath.s@fundsindia.com"
+                  className="w-full px-3 py-2 bg-slate-950/80 border border-teal-500/30 rounded-xl text-slate-200 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">Email Subject</label>
+                <input
+                  type="text"
+                  value={sendSubject}
+                  onChange={(e) => setSendSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-950/80 border border-teal-500/30 rounded-xl text-slate-200 focus:outline-none focus:border-teal-400"
+                />
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {sendModalError && (
+              <div className="p-3 bg-rose-950/50 border border-rose-500/30 rounded-xl text-rose-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{sendModalError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-teal-500/20">
+              <button
+                type="button"
+                onClick={() => setSendModalScorecard(null)}
+                disabled={sendModalLoading}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSendModal}
+                disabled={sendModalLoading}
+                className="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {sendModalLoading ? (
+                  <>
+                    <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending Scorecard…</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Send Scorecard</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

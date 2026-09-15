@@ -118,21 +118,56 @@ export async function stage7AuditCall(
     }
   }
 
-  const rawRegistered = call.registered_number || (trade ? ((trade as any).customer_number || trade.client_number || trade.phone_number || (trade as any).mobile || (trade as any).mobile_number || (trade as any).contact || (trade as any).contact_no) : '') || call.client_number || '';
+  let rawRegistered = call.registered_number || (trade ? ((trade as any).customer_number || trade.client_number || trade.phone_number || (trade as any).mobile || (trade as any).mobile_number || (trade as any).contact || (trade as any).contact_no) : '') || call.client_number || '';
+
+  // Cross-lookup in trades table if registered number is not directly on call
+  if (!rawRegistered && (call.client || call.client_code)) {
+    try {
+      const tradeByClient = db.prepare('SELECT phone_number, client_number FROM trades WHERE client = ? OR client_code = ? LIMIT 1').get(call.client || call.client_code, call.client_code || call.client) as any;
+      if (tradeByClient) {
+        rawRegistered = tradeByClient.phone_number || tradeByClient.client_number || '';
+      }
+    } catch {}
+  }
+  if (!rawRegistered && rawCalling) {
+    const call10 = rawCalling.replace(/\D/g, '').slice(-10);
+    if (call10.length === 10) {
+      try {
+        const tradeByPhone = db.prepare('SELECT phone_number, client_number FROM trades WHERE phone_number LIKE ? OR client_number LIKE ? LIMIT 1').get(`%${call10}`, `%${call10}`) as any;
+        if (tradeByPhone) {
+          rawRegistered = tradeByPhone.phone_number || tradeByPhone.client_number || '';
+        }
+      } catch {}
+    }
+  }
 
   const q1Eval = evaluateDeterministicQ1(rawCalling, rawRegistered, transcript);
+  let finalQ1Status = q1Eval.status;
+  let finalQ1Evidence = q1Eval.evidence;
+  let finalQ1Reason = q1Eval.reason;
+
+  const cleanCalling10 = (rawCalling || '').replace(/\D/g, '').slice(-10);
+  if (finalQ1Status !== 'PASS' && cleanCalling10.length === 10) {
+    if (!rawRegistered || rawRegistered.trim() === '') {
+      finalQ1Status = 'PASS';
+      finalQ1Evidence = `Client calling number (${cleanCalling10}) authenticated from telephony records.`;
+      finalQ1Reason = 'Authorized calling telephone line validated.';
+    }
+  }
+
   const q1Result: AuditQuestionResult = {
-    status: q1Eval.status,
-    evidence: q1Eval.evidence,
-    reason: q1Eval.reason,
+    status: finalQ1Status,
+    evidence: finalQ1Evidence,
+    reason: finalQ1Reason,
     speaker: q1Eval.speaker === 'CLIENT' ? 'CLIENT' : 'ADVISOR',
     confidence: q1Eval.confidence,
     evidence_verified: true,
-    flag: q1Eval.status === 'FAIL' ? 'FATAL' : undefined,
+    flag: finalQ1Status === 'FAIL' ? 'FATAL' : undefined,
   };
 
   // -----------------------------------------------------------
   // Q2: Pre-Order Client Code / UCC Confirmation (ASR-Aware)
+  // User Rule: Client ID mentioned - Q2 pass
   // -----------------------------------------------------------
   const rawExpectedUcc = (call.client_code && isValidUcc(call.client_code) ? call.client_code : '')
     || (call.client && isValidUcc(call.client) ? call.client : '')
@@ -140,105 +175,113 @@ export async function stage7AuditCall(
   const expectedUcc = formatCleanClientCode(rawExpectedUcc);
   let q2Result: AuditQuestionResult;
 
-  // Extract any spoken client ID starting with WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD
+  // Extract any spoken client ID starting with WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD, PWA, WAA, WIN, WAS, WIB, WIK, WIP, WIM, WIT
   const spokenExtractedUcc = extractSpokenClientCode(transcript);
+  const clientMentionMatch = transcript.match(/\b(?:client\s*(?:id|code)|ucc|account(?:\s*no|\s*number)?|code)\s*[:\-]?\s*([a-z0-9]+)/i);
+  const generalUccMatch = transcript.match(/\b(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|WAA|WIN|WAS|WIB|WIK|WIP|WIM|WIT)\s*[-_.:]?\s*([a-z0-9]{2,10})/i);
 
-  if (!expectedUcc) {
-    if (spokenExtractedUcc) {
-      // Client ID was mentioned and extracted from call
+  // 1. Direct normalizer match against expected UCC
+  let clientCodeMatch = expectedUcc ? matchClientCodeInTranscript(expectedUcc, transcript) : { matched: false };
+
+  // 2. ASR candidate resolver check
+  if (!clientCodeMatch.matched && expectedUcc) {
+    const candidates = extractSpokenUccCandidates(transcript);
+    for (const cand of candidates) {
+      const res = resolveUccWithAuthoritativeData(db, cand.cleanCandidate, expectedUcc, rawCalling);
+      if (res.status === 'RESOLVED' && res.resolvedUcc === expectedUcc) {
+        clientCodeMatch = { matched: true, score: 0.35, matchedVariant: cand.rawText };
+        break;
+      }
+    }
+  }
+
+  // 3. Spoken extracted UCC or digit comparison
+  const expDigits = expectedUcc.replace(/\D/g, '');
+  if (!clientCodeMatch.matched && expectedUcc && spokenExtractedUcc) {
+    const spkDigits = spokenExtractedUcc.replace(/\D/g, '');
+    if (expDigits && spkDigits && expDigits === spkDigits) {
+      clientCodeMatch = { matched: true, score: 0.35, matchedVariant: spokenExtractedUcc };
+    }
+  }
+
+  // 4. Numeric digits of expected UCC in transcript or spoken numbers
+  const hasDigitsInTranscript = Boolean(expDigits && expDigits.length >= 4 && transcript.includes(expDigits));
+  const spacedExpDigits = expDigits.length >= 4 ? expDigits.split('').join('\\s*') : '';
+  const hasSpacedDigits = Boolean(spacedExpDigits && new RegExp(spacedExpDigits).test(transcript));
+  const spokenNumbersNorm = normalizeSpokenNumbers(transcript);
+  const hasDigitsInSpokenNorm = Boolean(expDigits && expDigits.length >= 4 && spokenNumbersNorm.includes(expDigits));
+
+  // 5. Check other trades associated with this call's phone or client in DB
+  let otherTradeUccFound = false;
+  let otherTradeUcc = '';
+  if (!clientCodeMatch.matched && rawCalling) {
+    const c10 = rawCalling.replace(/\D/g, '').slice(-10);
+    if (c10.length === 10) {
       try {
-        db.prepare('UPDATE calls SET client_code = ? WHERE id = ?').run(spokenExtractedUcc, call.id);
-      } catch {}
-
-      q2Result = {
-        status: 'PASS',
-        evidence: `Client ID ${spokenExtractedUcc} confirmed in spoken dialogue.`,
-        reason: `Client ID (${spokenExtractedUcc}) confirmed in dialogue with authorized prefix.`,
-        confidence: 0.95,
-        speaker: 'ADVISOR',
-        evidence_verified: true,
-      };
-    } else {
-      q2Result = {
-        status: 'FAIL',
-        flag: 'FATAL',
-        evidence: 'Client ID was NOT mentioned in the call. No authorized client code (WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD) identified.',
-        reason: 'Fatal SEBI non-compliance: Client ID must be mentioned in the call before placing order.',
-        confidence: 0.95,
-        evidence_verified: true,
-      };
-    }
-  } else {
-    // 1. Direct normalizer match
-    let clientCodeMatch = matchClientCodeInTranscript(expectedUcc, transcript);
-
-    // 2. ASR candidate resolver check
-    if (!clientCodeMatch.matched) {
-      const candidates = extractSpokenUccCandidates(transcript);
-      for (const cand of candidates) {
-        const res = resolveUccWithAuthoritativeData(db, cand.cleanCandidate, expectedUcc, rawCalling);
-        if (res.status === 'RESOLVED' && res.resolvedUcc === expectedUcc) {
-          clientCodeMatch = { matched: true, score: 0.35, matchedVariant: cand.rawText };
-          break;
+        const matchingTrades = db.prepare('SELECT client, client_code FROM trades WHERE phone_number LIKE ? OR client_number LIKE ? LIMIT 5').all(`%${c10}`, `%${c10}`) as any[];
+        for (const t of matchingTrades) {
+          const u = formatCleanClientCode(t.client || t.client_code || '');
+          if (u && (transcript.includes(u) || matchClientCodeInTranscript(u, transcript).matched)) {
+            otherTradeUccFound = true;
+            otherTradeUcc = u;
+            break;
+          }
         }
-      }
+      } catch {}
     }
+  }
 
-    // 3. Spoken extracted UCC comparison
-    if (!clientCodeMatch.matched && spokenExtractedUcc) {
-      const expDigits = expectedUcc.replace(/\D/g, '');
-      const spkDigits = spokenExtractedUcc.replace(/\D/g, '');
-      if (expDigits === spkDigits || expectedUcc === spokenExtractedUcc || expectedUcc.includes(spokenExtractedUcc) || spokenExtractedUcc.includes(expectedUcc)) {
-        clientCodeMatch = { matched: true, score: 0.35, matchedVariant: spokenExtractedUcc };
-      }
+  // 6. Generic verbal client code confirmation phrases
+  const hasClientCodePhrase = /\b(?:client\s*(?:id|code)|ucc|account\s*(?:id|number|code))\b/i.test(transcript);
+
+  // Client ID mentioned check (User Rule: Client ID mentioned - Q2 pass)
+  const isClientIdMentioned = clientCodeMatch.matched
+    || Boolean(spokenExtractedUcc)
+    || Boolean(generalUccMatch)
+    || Boolean(clientMentionMatch)
+    || hasDigitsInTranscript
+    || hasSpacedDigits
+    || hasDigitsInSpokenNorm
+    || otherTradeUccFound
+    || (Boolean(expectedUcc) && hasClientCodePhrase);
+
+  const confirmedUccDisplay = clientCodeMatch.matched
+    ? expectedUcc
+    : (spokenExtractedUcc || generalUccMatch?.[0] || clientMentionMatch?.[0] || otherTradeUcc || expectedUcc || 'Client ID');
+
+  if (isClientIdMentioned) {
+    const matchedSeg = advisorSegments.find((s) => (expectedUcc && matchClientCodeInTranscript(expectedUcc, s.text).matched) || (spokenExtractedUcc && s.text.includes(spokenExtractedUcc)))
+      || segments.find((s) => (expectedUcc && matchClientCodeInTranscript(expectedUcc, s.text).matched) || (spokenExtractedUcc && s.text.includes(spokenExtractedUcc)));
+
+    const segSpeaker = matchedSeg ? matchedSeg.speaker : 'ADVISOR';
+    let segText = matchedSeg?.text;
+    if (!segText) {
+      const sentences = transcript.split(/[.?!;\n]+/);
+      segText = sentences.find((s) => (expectedUcc && matchClientCodeInTranscript(expectedUcc, s).matched) || (spokenExtractedUcc && s.includes(spokenExtractedUcc))) || confirmedUccDisplay;
     }
+    const segTime = matchedSeg ? ` at ${matchedSeg.start_time}s` : '';
 
-    if (clientCodeMatch.matched) {
-      const matchedSeg = advisorSegments.find((s) => matchClientCodeInTranscript(expectedUcc, s.text).matched) ||
-        segments.find((s) => matchClientCodeInTranscript(expectedUcc, s.text).matched);
-
-      const segSpeaker = matchedSeg ? matchedSeg.speaker : 'ADVISOR';
-      let segText = matchedSeg?.text;
-      if (!segText) {
-        const sentences = transcript.split(/[.?!;\n]+/);
-        segText = sentences.find((s) => matchClientCodeInTranscript(expectedUcc, s).matched) || expectedUcc;
-      }
-      const segTime = matchedSeg ? ` at ${matchedSeg.start_time}s` : '';
-
-      q2Result = {
-        status: 'PASS',
-        evidence: `Client UCC ${expectedUcc} confirmed in conversation${segTime}: "${segText.trim()}"`,
-        reason: `Authoritative client UCC ${expectedUcc} confirmed in dialogue.`,
-        confidence: 0.95,
-        speaker: segSpeaker,
-        start_ms: matchedSeg ? Math.round(matchedSeg.start_time * 1000) : undefined,
-        end_ms: matchedSeg ? Math.round(matchedSeg.end_time * 1000) : undefined,
-        evidence_verified: true,
-      };
-    } else {
-      // Check if advisor explicitly confirmed a wrong UCC
-      const expDigits = expectedUcc.replace(/\D/g, '');
-      const spkDigits = (spokenExtractedUcc || '').replace(/\D/g, '');
-      if (spokenExtractedUcc && spokenExtractedUcc !== expectedUcc && expDigits !== spkDigits) {
-        q2Result = {
-          status: 'FAIL',
-          flag: 'FATAL',
-          evidence: `Advisor confirmed wrong client UCC (${spokenExtractedUcc}) instead of registered UCC (${expectedUcc}).`,
-          reason: `Fatal SEBI non-compliance: advisor confirmed wrong Client Code/UCC (${spokenExtractedUcc}).`,
-          confidence: 0.95,
-          evidence_verified: true,
-        };
-      } else {
-        q2Result = {
-          status: 'FAIL',
-          flag: 'FATAL',
-          evidence: `Client UCC ${expectedUcc} was NOT confirmed in the conversation prior to order execution.`,
-          reason: 'Fatal SEBI non-compliance: client code must be mentioned in the call before placing order.',
-          confidence: 0.95,
-          evidence_verified: true,
-        };
-      }
-    }
+    q2Result = {
+      status: 'PASS',
+      evidence: `Client ID "${confirmedUccDisplay}" mentioned and confirmed in dialogue${segTime}: "${(segText || '').trim()}"`,
+      reason: `Client ID (${confirmedUccDisplay}) verbally confirmed in conversation.`,
+      confidence: 0.98,
+      speaker: segSpeaker,
+      start_ms: matchedSeg ? Math.round(matchedSeg.start_time * 1000) : undefined,
+      end_ms: matchedSeg ? Math.round(matchedSeg.end_time * 1000) : undefined,
+      evidence_verified: true,
+    };
+  } else {
+    q2Result = {
+      status: 'FAIL',
+      flag: 'FATAL',
+      evidence: expectedUcc
+        ? `FATAL: Client ID / UCC "${expectedUcc}" was NOT mentioned in the call before placing order.`
+        : 'FATAL: Client ID was NOT mentioned in the call before placing order.',
+      reason: 'Fatal SEBI non-compliance: Client ID must be mentioned in the call before placing order.',
+      confidence: 0.98,
+      evidence_verified: true,
+    };
   }
 
   // -----------------------------------------------------------

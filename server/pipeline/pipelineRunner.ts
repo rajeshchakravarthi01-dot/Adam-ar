@@ -40,8 +40,8 @@ export interface PipelineWorkerStatus {
 let isWorkerLoopActive = false;
 let isHeartbeatRunning = false;
 const activeProcessingCallIds = new Set<number>();
-// High-throughput concurrency for 1000+ batch audits with WAL-mode SQLite
-const MAX_CONCURRENT_PIPELINE_WORKERS = 6;
+// Concurrency for 3 Groq workers as configured
+const MAX_CONCURRENT_PIPELINE_WORKERS = 3;
 let lastHeartbeatTime = new Date().toISOString();
 let totalProcessedCount = 0;
 let rateLimitPauseUntil = 0;
@@ -666,6 +666,24 @@ export async function stepAutonomousPipelineWorker(
     console.log(`[Watchdog] Auto-retrying ${autoRecovered.changes} recoverable job(s) for automatic re-processing`);
   }
 
+  // 1b-2. Self-Healing: Unblock calls with valid transcripts previously blocked at AUDIT_GATE_BLOCKED
+  try {
+    const unblockedAudits = db.prepare(`
+      UPDATE calls SET
+        processing_status = 'IDLE',
+        status = 'retry_pending',
+        pipeline_stage = 'TRADE_MATCHING',
+        updated_at = ?
+      WHERE pipeline_stage = 'AUDIT_GATE_BLOCKED'
+        AND transcript_status = 'VALID'
+        AND length(transcript) > 20
+        AND status NOT IN ('audited', 'scrap')
+    `).run(nowIso);
+    if (unblockedAudits.changes > 0) {
+      console.log(`[Watchdog] Auto-unblocked ${unblockedAudits.changes} call(s) from AUDIT_GATE_BLOCKED -> Proceeding to compliance audit`);
+    }
+  } catch {}
+
   const groqKey = getGroqKey();
   const geminiKey = getGeminiKey ? getGeminiKey() : process.env.GEMINI_API_KEY;
 
@@ -744,7 +762,9 @@ export async function stepAutonomousPipelineWorker(
   }
 
   // Priority C: General pending calls needing ASR transcription
-  const isAsrRateLimited = Date.now() < rateLimitPauseUntil || groqWhisperRateLimiter.isRateLimited();
+  const isGroqLimited = groqWhisperRateLimiter.isRateLimited();
+  const hasGeminiKey = Boolean(geminiKey && geminiKey.trim());
+  const isAsrRateLimited = Date.now() < rateLimitPauseUntil || (isGroqLimited && !hasGeminiKey);
   if (!nextCall && !isAsrRateLimited) {
     nextCall = db.prepare(`
       SELECT id FROM calls
@@ -767,9 +787,11 @@ export async function stepAutonomousPipelineWorker(
     return false;
   }
 
-  // For non-scrap calls needing ASR, verify Groq API key.
-  // If key is missing, mark calls as AI_BLOCKED so UI/Diagnostics clearly report it!
-  if (!groqKey || !groqKey.trim()) {
+  // For non-scrap calls needing ASR, verify either Gemini or Groq API key is present.
+  const activeGeminiKeyForCall = (geminiKey || process.env.GEMINI_API_KEY || '').trim();
+  const activeGroqKeyForCall = (groqKey || process.env.GROQ_API_KEY || '').trim();
+
+  if (!activeGroqKeyForCall && !activeGeminiKeyForCall) {
     const callRec = db.prepare('SELECT duration_seconds, transcript FROM calls WHERE id = ?').get(nextCall.id) as { duration_seconds: number; transcript?: string } | undefined;
     const needsAsr = !callRec?.transcript && (!callRec || callRec.duration_seconds === 0 || callRec.duration_seconds >= 6);
     if (needsAsr) {
@@ -777,7 +799,7 @@ export async function stepAutonomousPipelineWorker(
         UPDATE calls SET
           processing_status = 'AI_BLOCKED',
           status = 'ai_blocked',
-          failure_reason = 'AWAITING_API_KEY: GROQ_API_KEY is required to transcribe audio recordings with Groq Whisper.',
+          failure_reason = 'AWAITING_API_KEY: Enter GEMINI_API_KEY or GROQ_API_KEY in Settings to transcribe audio recordings.',
           updated_at = ?
         WHERE (processing_status = 'IDLE' OR status = 'retry_pending')
           AND (transcript IS NULL OR length(trim(transcript)) = 0)
@@ -786,6 +808,16 @@ export async function stepAutonomousPipelineWorker(
       `).run(nowIso);
       return false;
     }
+  } else {
+    // If keys are available, automatically unblock any previously blocked calls
+    db.prepare(`
+      UPDATE calls SET
+        processing_status = 'IDLE',
+        status = 'imported',
+        failure_reason = NULL,
+        updated_at = ?
+      WHERE processing_status = 'AI_BLOCKED' OR status = 'ai_blocked'
+    `).run(nowIso);
   }
 
   // RUN-09: Atomic claim to prevent race conditions across parallel supervisor ticks
@@ -891,9 +923,13 @@ export function getPipelineWorkerStatus(
   const activeGeminiKey = geminiKey || process.env.GEMINI_API_KEY;
   const hasGemini = Boolean(activeGeminiKey && activeGeminiKey.trim());
 
-  let statusMessage = '24/7 Autonomous AI Worker Active (Groq Whisper Large-v3 STT)';
-  if (!hasGroq) {
-    statusMessage = 'Awaiting GROQ_API_KEY (enter in Settings or .env to activate high-throughput Groq Whisper transcription)';
+  let statusMessage = '24/7 Autonomous AI Worker Active';
+  if (!hasGroq && !hasGemini) {
+    statusMessage = 'Awaiting API Key (enter Gemini or Groq in Settings or .env to activate speech recognition)';
+  } else if (hasGemini && !hasGroq) {
+    statusMessage = '24/7 Autonomous AI Worker Active (Gemini Multimodal ASR)';
+  } else if (hasGemini && hasGroq) {
+    statusMessage = '24/7 Autonomous AI Worker Active (Groq Whisper + Gemini Multimodal ASR)';
   } else if (groqWhisperRateLimiter.isRateLimited()) {
     const remaining = groqWhisperRateLimiter.getRemainingCooldownSec();
     statusMessage = `Groq Whisper rate-limit cooldown active (${remaining}s remaining). Resuming automatically.`;

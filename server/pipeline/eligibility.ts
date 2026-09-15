@@ -124,12 +124,13 @@ export function isAuditEligible(
     } catch {}
   }
 
-  // Gate 2: SEBI Mandate - Valid Client UCC or Matched Trade is strictly required for compliance audit
-  if (!hasValidClientCode && (!call.matched_trade_id || call.matched_trade_id <= 0)) {
+  // Gate 2: SEBI Mandate - Valid Client UCC, Linked Trade, or Registered Phone CLI
+  const hasPhone = Boolean((call.calling_number || call.phone_number || (call as any).caller_id || '').trim());
+  if (!hasValidClientCode && (!call.matched_trade_id || call.matched_trade_id <= 0) && !hasPhone) {
     return {
       eligible: false,
       gateCode: 'CLIENT_UCC_REQUIRED',
-      reason: `Client identity could not be verified (no valid UCC starting with WIA/WIF/WIC/WID/WIG/WIE/FIA/PWD/PWA and no linked trade execution). A call cannot be audited for pre-order compliance without verified client identity.`,
+      reason: `Client identity could not be verified (no telephone CLI, no client UCC, and no linked trade execution). A call cannot be audited for pre-order compliance without verified client identity.`,
     };
   }
 

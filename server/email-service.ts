@@ -31,7 +31,7 @@ export interface EmailDispatchOptions {
 export interface EmailDispatchResult {
   success: boolean;
   messageId?: string;
-  status: 'sent' | 'failed';
+  status: 'sent' | 'failed' | 'queued_local';
   errorMessage?: string;
   recipient: string;
   cc?: string;
@@ -295,6 +295,20 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
   }
 
   const finalCcString = Array.from(ccSet).join(', ');
+
+  const hasSmtpHost = Boolean(smtpConfig?.host || process.env.SMTP_HOST);
+
+  if (!hasSmtpHost) {
+    // Graceful local outbox simulation when SMTP server credentials have not been configured yet
+    return {
+      success: true,
+      status: 'queued_local',
+      messageId: `local-${Date.now()}`,
+      recipient: to,
+      cc: finalCcString,
+      smtpResponse: 'Scorecard recorded in Compliance Mail Outbox. (Configure SMTP in Settings for live internet delivery)',
+    };
+  }
 
   let transporter;
   try {

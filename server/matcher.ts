@@ -129,7 +129,10 @@ export function scoreTradeCandidates(call: CallRecord, trades: TradeRecord[]): S
 
     // 2. Client code conflict (if both specified and different)
     const normTradeClient = normalizeClientCode(trade.client);
-    if (normTradeClient && normCallClient && normTradeClient !== normCallClient) {
+    const cleanCallClient = (call.client || '').trim().toUpperCase().replace(/[\s\-._]/g, '');
+    const cleanTradeClient = (trade.client || '').trim().toUpperCase().replace(/[\s\-._]/g, '');
+    if ((normTradeClient && normCallClient && normTradeClient !== normCallClient) ||
+        (cleanCallClient && cleanTradeClient && cleanCallClient !== cleanTradeClient)) {
       continue; // Exclude candidate with different client
     }
 

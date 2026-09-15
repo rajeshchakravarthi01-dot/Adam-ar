@@ -500,6 +500,7 @@ export const VALID_CLIENT_PREFIXES = [
   'FIA',
   'PWD',
   'PWA',
+  'WAA',
 ] as const;
 
 export type ValidClientPrefix = typeof VALID_CLIENT_PREFIXES[number];
@@ -548,13 +549,14 @@ export function formatCleanClientCode(clientCode?: string | null): string {
     { pattern: /^(?:FIA|F1A)/, canonical: 'FIA' },
     { pattern: /^(?:PWD|PVD|PW(?=\d))/, canonical: 'PWD' },
     { pattern: /^(?:PWA)/, canonical: 'PWA' },
+    { pattern: /^(?:WAA|WAS)/, canonical: 'WAA' },
   ];
 
   for (const item of prefixMap) {
     const match = squashed.match(item.pattern);
     if (match) {
       const remaining = squashed.slice(match[0].length);
-      const digitMatch = remaining.match(/^(\d{2,10})/);
+      const digitMatch = remaining.match(/^(\d{1,10})/);
       if (digitMatch) {
         return `${item.canonical}${digitMatch[1]}`;
       }
@@ -564,7 +566,7 @@ export function formatCleanClientCode(clientCode?: string | null): string {
   for (const p of VALID_CLIENT_PREFIXES) {
     if (squashed.startsWith(p)) {
       const digits = squashed.slice(p.length).replace(/\D/g, '');
-      if (digits.length >= 2) {
+      if (digits.length >= 1) {
         return `${p}${digits}`;
       }
     }
@@ -577,7 +579,7 @@ export function formatCleanClientCode(clientCode?: string | null): string {
 export function isStrictValidClientCode(code?: string | null): boolean {
   if (!code) return false;
   const clean = formatCleanClientCode(code);
-  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA)\d{2,10}$/.test(clean);
+  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|WAA)\d{1,10}$/.test(clean);
 }
 
 /**
@@ -588,7 +590,7 @@ export function isStrictValidClientCode(code?: string | null): boolean {
 export function normalizeClientCode(clientCode?: string | null): string {
   if (!clientCode) return '';
   const cleaned = formatCleanClientCode(clientCode);
-  if (cleaned) return cleaned;
+  if (cleaned && isStrictValidClientCode(cleaned)) return cleaned;
 
   let normalized = String(clientCode).trim().toLowerCase();
   for (const [word, digit] of Object.entries(WORD_TO_DIGIT)) {
@@ -596,22 +598,62 @@ export function normalizeClientCode(clientCode?: string | null): string {
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     normalized = normalized.replace(regex, digit);
   }
-  return normalized.replace(/[\s\-._]/g, '').toUpperCase();
+  const squashed = normalized.replace(/[\s\-._]/g, '').toUpperCase();
+  if (
+    !squashed ||
+    squashed.length < 3 ||
+    squashed === 'START' ||
+    squashed === '-START' ||
+    squashed === 'ADDICTION' ||
+    squashed === 'PRAJA' ||
+    squashed === 'ENTERPRISE' ||
+    squashed === 'ADVISOR' ||
+    squashed === 'CALLER' ||
+    squashed === 'DEALER' ||
+    squashed === 'UNKNOWN'
+  ) {
+    return '';
+  }
+  return squashed;
 }
 
 /**
  * Cleans advisor / dealer / caller names by stripping phone numbers in parentheses or brackets.
+ * Also strictly rejects placeholder strings like "-START", "START", "Advisor", "Caller", "Dealer", "Agent", etc.
  * e.g., "Ajeet kumar pandey (+9042565871)" -> "Ajeet kumar pandey"
- *       "Ajeetkumar Bharthidasan (8106365245)" -> "Ajeetkumar Bharthidasan"
+ *       "-START" -> ""
+ *       "Advisor" -> ""
  */
 export function cleanCallerName(name: string | null | undefined): string {
   if (!name) return '';
   const str = String(name).trim();
+  const lower = str.toLowerCase().replace(/^[ \-_:]+/, '').trim();
+  if (
+    !lower ||
+    lower === 'start' ||
+    lower === '-start' ||
+    lower === 'advisor' ||
+    lower === 'caller' ||
+    lower === 'agent' ||
+    lower === 'dealer' ||
+    lower === 'admin' ||
+    lower === 'test' ||
+    lower === 'unknown' ||
+    lower === 'null' ||
+    lower === 'undefined' ||
+    lower === 'na' ||
+    lower === 'n/a' ||
+    lower === '—' ||
+    lower === '-' ||
+    lower === 'none'
+  ) {
+    return '';
+  }
   const cleaned = str
     .replace(/\s*[\(\[]\s*\+?[\d\s-]{7,15}\s*[\)\]]\s*$/i, '')
     .replace(/\s*[\(\[]\s*ext\s*\d+\s*[\)\]]\s*$/i, '')
     .trim();
-  return cleaned || str;
+  return cleaned || '';
 }
 
 /**
@@ -710,6 +752,11 @@ export function matchClientCodeInTranscript(
       prefixVariants.push('P[\\s\\-_.]*(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*D');
       prefixVariants.push('(?:P\\s*V\\s*D|PVD)');
       prefixVariants.push('(?:P\\s*W|PW)(?=[\\s\\-_.:]*\\d)');
+    } else if (rawPrefix === 'WAA') {
+      prefixVariants.push('(?:W\\s*A\\s*A|WAA|WA\\s*A|W\\s*AA)');
+      prefixVariants.push('(?:W\\s*A\\s*S|WAS|WA\\s*S|W\\s*AS)');
+      prefixVariants.push('(?:V\\s*A\\s*A|VAA)');
+      prefixVariants.push('(?:W\\s*I\\s*A|WIA)');
     } else if (rawPrefix.startsWith('W')) {
       const vPrefix = 'V' + rawPrefix.slice(1);
       prefixVariants.push(vPrefix.split('').join('[\\s\\-_.]*'));

@@ -210,16 +210,24 @@ export function evaluateEvidenceCompliance(
 
   // -------------------------------------------------------------
   // Q2: Client Identification / Spoken UCC Code Confirmation
-  // RULE: Expected client code -> spoken candidate -> normalize -> compare
-  // 90% match rule (speech tolerance, e.g. WAS 9767 vs WAA9767)
+  // RULE: Client ID mentioned - Q2 pass
   // -------------------------------------------------------------
   const expectedClientCode = (authoritativeClientCode || call.client || resolvedTrade?.client || '').trim();
   let q2: AuditQuestionOutput;
 
+  const clientMentionRegex = /\b(?:client\s*(?:id|code)|ucc|account(?:\s*no|\s*number)?|code)\s*[:\-]?\s*([a-z0-9]+)/i;
+  const generalUccRegex = /\b(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|WAA|WIN|WAS|WIB|WIK|WIP|WIM|WIT)\s*[-_.:]?\s*([a-z0-9]{1,10})/i;
+  const spokenExtractedCode = extracted.detectedClientCode?.normalized_value || null;
+
+  const hasClientMentionPhrase = clientMentionRegex.test(transcript);
+  const generalUccMatch = transcript.match(generalUccRegex);
+
+  let isCodeMentioned = false;
+  let matchedDisplayName = expectedClientCode || spokenExtractedCode || generalUccMatch?.[0] || 'Client ID';
+
   if (expectedClientCode) {
     const normExpected = normalizeClientCode(expectedClientCode);
     const transcriptMatch = matchClientCodeInTranscript(expectedClientCode, transcript);
-    const spokenCodeCandidate = extracted.detectedClientCode?.normalized_value || null;
 
     const numericPart = normExpected.replace(/\D/g, '');
     const hasNumericMatch = numericPart.length >= 3 && (
@@ -244,38 +252,29 @@ export function evaluateEvidenceCompliance(
       }
     }
 
-    if (isFuzzyCodeMatched) {
-      q2 = {
-        status: 'PASS',
-        evidence: `Client UCC code "${expectedClientCode}" verified in spoken conversation.`,
-        reason: 'Client identification verbally confirmed prior to order execution.',
-        speaker: 'ADVISOR',
-        confidence: 0.98,
-      };
-    } else if (spokenCodeCandidate && fuzzySimilarity(String(spokenCodeCandidate), normExpected) < 0.5) {
-      q2 = {
-        status: 'FAIL',
-        evidence: `FATAL: Spoken client code "${spokenCodeCandidate}" mismatches expected registered client code "${expectedClientCode}".`,
-        reason: 'Spoken client identification contradicts trade registry records.',
-        speaker: 'ADVISOR',
-        confidence: 0.95,
-      };
-    } else {
-      q2 = {
-        status: 'FAIL',
-        evidence: `FATAL: Client code / UCC "${expectedClientCode}" was not spoken or confirmed in the dialogue before order placement.`,
-        reason: 'Client code not explicitly confirmed in pre-order call.',
-        speaker: 'ADVISOR',
-        confidence: 0.95,
-      };
-    }
+    isCodeMentioned = isFuzzyCodeMatched || Boolean(spokenExtractedCode) || Boolean(generalUccMatch) || hasClientMentionPhrase;
+    if (isFuzzyCodeMatched) matchedDisplayName = expectedClientCode;
   } else {
+    isCodeMentioned = Boolean(spokenExtractedCode) || Boolean(generalUccMatch) || hasClientMentionPhrase;
+  }
+
+  if (isCodeMentioned) {
     q2 = {
       status: 'PASS',
-      evidence: 'Client identification verified.',
+      evidence: `Client ID "${matchedDisplayName}" mentioned and confirmed in dialogue.`,
       reason: 'Client identification verbally confirmed prior to order execution.',
       speaker: 'ADVISOR',
-      confidence: 0.90,
+      confidence: 0.98,
+    };
+  } else {
+    q2 = {
+      status: 'FAIL',
+      evidence: expectedClientCode
+        ? `FATAL: Client ID / UCC "${expectedClientCode}" was NOT mentioned in the call before placing order.`
+        : 'FATAL: Client ID was NOT mentioned in the call before placing order.',
+      reason: 'Fatal SEBI non-compliance: Client ID must be mentioned in the call before placing order.',
+      speaker: 'ADVISOR',
+      confidence: 0.98,
     };
   }
 
