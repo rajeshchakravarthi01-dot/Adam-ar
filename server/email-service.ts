@@ -40,46 +40,60 @@ export interface EmailDispatchResult {
 
 /**
  * Creates a real authenticated Nodemailer SMTP transporter.
- * If credentials are missing, throws a descriptive error so the user knows to configure them.
+ * Supports standard TLS/STARTTLS, Gmail App Passwords, Office365, Amazon SES, SendGrid,
+ * and internal corporate unauthenticated relays with proper timeouts.
  */
 export function createMailTransporter(config?: SmtpConfig) {
-  const host = config?.host || process.env.SMTP_HOST || 'smtp.gmail.com';
+  const host = (config?.host || process.env.SMTP_HOST || '').trim();
   const port = config?.port || (process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587);
-  const user = config?.user || process.env.SMTP_USER || '';
-  const pass = config?.pass || process.env.SMTP_PASS || '';
-  const secure = config?.secure !== undefined ? config.secure : port === 465;
+  const user = (config?.user || process.env.SMTP_USER || '').trim();
+  const pass = (config?.pass || process.env.SMTP_PASS || '').trim();
+  const secure = config?.secure !== undefined ? Boolean(config.secure) : port === 465;
 
-  if (!host || !user || !pass) {
+  if (!host) {
     throw new Error(
-      'SMTP Server not configured. Please configure your SMTP Host, Port, Username, and Password in the Mail Settings tab to send real emails to inboxes.'
+      'SMTP Host not configured. Please enter your SMTP server host (e.g. smtp.gmail.com, smtp.office365.com) in the Settings page.'
     );
   }
+
+  // Common transporter options with production-grade socket timeouts
+  const commonOptions: any = {
+    connectionTimeout: 15000,
+    greetingTimeout: 15000,
+    socketTimeout: 30000,
+    tls: {
+      rejectUnauthorized: false, // Prevents failure with corporate self-signed or internal CA relays
+    },
+  };
 
   // Gmail special optimization
   if (host.includes('gmail.com')) {
     return nodemailer.createTransport({
       service: 'gmail',
-      auth: {
-        user,
-        pass, // Gmail 16-character App Password
-      },
-      tls: {
-        rejectUnauthorized: false,
-      },
+      auth: user && pass ? { user, pass } : undefined,
+      ...commonOptions,
     });
   }
 
+  // Office 365 / Outlook optimization
+  if (host.includes('office365.com') || host.includes('outlook.com')) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure: false, // Office365 uses STARTTLS on port 587
+      requireTLS: true,
+      auth: user && pass ? { user, pass } : undefined,
+      ...commonOptions,
+    });
+  }
+
+  // Standard SMTP relay (authenticated if user/pass provided, or unauthenticated internal relay)
   return nodemailer.createTransport({
     host,
     port,
     secure,
-    auth: {
-      user,
-      pass,
-    },
-    tls: {
-      rejectUnauthorized: false,
-    },
+    auth: user && pass ? { user, pass } : undefined,
+    ...commonOptions,
   });
 }
 
@@ -97,7 +111,7 @@ export async function testSmtpConnection(config?: SmtpConfig): Promise<{ ok: boo
 }
 
 /**
- * Renders HTML email template for compliance scorecards in exact FundsIndia / SEBI layout
+ * Renders HTML email template for compliance scorecards in exact Enterprise / SEBI layout
  */
 export function renderScorecardEmailHtml(scorecards: ScorecardRecord[], advisorName?: string): string {
   const isBulk = scorecards.length > 1;
@@ -197,11 +211,11 @@ export function renderScorecardEmailHtml(scorecards: ScorecardRecord[], advisorN
               <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-weight: bold; color: ${s.q5_status === 'PASS' ? '#15803d' : '#b91c1c'};">${s.q5_status === 'PASS' ? 'Yes' : 'No'}</td>
             </tr>
             <!-- Total Row -->
-            <tr style="background-color: #ecfccb; font-weight: bold; color: #0f172a;">
-              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right;">TOTAL</td>
+            <tr style="background-color: #f0fdfa; font-weight: bold; color: #0f172a; border-top: 2px solid #0d9488;">
+              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: right; color: #0f766e;">TOTAL</td>
               <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-size: 14px;">5</td>
-              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-size: 16px; color: #854d0e;">${stars}</td>
-              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-size: 16px; color: #1e3a8a;">${s.score !== null ? s.score : 'Pending'}</td>
+              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-size: 16px; color: #0f766e;">${stars}</td>
+              <td style="border: 1px solid #94a3b8; padding: 8px 10px; text-align: center; font-size: 16px; color: #0f766e;">${s.score !== null ? s.score : 'Pending'}</td>
             </tr>
           </tbody>
         </table>
@@ -225,14 +239,14 @@ export function renderScorecardEmailHtml(scorecards: ScorecardRecord[], advisorN
   <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; padding: 24px; margin: 0;">
     <div style="max-width: 800px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
       <div style="border-bottom: 2px solid #1e3a8a; padding-bottom: 16px; margin-bottom: 24px;">
-        <h1 style="margin: 0 0 6px 0; color: #0f172a; font-size: 20px;">FundsIndia Compliance & Quality Assurance • AuditEQ Quality & Compliance Intelligence</h1>
+        <h1 style="margin: 0 0 6px 0; color: #0f172a; font-size: 20px;">Enterprise Compliance & Quality Assurance • AuditEQ Quality & Compliance Intelligence</h1>
         <p style="margin: 0; color: #64748b; font-size: 13px;">SEBI Regulatory Offline Pre-Order Call Audit Scorecard Summary</p>
       </div>
 
       ${scorecardsHtml}
 
       <div style="margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 11px; color: #94a3b8; text-align: center;">
-        ADAM-AR FundsIndia Quality & Compliance Assurance Engine • Developed and designed by TAJ
+        ADAM-AR Enterprise Quality & Compliance Assurance Engine • Developed and designed by TAJ
       </div>
     </div>
   </body>
@@ -257,7 +271,7 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
   }
 
   // Detect whether any scorecard in this batch is marked FATAL
-  // "keep sambath.s@fundsindia.com only when i will send only fatals scorecards"
+  // "keep sambath.s@fundsindia.com only when i will send only fatals scorecards (0 marks)"
   // "no need sambath.s@fundsindia.com while sending 5 marks and 4 marks also when i send all scorecard"
   const isFatalScorecard = (s: ScorecardRecord) =>
     Boolean(s.is_fatal) || s.score === 0 || s.q1_status === 'FAIL' || s.q2_status === 'FAIL' || s.q5_status === 'FAIL';
@@ -272,11 +286,12 @@ export async function sendScorecardEmail(options: EmailDispatchOptions): Promise
       .forEach((e) => ccSet.add(e));
   }
 
-  // Only add Sambath S when sending fatals alone/only fatals
+  // Only add Sambath S when sending fatals alone/only fatals (0 marks)
   if (isFatalAlone) {
     ccSet.add(FATAL_CC_EMAIL.toLowerCase());
   } else {
     ccSet.delete(FATAL_CC_EMAIL.toLowerCase());
+    ccSet.delete('sambath.s@auditeq.com');
   }
 
   const finalCcString = Array.from(ccSet).join(', ');

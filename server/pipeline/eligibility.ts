@@ -26,6 +26,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import type { AuditEligibilityResult } from './types';
 import type { CallRecord } from '../../src/types';
 import { isValidUcc } from './uccResolver';
+import { extractSpokenClientCode } from '../normalizer';
 
 export function isAuditEligible(
   db: DatabaseSync,
@@ -105,19 +106,31 @@ export function isAuditEligible(
     } catch {}
   }
 
-  if (!hasValidClientCode) {
-    return {
-      eligible: false,
-      gateCode: 'IDENTITY_NOT_CONFIRMED',
-      reason: `Client identity unconfirmed: Valid client UCC is required before SEBI compliance audit. Found: "${rawCode || 'NONE'}".`,
-    };
+  if (!hasValidClientCode && call.transcript) {
+    const spokenUcc = extractSpokenClientCode(call.transcript);
+    if (spokenUcc && isValidUcc(spokenUcc)) {
+      rawCode = spokenUcc;
+      hasValidClientCode = true;
+      try {
+        db.prepare("UPDATE calls SET client_code = ?, client = ?, identity_status = 'CONFIRMED' WHERE id = ?").run(spokenUcc, spokenUcc, call.id);
+      } catch {}
+    }
   }
 
-  if (identityStatus !== 'CONFIRMED') {
+  if (hasValidClientCode && identityStatus !== 'CONFIRMED') {
     identityStatus = 'CONFIRMED';
     try {
       db.prepare("UPDATE calls SET identity_status = 'CONFIRMED' WHERE id = ?").run(call.id);
     } catch {}
+  }
+
+  // Gate 2: SEBI Mandate - Valid Client UCC or Matched Trade is strictly required for compliance audit
+  if (!hasValidClientCode && (!call.matched_trade_id || call.matched_trade_id <= 0)) {
+    return {
+      eligible: false,
+      gateCode: 'CLIENT_UCC_REQUIRED',
+      reason: `Client identity could not be verified (no valid UCC starting with WIA/WIF/WIC/WID/WIG/WIE/FIA/PWD/PWA and no linked trade execution). A call cannot be audited for pre-order compliance without verified client identity.`,
+    };
   }
 
   // Gate 3: Transcript check - STRICT MANDATE: Cannot audit call before transcription!

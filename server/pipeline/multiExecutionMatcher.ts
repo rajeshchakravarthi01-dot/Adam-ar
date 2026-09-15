@@ -441,13 +441,14 @@ export function stage5MultiExecutionMatch(
       // Time correlation: if call_time and trade_time are both available
       if (call.call_time && trade.trade_time) {
         try {
-          const [ch, cm, cs] = call.call_time.split(':').map(Number);
-          const [th, tm, ts] = trade.trade_time.split(':').map(Number);
-          if (!isNaN(ch) && !isNaN(th)) {
-            const callSec = ch * 3600 + (cm || 0) * 60 + (cs || 0);
-            const tradeSec = th * 3600 + (tm || 0) * 60 + (ts || 0);
+          const callSec = parseTradeSecondsFromMidnight(call.call_time, call.call_date);
+          const tradeSec = parseTradeSecondsFromMidnight(trade.trade_time, trade.trade_date);
+          if (callSec > 0 && tradeSec > 0) {
+            // User rule: trade executed for client during or after the call
             const diffSec = Math.abs(tradeSec - callSec);
-            if (diffSec <= 900) {
+            if (tradeSec >= callSec - 60 && tradeSec <= callSec + 1800) {
+              execConf += 0.20;
+            } else if (diffSec <= 900) {
               execConf += 0.15;
             } else if (diffSec <= 3600) {
               execConf += 0.05;

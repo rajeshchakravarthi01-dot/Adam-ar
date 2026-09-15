@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
         )}
         <div>
           <div className="text-[11px] font-bold tracking-wider uppercase text-teal-400 mb-0.5 flex items-center gap-2">
-            <span>FundsIndia Quality Assurance</span>
+            <span>AuditEQ Quality Assurance</span>
             <span className="text-[10px] px-2 py-0.5 bg-teal-950/70 text-teal-300 rounded-full font-mono border border-teal-500/30">
               ADAM-AR v1.1
             </span>
@@ -76,14 +76,14 @@ export const Header: React.FC<HeaderProps> = ({
         {onTriggerBee && (
           <button
             onClick={onTriggerBee}
-            className="relative group p-2 bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 hover:brightness-110 active:scale-95 text-slate-950 rounded-xl shadow-[0_4px_16px_rgba(245,158,11,0.4)] transition-all cursor-pointer flex items-center gap-1.5 border border-amber-300/60"
+            className="relative group p-2 bg-gradient-to-br from-teal-400 via-teal-500 to-emerald-500 hover:brightness-110 active:scale-95 text-slate-950 rounded-xl shadow-[0_4px_16px_rgba(20,184,166,0.4)] transition-all cursor-pointer flex items-center gap-1.5 border border-teal-300/60"
             title="AdamBee Ticket Auditor (Click to fly & scan screen)"
           >
             <span className="text-lg leading-none filter drop-shadow animate-pulse">🐝</span>
             <span className="hidden md:inline text-xs font-black tracking-tight">AdamBee</span>
             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-600"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-300 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500"></span>
             </span>
           </button>
         )}

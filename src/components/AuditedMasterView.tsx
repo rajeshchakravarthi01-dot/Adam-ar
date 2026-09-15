@@ -566,7 +566,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
     <div className="space-y-5">
       {/* Action Notice */}
       {actionMessage && (
-        <div className="bg-amber-400 text-black px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs">
+        <div className="bg-teal-400 text-slate-950 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4" />
             <span>{actionMessage}</span>
@@ -589,7 +589,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
               {filteredAndSortedScorecards.length} Records
             </span>
             {dirtyRowIds.length > 0 && (
-              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-400 text-black animate-pulse">
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-teal-400/20 text-teal-300 border border-teal-400/40 animate-pulse">
                 {dirtyRowIds.length} Unsaved Changes
               </span>
             )}
@@ -604,7 +604,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
             <button
               onClick={handleSaveAllDirty}
               disabled={isBulkSaving}
-              className="px-3.5 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-md cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isBulkSaving ? 'Saving...' : `Save All (${dirtyRowIds.length})`}</span>
@@ -785,7 +785,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
       {audioPreviewCallId && (
         <div className="bg-neutral-900 text-white p-3.5 rounded-xl border border-neutral-800 flex items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-amber-400 text-black">
+            <div className="p-1.5 rounded-lg bg-teal-500 text-slate-950">
               <Volume2 className="w-4 h-4" />
             </div>
             <div>
@@ -927,7 +927,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                   return (
                     <tr
                       key={sc.id}
-                      className={`transition-colors ${isDirty ? 'bg-amber-500/10' : 'hover:bg-teal-500/5'} ${isFatal ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-transparent'}`}
+                      className={`transition-colors ${isDirty ? 'bg-teal-500/15' : 'hover:bg-teal-500/5'} ${isFatal ? 'border-l-4 border-l-rose-500' : 'border-l-4 border-l-transparent'}`}
                     >
                       {/* ID */}
                       <td className="py-2.5 px-3 font-mono font-bold text-teal-400 whitespace-nowrap">
@@ -1045,11 +1045,11 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                           className={`text-center font-bold text-[11px] px-1.5 py-0.5 rounded-md border cursor-pointer ${
                             state.q3_status === 'PASS'
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                           }`}
                         >
                           <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
-                          <option value="FAIL" className="bg-slate-900 text-amber-300">FAIL (-1)</option>
+                          <option value="FAIL" className="bg-slate-900 text-cyan-300">FAIL (-1)</option>
                         </select>
                       </td>
 
@@ -1110,7 +1110,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                               <button
                                 onClick={() => handleSaveRow(sc)}
                                 disabled={isSavingThis}
-                                className="p-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-black rounded-md cursor-pointer transition-colors shadow-sm"
+                                className="p-1 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 rounded-md cursor-pointer transition-colors shadow-sm"
                                 title="Save changes to this row"
                               >
                                 <Save className="w-3.5 h-3.5" />
@@ -1291,7 +1291,7 @@ export const AuditedMasterView: React.FC<AuditedMasterViewProps> = ({
                     <span className="text-slate-200">Q3: Stock Symbol, Quantity &amp; Execution Price</span>
                     <span className="text-[10px] text-slate-400 bg-slate-800/60 px-1 py-0.5 rounded border border-slate-700/60 font-semibold">1 PT</span>
                   </span>
-                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}`}>
+                  <span className={`px-2 py-0.5 rounded-md font-bold text-xs ${activeModalItem.q3_status === 'PASS' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'}`}>
                     {activeModalItem.q3_status}
                   </span>
                 </div>

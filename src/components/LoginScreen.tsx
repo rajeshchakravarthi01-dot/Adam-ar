@@ -35,7 +35,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       const resp = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
       });
 
       const data = await resp.json();
@@ -75,7 +75,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
             ADAM-<span className="text-teal-400">AR</span> <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30">v1.1</span>
           </h1>
           <p className="mt-1 text-xs text-slate-400 font-medium">
-            FundsIndia Pre-Order Speech &amp; Quality Audit Engine
+            Pre-Order Voice &amp; Regulatory Quality Audit Engine
           </p>
         </div>
 
@@ -116,7 +116,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="admin@fundsindia.com"
+                  placeholder="name@company.com"
                   className="block w-full pl-10 pr-3.5 py-2.5 bg-slate-950/60 border border-teal-500/25 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-teal-400 focus:ring-1 focus:ring-teal-400/30 transition-all"
                 />
               </div>

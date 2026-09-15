@@ -279,7 +279,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Audit_Report');
-    XLSX.writeFile(wb, `FundsIndia_Audit_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `AuditEQ_Audit_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   // Export to CSV (.csv)
@@ -334,7 +334,7 @@ export const AuditView: React.FC<AuditViewProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `FundsIndia_Audits_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `AuditEQ_Audits_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     link.remove();

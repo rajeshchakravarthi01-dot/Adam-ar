@@ -107,16 +107,44 @@ export function stage1ImportCalls(
   `);
 
   files.forEach((file, index) => {
-    // Extract phone/caller_id from filename or metadata if not explicitly provided
-    let extractedCallerId = normalizePhoneNumber(file.calling_number || file.caller_id || '') || file.caller_id || file.calling_number || '';
-    if (!extractedCallerId) {
+    // 1. Look up telephony metadata cache using filename as caller_id / recording_name
+    const cleanAudioId = file.original_filename.replace(/\.(mp3|wav|m4a|ogg|aac|flac|wma|webm)$/i, '').replace(/^audio_/, '').trim();
+    let meta: any = null;
+    try {
+      meta = db.prepare(`
+        SELECT * FROM call_metadata_cache
+        WHERE caller_id = ? OR call_id = ? OR recording_file_name = ?
+        LIMIT 1
+      `).get(cleanAudioId, cleanAudioId, cleanAudioId);
+      if (!meta && cleanAudioId.length >= 10) {
+        const prefix = cleanAudioId.slice(0, 15);
+        meta = db.prepare(`
+          SELECT * FROM call_metadata_cache
+          WHERE caller_id LIKE ? OR call_id LIKE ? OR recording_file_name LIKE ?
+          LIMIT 1
+        `).get(`${prefix}%`, `${prefix}%`, `${prefix}%`);
+      }
+    } catch {}
+
+    // Extract phone/caller_id from metadata or filename
+    let extractedCallerId = normalizePhoneNumber(file.calling_number || file.caller_id || (meta ? meta.client_number : '') || '') || file.caller_id || file.calling_number || (meta ? meta.caller_id : '') || '';
+    if (!extractedCallerId || extractedCallerId === '0000000000') {
       const match = file.original_filename.match(/(?:^|[^0-9])([6-9]\d{9})(?:[^0-9]|$)/);
       if (match) {
         extractedCallerId = match[1];
       }
     }
-    // Extract client code from filename or metadata first
-    let extractedClientCode = file.client_code || '';
+
+    // Extract client code from metadata, trade record, or filename
+    let extractedClientCode = file.client_code || (meta ? meta.client_code : '') || '';
+    if (!extractedClientCode && extractedCallerId && extractedCallerId !== '0000000000') {
+      try {
+        const trade = db.prepare('SELECT client FROM trades WHERE phone_number = ? OR client_number = ? LIMIT 1').get(extractedCallerId, extractedCallerId) as any;
+        if (trade && trade.client) {
+          extractedClientCode = trade.client;
+        }
+      } catch {}
+    }
     if (!extractedClientCode) {
       const match = file.original_filename.match(/\b([A-Z]{2,4}[0-9]{3,7})\b/i);
       if (match) {
@@ -124,7 +152,19 @@ export function stage1ImportCalls(
       }
     }
 
-    // Registered number must come from metadata or authoritative clients master, NEVER fallback to calling number
+    // Advisor / Dealer name
+    let advisorName = cleanCallerName(file.advisor_name || (meta ? meta.advisor : '') || '');
+    let dealerName = cleanCallerName(file.dealer || (meta ? meta.dealer : '') || '');
+    if (!advisorName && extractedCallerId) {
+      try {
+        const trade = db.prepare('SELECT advisor_name, team FROM trades WHERE phone_number = ? OR client_number = ? LIMIT 1').get(extractedCallerId, extractedCallerId) as any;
+        if (trade && trade.advisor_name) {
+          advisorName = cleanCallerName(trade.advisor_name);
+        }
+      } catch {}
+    }
+
+    // Registered number must come from metadata or authoritative clients master
     let regNumber = normalizePhoneNumber(file.registered_number || '') || file.registered_number || '';
     if (!regNumber && extractedClientCode) {
       try {
@@ -135,10 +175,10 @@ export function stage1ImportCalls(
       } catch {}
     }
 
-    const duration = file.duration_seconds || 0;
+    const duration = file.duration_seconds || (meta ? meta.duration : 0) || 0;
     const recordingName = path.basename(file.storage_path);
-    const callDate = file.call_date || now.slice(0, 10);
-    const callTime = file.call_time || now.slice(11, 19);
+    const callDate = file.call_date || (meta ? meta.date : '') || now.slice(0, 10);
+    const callTime = file.call_time || (meta ? meta.time : '') || now.slice(11, 19);
 
     const res = insertStmt.run(
       batchId,
@@ -153,8 +193,8 @@ export function stage1ImportCalls(
       regNumber,
       extractedClientCode,
       extractedClientCode,
-      cleanCallerName(file.advisor_name || ''),
-      cleanCallerName(file.dealer || ''),
+      advisorName,
+      dealerName,
       callDate,
       callTime,
       duration,

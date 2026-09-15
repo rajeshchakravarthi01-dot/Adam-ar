@@ -3,7 +3,7 @@
 // =============================================================
 
 export type IdentityStatus = 'PENDING' | 'CONFIRMED' | 'REVIEW' | 'FAILED';
-export type IdentitySource = 'METADATA' | 'FILENAME' | 'TRADE_EXACT' | 'MANUAL';
+export type IdentitySource = 'METADATA' | 'FILENAME' | 'TRADE_EXACT' | 'MANUAL' | 'UNRESOLVED';
 
 export type TranscriptStatus = 'PENDING' | 'VALID' | 'FAILED';
 

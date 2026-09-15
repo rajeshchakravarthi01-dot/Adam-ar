@@ -41,13 +41,7 @@ export const INVALID_UCC_WORDS = new Set([
 export function isValidUcc(candidate?: string | null): boolean {
   if (!candidate) return false;
   const cleaned = formatCleanClientCode(candidate);
-  if (isStrictValidClientCode(cleaned)) return true;
-  const squashed = candidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (squashed.length < 3 || squashed.length > 16) return false;
-  if (INVALID_UCC_WORDS.has(squashed)) return false;
-  // If candidate is a pure numeric account code (e.g. 5-8 digits verified against trade account number)
-  if (/^\d{4,10}$/.test(squashed)) return true;
-  return false;
+  return isStrictValidClientCode(cleaned);
 }
 
 export interface UccResolutionResult {
@@ -130,8 +124,8 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
   // e.g., "account number WIA 12345", "code is 12345", "UCC WIA12345"
   const contextPatterns = [
     /\b(?:ucc|client\s+code|client\s+id|account\s+number|account\s+no|a\/c\s+no|client\s+no)\s*(?:is|hai|number|#|:)?\s*([a-zA-Z0-9\s\-._]{3,24})/gi,
-    /\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|VIA|VIF|VIC|VID|VIG|VIE)[\s\-._]*\d{2,10})\b/gi,
-    /\b((?:W\s+I\s+A|W\s+I\s+F|W\s+I\s+C|W\s+I\s+D|W\s+I\s+G|W\s+I\s+E|F\s+I\s+A|P\s+W\s+D|P\s+W|W\s+I)[\s\-._]*\d{2,10})\b/gi,
+    /\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|VIA|VIF|VIC|VID|VIG|VIE)[\s\-._]*\d{2,10})\b/gi,
+    /\b((?:W\s+I\s+A|W\s+I\s+F|W\s+I\s+C|W\s+I\s+D|W\s+I\s+G|W\s+I\s+E|F\s+I\s+A|P\s+W\s+D|P\s+W\s+A|P\s+W|W\s+I)[\s\-._]*\d{2,10})\b/gi,
     /\b(double\s+u\s+i\s+[a-z][\s\-._]*\d{2,10})\b/gi,
   ];
 
@@ -143,17 +137,12 @@ export function extractSpokenUccCandidates(transcript: string): Array<{ rawText:
       const cleaned = formatCleanClientCode(cleanCandidate);
       if (cleaned && isStrictValidClientCode(cleaned)) {
         candidates.push({ rawText, cleanCandidate: cleaned });
-      } else {
-        const squashed = cleanCandidate.toUpperCase().replace(/[^A-Z0-9]/g, '');
-        if (squashed.length >= 4 && isValidUcc(squashed)) {
-          candidates.push({ rawText, cleanCandidate: squashed });
-        }
       }
     }
   }
 
-  // Also extract bare standard UCC patterns (e.g. WIA12345 or PWD12345) from raw transcript
-  const directUccMatch = transcript.match(/\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|VIA)[A-Z0-9\s\-._]{2,14})\b/gi);
+  // Also extract bare standard UCC patterns (e.g. WIA12345 or PWD12345 or PWA00930) from raw transcript
+  const directUccMatch = transcript.match(/\b((?:WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA|VIA)[A-Z0-9\s\-._]{2,14})\b/gi);
   if (directUccMatch) {
     for (const m of directUccMatch) {
       const cleaned = formatCleanClientCode(m);

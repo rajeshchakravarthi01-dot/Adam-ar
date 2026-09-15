@@ -109,7 +109,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Live Engine Status Banner - Liquid Glass Interactive Strip */}
       <div className={`p-4 sm:p-5 rounded-2xl glass-panel transition-all ${
         isBlockedAwaitingKey
-          ? 'border-amber-500/40 bg-amber-950/20'
+          ? 'border-teal-500/40 bg-teal-950/20'
           : isAIActive
           ? 'border-teal-500/40 bg-teal-950/20'
           : 'border-teal-500/20'
@@ -118,7 +118,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="flex items-center gap-3.5">
             <div className={`p-2.5 rounded-xl shrink-0 shadow-lg ${
               isBlockedAwaitingKey
-                ? 'bg-amber-500 text-slate-950 shadow-amber-500/30'
+                ? 'bg-teal-500 text-slate-950 shadow-teal-500/30'
                 : isAIActive
                 ? 'bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950 shadow-teal-500/30 animate-pulse'
                 : 'bg-slate-900 text-teal-300 border border-teal-500/30'
@@ -129,12 +129,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide font-mono ${
                   isBlockedAwaitingKey
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                    ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                     : isAIActive
                     ? 'bg-teal-500/20 text-teal-200 border border-teal-400/40'
                     : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                 }`}>
-                  <span className={`w-2 h-2 rounded-full ${isBlockedAwaitingKey ? 'bg-amber-400' : isAIActive ? 'bg-teal-300 animate-ping' : 'bg-emerald-400'}`} />
+                  <span className={`w-2 h-2 rounded-full ${isBlockedAwaitingKey ? 'bg-teal-400' : isAIActive ? 'bg-teal-300 animate-ping' : 'bg-emerald-400'}`} />
                   <span>{isBlockedAwaitingKey ? 'Awaiting Processing Key' : isAIActive ? 'Engine Active & Processing' : 'Supervisory Engine Online'}</span>
                 </span>
                 <span className="text-xs text-slate-400 font-medium">Auto Pipeline v1.1</span>
@@ -155,7 +155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {isBlockedAwaitingKey ? (
               <button
                 onClick={() => onNavigate('integrations')}
-                className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
+                className="px-4 py-2 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-md"
               >
                 <span>Configure Key</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -319,7 +319,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         >
           <div className="flex items-center justify-between mb-3">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Scorecards</span>
-            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-300 border border-amber-500/20 group-hover:scale-110 transition-transform">
+            <div className="p-2 rounded-xl bg-teal-500/10 text-teal-300 border border-teal-500/20 group-hover:scale-110 transition-transform">
               <Award className="w-4 h-4" />
             </div>
           </div>
@@ -328,7 +328,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div>
               <div className="text-2xl font-black text-white tracking-tight">{scored.toLocaleString()}</div>
               <div className="text-xs text-slate-400 mt-0.5">
-                Avg Score: <b className="text-amber-300">{avgScore}/4</b>
+                Avg Score: <b className="text-teal-300">{avgScore}/4</b>
               </div>
             </div>
 
@@ -340,7 +340,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   cx="24"
                   cy="24"
                   r="18"
-                  className="stroke-amber-400 transition-all duration-1000"
+                  className="stroke-teal-400 transition-all duration-1000"
                   strokeWidth="4"
                   strokeDasharray={113}
                   strokeDashoffset={113 - (113 * (trades > 0 ? Math.min(100, Math.round((scored / trades) * 100)) : 0)) / 100}
@@ -348,7 +348,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   fill="none"
                 />
               </svg>
-              <span className="absolute text-[11px] font-bold font-mono text-amber-200">
+              <span className="absolute text-[11px] font-bold font-mono text-teal-200">
                 {trades > 0 ? Math.min(100, Math.round((scored / trades) * 100)) : 0}%
               </span>
             </div>

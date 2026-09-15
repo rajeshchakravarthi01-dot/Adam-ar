@@ -56,7 +56,7 @@ export const MailView: React.FC<MailViewProps> = ({
   // Custom user-entered advisors (persisted in browser storage)
   const [customAdvisors, setCustomAdvisors] = useState<Array<{ name: string; email: string }>>(() => {
     try {
-      const saved = localStorage.getItem('fundsindia_custom_advisors');
+      const saved = localStorage.getItem('auditeq_custom_advisors') || localStorage.getItem('fundsindia_custom_advisors');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -112,7 +112,7 @@ export const MailView: React.FC<MailViewProps> = ({
   const [showEmailJsConfig, setShowEmailJsConfig] = useState<boolean>(false);
 
   // Live SMTP Diagnostic State
-  const [testEmail, setTestEmail] = useState<string>('ashutosh.kumar@fundsindia.com');
+  const [testEmail, setTestEmail] = useState<string>('ashutosh.kumar@auditeq.com');
   const [isTestingSmtp, setIsTestingSmtp] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [smtpResult, setSmtpResult] = useState<{ ok: boolean; message: string } | null>(null);
@@ -126,14 +126,14 @@ export const MailView: React.FC<MailViewProps> = ({
       } else {
         setToEmail('Individual Advisor Mailboxes (Auto-routed via directory)');
       }
-      setCcEmail(isFatalAlone ? `compliance@fundsindia.com, ${FATAL_CC_EMAIL}` : 'compliance@fundsindia.com');
+      setCcEmail(isFatalAlone ? `compliance@auditeq.com, ${FATAL_CC_EMAIL}` : 'compliance@auditeq.com');
     } else if (selectedAdvisor) {
       const customMatch = customAdvisors.find(
         (c) => c.name.toLowerCase() === selectedAdvisor.toLowerCase()
       );
       if (customMatch) {
         setToEmail(customMatch.email);
-        setCcEmail(markerFilter === '0' ? `compliance@fundsindia.com, ${FATAL_CC_EMAIL}` : 'compliance@fundsindia.com');
+        setCcEmail(markerFilter === '0' ? `compliance@auditeq.com, ${FATAL_CC_EMAIL}` : 'compliance@auditeq.com');
       } else {
         const isFatalAlone = markerFilter === '0';
         const routing = getAdvisorEmailRouting({
@@ -152,16 +152,16 @@ export const MailView: React.FC<MailViewProps> = ({
     if (selectedAdvisor === 'ALL') {
       const isFatalAlone = markerFilter === '0';
       setToEmail('Individual Advisor Mailboxes (Auto-routed via directory)');
-      setCcEmail(isFatalAlone ? `compliance@fundsindia.com, ${FATAL_CC_EMAIL}` : 'compliance@fundsindia.com');
+      setCcEmail(isFatalAlone ? `compliance@auditeq.com, ${FATAL_CC_EMAIL}` : 'compliance@auditeq.com');
       setCustomSubject('');
-      setStatusMsg({ text: 'Email recipients reset to FundsIndia directory standards.', type: 'success' });
+      setStatusMsg({ text: 'Email recipients reset to organizational directory standards.', type: 'success' });
     } else if (selectedAdvisor) {
       const customMatch = customAdvisors.find(
         (c) => c.name.toLowerCase() === selectedAdvisor.toLowerCase()
       );
       if (customMatch) {
         setToEmail(customMatch.email);
-        setCcEmail(markerFilter === '0' ? `compliance@fundsindia.com, ${FATAL_CC_EMAIL}` : 'compliance@fundsindia.com');
+        setCcEmail(markerFilter === '0' ? `compliance@auditeq.com, ${FATAL_CC_EMAIL}` : 'compliance@auditeq.com');
       } else {
         const isFatalAlone = markerFilter === '0';
         const routing = getAdvisorEmailRouting({
@@ -172,7 +172,7 @@ export const MailView: React.FC<MailViewProps> = ({
         setCcEmail(routing.cc);
       }
       setCustomSubject('');
-      setStatusMsg({ text: 'Email recipients reset to FundsIndia directory standards.', type: 'success' });
+      setStatusMsg({ text: 'Email recipients reset to organizational directory standards.', type: 'success' });
     }
   };
 
@@ -190,7 +190,7 @@ export const MailView: React.FC<MailViewProps> = ({
     ];
     setCustomAdvisors(updated);
     try {
-      localStorage.setItem('fundsindia_custom_advisors', JSON.stringify(updated));
+      localStorage.setItem('advisors_custom_directory', JSON.stringify(updated));
     } catch {}
     setSelectedAdvisor(trimmedName);
     setToEmail(trimmedEmail);
@@ -378,38 +378,38 @@ export const MailView: React.FC<MailViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Banner - Classy Black & Yellow */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+      {/* Top Banner - Liquid Glass Oceanic */}
+      <div className="glass-panel p-5 sm:p-6 rounded-2xl border border-teal-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-xl relative overflow-hidden">
+        <div className="relative z-10">
+          <h2 className="text-base font-bold text-white flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 text-slate-950 shadow-md shadow-teal-500/20">
               <Mail className="w-4 h-4" />
             </span>
             <span>Advisor Scorecard Dispatch &amp; Categorization</span>
           </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
-            Filter scorecards by advisor, date range, and marker score (0 / 4 / 5) with automatic FundsIndia directory routing.
+          <p className="text-xs text-slate-300 mt-1">
+            Filter scorecards by advisor, date range, and marker score (0 / 4 / 5) with automatic organizational directory routing.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <span className="text-xs px-3 py-1 bg-amber-400/10 text-amber-900 font-bold rounded-lg border border-amber-400/30 flex items-center gap-1.5">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-            <span>FundsIndia Routing Directory Enforced</span>
+        <div className="flex items-center gap-2 relative z-10">
+          <span className="text-xs px-3.5 py-1.5 bg-teal-500/10 text-teal-300 font-bold rounded-xl border border-teal-500/30 flex items-center gap-1.5 backdrop-blur-md shadow-xs">
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+            <span>Advisor Routing Directory Enforced</span>
           </span>
         </div>
       </div>
 
       {/* 1-Click Dispatch Interactive Panel */}
-      <div className="bg-white rounded-2xl border border-neutral-200 shadow-xs overflow-hidden">
-        <div className="bg-[#111115] p-4 text-white border-b border-neutral-800">
+      <div className="glass-panel rounded-2xl border border-teal-500/20 shadow-2xl overflow-hidden backdrop-blur-xl">
+        <div className="bg-slate-950/80 p-4 text-white border-b border-teal-500/20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2 font-bold text-sm text-amber-400">
-              <Sparkles className="w-4 h-4 text-amber-400" />
+            <div className="flex items-center gap-2 font-bold text-sm text-teal-300">
+              <Sparkles className="w-4 h-4 text-teal-400" />
               <span>Configure Batch Dispatch &amp; Categorization Parameters</span>
             </div>
-            <div className="text-xs text-neutral-400 font-mono">
-              Audit Standard · FundsIndia SEBI Compliance v18.0
+            <div className="text-xs text-slate-400 font-mono">
+              Audit Standard · Regulatory Compliance v18.0
             </div>
           </div>
         </div>
@@ -420,15 +420,15 @@ export const MailView: React.FC<MailViewProps> = ({
             {/* Advisor Selector (col-span-6) */}
             <div className="md:col-span-6 space-y-1.5">
               <div className="flex items-center justify-between">
-                <label className="font-bold text-neutral-800 text-xs flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-amber-500" />
+                <label className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-teal-400" />
                   <span>Select Advisor Name *</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowAddAdvisorInline(!showAddAdvisorInline)}
-                    className="text-[11px] text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200"
+                    className="text-[11px] text-teal-300 hover:text-teal-200 font-bold flex items-center gap-1 cursor-pointer bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-1 rounded-lg border border-teal-500/30 transition-colors"
                     title="Add custom advisor email ID manually"
                   >
                     <Plus className="w-3 h-3" />
@@ -437,16 +437,16 @@ export const MailView: React.FC<MailViewProps> = ({
                   <button
                     type="button"
                     onClick={handleResetFilters}
-                    className="text-[11px] text-neutral-600 hover:text-neutral-900 font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                     title="Reset all filters"
                   >
-                    <Filter className="w-3 h-3 text-neutral-400" />
+                    <Filter className="w-3 h-3 text-slate-400" />
                     <span>Reset Filters</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleResetRouting}
-                    className="text-[11px] text-amber-700 hover:text-amber-800 font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] text-teal-400 hover:text-teal-300 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
                     title="Reset To and CC from directory matrix"
                   >
                     <RotateCcw className="w-3 h-3" />
@@ -457,39 +457,39 @@ export const MailView: React.FC<MailViewProps> = ({
 
               {/* Inline Manual Advisor Addition Card */}
               {showAddAdvisorInline && (
-                <div className="p-3 bg-amber-50/80 border border-amber-300 rounded-xl space-y-2.5">
+                <div className="p-4 glass-inner border border-teal-500/30 rounded-xl space-y-3 shadow-lg">
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-neutral-900 text-xs flex items-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="font-bold text-white text-xs flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-teal-400" />
                       <span>Add Advisor Email ID Manually</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => setShowAddAdvisorInline(false)}
-                      className="text-neutral-400 hover:text-neutral-700 cursor-pointer"
+                      className="text-slate-400 hover:text-slate-200 cursor-pointer"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Advisor Name</label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Advisor Name</label>
                       <input
                         type="text"
                         placeholder="e.g. Vikram Malhotra"
                         value={newAdvisorName}
                         onChange={(e) => setNewAdvisorName(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded-md text-xs font-medium focus:outline-hidden focus:border-amber-400"
+                        className="w-full px-3 py-1.5 glass-input rounded-xl text-xs font-medium placeholder-slate-500"
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-neutral-700 mb-0.5">Advisor Email ID</label>
+                      <label className="block text-[11px] font-semibold text-slate-300 mb-1">Advisor Email ID</label>
                       <input
                         type="email"
-                        placeholder="e.g. vikram.malhotra@fundsindia.com"
+                        placeholder="e.g. vikram.malhotra@company.com"
                         value={newAdvisorEmail}
                         onChange={(e) => setNewAdvisorEmail(e.target.value)}
-                        className="w-full px-2.5 py-1.5 bg-white border border-neutral-300 rounded-md text-xs font-mono focus:outline-hidden focus:border-amber-400"
+                        className="w-full px-3 py-1.5 glass-input rounded-xl text-xs font-mono placeholder-slate-500"
                       />
                     </div>
                   </div>
@@ -497,14 +497,14 @@ export const MailView: React.FC<MailViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowAddAdvisorInline(false)}
-                      className="px-2.5 py-1 text-neutral-600 hover:bg-neutral-100 rounded-md text-xs font-semibold cursor-pointer"
+                      className="px-3 py-1.5 text-slate-400 hover:text-slate-200 glass-inner rounded-xl text-xs font-semibold cursor-pointer transition-colors"
                     >
                       Cancel
                     </button>
                     <button
                       type="button"
                       onClick={handleAddCustomAdvisor}
-                      className="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold rounded-md text-xs cursor-pointer shadow-xs"
+                      className="px-3.5 py-1.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold rounded-xl text-xs cursor-pointer shadow-md transition-transform active:scale-95"
                     >
                       Save &amp; Select Advisor
                     </button>
@@ -521,10 +521,10 @@ export const MailView: React.FC<MailViewProps> = ({
                     setSelectedAdvisor(e.target.value);
                   }
                 }}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-900 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className="w-full px-3 py-2.5 glass-input rounded-xl text-xs font-semibold text-slate-100 cursor-pointer"
               >
-                <option value="ALL">🌟 All Advisors ({scorecards.length} scorecards recorded)</option>
-                <option value="__ADD_MANUAL__" className="font-bold text-amber-700 bg-amber-50">
+                <option value="ALL" className="bg-slate-900 text-white">🌟 All Advisors ({scorecards.length} scorecards recorded)</option>
+                <option value="__ADD_MANUAL__" className="font-bold text-teal-300 bg-slate-900">
                   ➕ + Add Manual Advisor Email ID...
                 </option>
                 {availableAdvisors.length > 0 ? (
@@ -540,31 +540,31 @@ export const MailView: React.FC<MailViewProps> = ({
                     );
                     const dealerTag = dirEntry ? `[${dirEntry.dealer}] ` : isCustom ? '[Manual] ' : '';
                     return (
-                      <option key={adv} value={adv}>
+                      <option key={adv} value={adv} className="bg-slate-900 text-white">
                         {dealerTag}{adv} ({advCount} scorecards available)
                       </option>
                     );
                   })
                 ) : (
-                  <option value="Ashutosh">Ashutosh</option>
+                  <option value="Ashutosh" className="bg-slate-900 text-white">Ashutosh</option>
                 )}
               </select>
             </div>
 
             {/* Marker / Score Filter Categorization (col-span-6) */}
             <div className="md:col-span-6 space-y-1.5">
-              <label className="font-bold text-neutral-800 text-xs flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-amber-500" />
+              <label className="font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-teal-400" />
                 <span>Scorecard Marker / Category Filter</span>
               </label>
               <div className="grid grid-cols-4 gap-1.5">
                 <button
                   type="button"
                   onClick={() => setMarkerFilter('all')}
-                  className={`py-2 px-1.5 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border text-center font-bold text-xs cursor-pointer transition-all duration-200 ${
                     markerFilter === 'all'
-                      ? 'bg-neutral-900 text-amber-400 border-neutral-900 shadow-xs'
-                      : 'bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100'
+                      ? 'bg-teal-400 text-slate-950 border-teal-300 shadow-[0_0_15px_rgba(20,184,166,0.35)]'
+                      : 'glass-inner text-slate-300 border-teal-500/20 hover:bg-teal-500/10'
                   }`}
                 >
                   All Markers
@@ -572,10 +572,10 @@ export const MailView: React.FC<MailViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setMarkerFilter('0')}
-                  className={`py-2 px-1.5 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border text-center font-bold text-xs cursor-pointer transition-all duration-200 ${
                     markerFilter === '0'
-                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                      : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                      ? 'bg-rose-500 text-white border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.35)]'
+                      : 'glass-inner text-rose-300 border-rose-500/20 hover:bg-rose-500/15'
                   }`}
                   title="Filter scorecards with score 0 or fatal violations"
                 >
@@ -584,10 +584,10 @@ export const MailView: React.FC<MailViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setMarkerFilter('4')}
-                  className={`py-2 px-1.5 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border text-center font-bold text-xs cursor-pointer transition-all duration-200 ${
                     markerFilter === '4'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                      : 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                      ? 'bg-blue-500 text-white border-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.35)]'
+                      : 'glass-inner text-blue-300 border-blue-500/20 hover:bg-blue-500/15'
                   }`}
                   title="Filter scorecards with 4 marks (Partial Execution / Compliant)"
                 >
@@ -596,10 +596,10 @@ export const MailView: React.FC<MailViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setMarkerFilter('5')}
-                  className={`py-2 px-1.5 rounded-lg border text-center font-bold text-xs cursor-pointer transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border text-center font-bold text-xs cursor-pointer transition-all duration-200 ${
                     markerFilter === '5'
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                      : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.35)]'
+                      : 'glass-inner text-emerald-300 border-emerald-500/20 hover:bg-emerald-500/15'
                   }`}
                   title="Filter scorecards with 5 marks (Perfect Pre-Order Compliance)"
                 >
@@ -609,29 +609,29 @@ export const MailView: React.FC<MailViewProps> = ({
             </div>
           </div>
 
-          {/* Sambath S Conditional Routing Notification Banner */}
+          {/* Conditional Routing Notification Banner */}
           {markerFilter === '0' ? (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-xs flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/30 text-rose-200 text-xs flex items-center justify-between gap-3 backdrop-blur-md">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                 <span>
-                  <strong>Fatal Filter Active (0 Marks):</strong> <code className="font-mono font-bold bg-rose-100 px-1 py-0.5 rounded text-rose-900">{FATAL_CC_EMAIL}</code> is <strong>included in CC</strong> per FundsIndia compliance policy.
+                  <strong>Fatal Filter Active (0 Marks):</strong> CCs applied: <code className="font-mono font-bold bg-rose-900/60 px-1.5 py-0.5 rounded text-rose-200">{FATAL_CC_EMAIL}</code> is <strong>included in CC</strong> for fatal scorecards (0 marks).
                 </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-200 text-rose-900 px-2 py-0.5 rounded">
-                Sambath S In CC
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2.5 py-0.5 rounded-full">
+                Lead Supervisor In CC
               </span>
             </div>
           ) : (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-xl bg-teal-950/40 border border-teal-500/30 text-teal-200 text-xs flex items-center justify-between gap-3 backdrop-blur-md">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-teal-400 shrink-0" />
                 <span>
-                  <strong>Standard Routing ({markerFilter === 'all' ? 'All Scorecards' : `${markerFilter} Marks`}):</strong> Standard supervisory manager CCs applied. <code className="font-mono text-neutral-600">{FATAL_CC_EMAIL}</code> is <strong>omitted</strong>.
+                  <strong>Standard Routing ({markerFilter === 'all' ? 'All Scorecards' : `${markerFilter} Marks`}):</strong> Standard supervisory manager CCs applied. <code className="font-mono text-teal-300/80">{FATAL_CC_EMAIL}</code> is <strong>omitted</strong> (excluded for 4 & 5 marks).
                 </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded">
-                Sambath S Excluded
+              <span className="text-[10px] font-bold uppercase tracking-wider bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2.5 py-0.5 rounded-full">
+                Supervisor Excluded
               </span>
             </div>
           )}
@@ -640,43 +640,43 @@ export const MailView: React.FC<MailViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
             {/* From Date */}
             <div className="space-y-1.5">
-              <label className="block font-bold text-neutral-800 text-xs flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-amber-500" />
+              <label className="block font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-teal-400" />
                 <span>From Date (Optional)</span>
               </label>
               <input
                 type="date"
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono text-neutral-900 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className="w-full px-3 py-2 glass-input rounded-xl text-xs font-mono text-slate-100"
               />
             </div>
 
             {/* To Date */}
             <div className="space-y-1.5">
-              <label className="block font-bold text-neutral-800 text-xs flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-amber-500" />
+              <label className="block font-bold text-slate-200 text-xs flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-teal-400" />
                 <span>To Date (Optional)</span>
               </label>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono text-neutral-900 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+                className="w-full px-3 py-2 glass-input rounded-xl text-xs font-mono text-slate-100"
               />
             </div>
           </div>
 
           {/* Quick Date Presets */}
-          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-neutral-200 text-[11px]">
-            <span className="text-neutral-500 font-semibold">Quick Presets:</span>
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-teal-500/15 text-[11px]">
+            <span className="text-slate-400 font-semibold">Quick Presets:</span>
             <button
               type="button"
               onClick={() => handleQuickDatePreset('all')}
-              className={`px-3 py-1 rounded-md border font-medium cursor-pointer transition-colors ${
+              className={`px-3 py-1 rounded-xl border font-medium cursor-pointer transition-colors ${
                 !fromDate && !toDate
-                  ? 'bg-black text-amber-400 border-black'
-                  : 'bg-neutral-100 text-neutral-700 border-neutral-200 hover:bg-neutral-200'
+                  ? 'bg-teal-400 text-slate-950 font-bold border-teal-300 shadow-xs'
+                  : 'glass-inner text-slate-300 border-teal-500/20 hover:bg-teal-500/15'
               }`}
             >
               All Recorded Dates
@@ -684,31 +684,31 @@ export const MailView: React.FC<MailViewProps> = ({
             <button
               type="button"
               onClick={() => handleQuickDatePreset('today')}
-              className="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md border border-neutral-200 font-medium cursor-pointer transition-colors"
+              className="px-3 py-1 glass-inner hover:bg-teal-500/15 text-slate-300 rounded-xl border border-teal-500/20 font-medium cursor-pointer transition-colors"
             >
               Today
             </button>
             <button
               type="button"
               onClick={() => handleQuickDatePreset('7days')}
-              className="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md border border-neutral-200 font-medium cursor-pointer transition-colors"
+              className="px-3 py-1 glass-inner hover:bg-teal-500/15 text-slate-300 rounded-xl border border-teal-500/20 font-medium cursor-pointer transition-colors"
             >
               Last 7 Days
             </button>
             <button
               type="button"
               onClick={() => handleQuickDatePreset('30days')}
-              className="px-3 py-1 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-md border border-neutral-200 font-medium cursor-pointer transition-colors"
+              className="px-3 py-1 glass-inner hover:bg-teal-500/15 text-slate-300 rounded-xl border border-teal-500/20 font-medium cursor-pointer transition-colors"
             >
               Last 30 Days
             </button>
           </div>
 
           {/* Row 3: Target Email, CC, and Subject */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-neutral-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-teal-500/15">
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block font-bold text-neutral-800 text-xs">
+                <label className="block font-bold text-slate-200 text-xs">
                   Advisor Email Address (To) *
                 </label>
                 {selectedAdvisor === 'ALL' && (
@@ -723,9 +723,9 @@ export const MailView: React.FC<MailViewProps> = ({
                         setToEmail('Individual Advisor Mailboxes (Auto-routed via directory)');
                       }
                     }}
-                    className="text-[11px] font-bold text-amber-700 hover:text-amber-900 flex items-center gap-1 cursor-pointer bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300"
+                    className="text-[11px] font-bold text-teal-300 hover:text-teal-200 flex items-center gap-1 cursor-pointer bg-teal-500/10 hover:bg-teal-500/20 px-2.5 py-0.5 rounded-lg border border-teal-500/30 transition-colors"
                   >
-                    <Edit3 className="w-3 h-3 text-amber-700" />
+                    <Edit3 className="w-3 h-3 text-teal-400" />
                     <span>{isManualEmailMode ? 'Reset to Auto-Route' : '+ Enter Manual Advisor Email'}</span>
                   </button>
                 )}
@@ -733,11 +733,11 @@ export const MailView: React.FC<MailViewProps> = ({
 
               {selectedAdvisor === 'ALL' && !isManualEmailMode ? (
                 <div>
-                  <div className="w-full px-3 py-2 bg-neutral-100 border border-neutral-300 rounded-lg text-xs font-semibold text-neutral-700 flex items-center justify-between">
+                  <div className="w-full px-3 py-2 glass-inner rounded-xl text-xs font-semibold text-slate-300 flex items-center justify-between border border-teal-500/20">
                     <span className="truncate">Individual Advisor Mailboxes (Auto-routed via directory)</span>
-                    <span className="text-[10px] font-bold bg-neutral-200 text-neutral-700 px-2 py-0.5 rounded-md shrink-0 ml-2">Directory Auto</span>
+                    <span className="text-[10px] font-bold bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-md shrink-0 ml-2 border border-teal-500/30">Directory Auto</span>
                   </div>
-                  <div className="flex items-center justify-between mt-1 text-[11px] text-neutral-500">
+                  <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400">
                     <span>Auto-routes each scorecard to its respective advisor email address from directory.</span>
                     <button
                       type="button"
@@ -745,7 +745,7 @@ export const MailView: React.FC<MailViewProps> = ({
                         setIsManualEmailMode(true);
                         setToEmail(manualEmailInput || '');
                       }}
-                      className="text-amber-700 hover:underline font-bold shrink-0 ml-2 cursor-pointer"
+                      className="text-teal-300 hover:underline font-bold shrink-0 ml-2 cursor-pointer"
                     >
                       Override manually
                     </button>
@@ -762,17 +762,17 @@ export const MailView: React.FC<MailViewProps> = ({
                         setManualEmailInput(e.target.value);
                       }
                     }}
-                    placeholder="Enter manual advisor email ID (e.g. advisor.name@fundsindia.com)"
-                    className="w-full px-3 py-2 bg-white border-2 border-amber-400 rounded-lg text-xs font-mono text-neutral-900 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                    placeholder="Enter manual advisor email ID (e.g. advisor.name@company.com)"
+                    className="w-full px-3 py-2 glass-input border-2 border-teal-400 rounded-xl text-xs font-mono text-white focus:outline-hidden focus:ring-1 focus:ring-teal-400"
                     required
                   />
                   <div className="mt-1 text-[11px]">
                     {selectedAdvisor === 'ALL' ? (
-                      <span className="text-amber-800 font-medium">
+                      <span className="text-teal-300 font-medium">
                         ⚡ <strong>Manual Override Active:</strong> All {matchedScorecards.length} filtered scorecards will be dispatched to <strong>{toEmail || 'this manual advisor email ID'}</strong>.
                       </span>
                     ) : (
-                      <span className="text-neutral-500">
+                      <span className="text-slate-400">
                         Target recipient mailbox for {selectedAdvisor}. You can edit or enter any custom email ID.
                       </span>
                     )}
@@ -782,23 +782,23 @@ export const MailView: React.FC<MailViewProps> = ({
             </div>
 
             <div>
-              <label className="block font-bold text-neutral-800 mb-1">
+              <label className="block font-bold text-slate-200 mb-1">
                 CC Email Addresses (Optional, comma-separated)
               </label>
               <input
                 type="text"
                 value={ccEmail}
                 onChange={(e) => setCcEmail(e.target.value)}
-                placeholder="compliance@fundsindia.com"
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono text-neutral-900 focus:outline-hidden focus:border-amber-400"
+                placeholder="compliance@company.com"
+                className="w-full px-3 py-2 glass-input rounded-xl text-xs font-mono text-white placeholder-slate-500"
               />
-              <span className="text-[11px] text-neutral-500 mt-0.5 block">
-                Official supervisory managers from FundsIndia directory.
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                Official supervisory managers from organizational directory.
               </span>
             </div>
 
             <div className="md:col-span-2">
-              <label className="block font-bold text-neutral-800 mb-1">
+              <label className="block font-bold text-slate-200 mb-1">
                 Email Subject Line *
               </label>
               <input
@@ -806,24 +806,24 @@ export const MailView: React.FC<MailViewProps> = ({
                 value={customSubject}
                 onChange={(e) => setCustomSubject(e.target.value)}
                 placeholder={defaultSubject}
-                className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-medium text-neutral-900 focus:outline-hidden focus:border-amber-400"
+                className="w-full px-3 py-2 glass-input rounded-xl text-xs font-medium text-white placeholder-slate-500"
               />
-              <span className="text-[11px] text-neutral-500 mt-0.5 block">
-                Subject: <span className="font-semibold text-neutral-900">{currentSubject}</span>
+              <span className="text-[11px] text-slate-400 mt-0.5 block">
+                Subject: <span className="font-semibold text-teal-300">{currentSubject}</span>
               </span>
             </div>
           </div>
 
           {/* Dispatch Engine: SMTP vs EmailJS Toggle */}
-          <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-3.5 glass-inner rounded-xl border border-teal-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <span className="font-bold text-neutral-800 text-xs">Dispatch Delivery Mode:</span>
-              <div className="inline-flex rounded-lg border border-neutral-300 p-0.5 bg-white">
+              <span className="font-bold text-slate-200 text-xs">Dispatch Delivery Mode:</span>
+              <div className="inline-flex rounded-xl border border-teal-500/30 p-0.5 bg-slate-950/80">
                 <button
                   type="button"
                   onClick={() => setDispatchEngine('smtp')}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                    dispatchEngine === 'smtp' ? 'bg-black text-amber-400' : 'text-neutral-600 hover:text-black'
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    dispatchEngine === 'smtp' ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-xs' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   High-Reliability SMTP
@@ -831,8 +831,8 @@ export const MailView: React.FC<MailViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setDispatchEngine('emailjs')}
-                  className={`px-3 py-1 rounded-md text-xs font-bold transition-colors cursor-pointer ${
-                    dispatchEngine === 'emailjs' ? 'bg-black text-amber-400' : 'text-neutral-600 hover:text-black'
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    dispatchEngine === 'emailjs' ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-xs' : 'text-slate-400 hover:text-white'
                   }`}
                 >
                   EmailJS Client
@@ -844,108 +844,108 @@ export const MailView: React.FC<MailViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowEmailJsConfig(!showEmailJsConfig)}
-                className="text-[11px] text-neutral-700 hover:text-black font-semibold flex items-center gap-1 cursor-pointer"
+                className="text-[11px] text-teal-300 hover:text-teal-200 font-semibold flex items-center gap-1 cursor-pointer transition-colors"
               >
-                <Settings className="w-3.5 h-3.5 text-amber-500" />
+                <Settings className="w-3.5 h-3.5 text-teal-400" />
                 <span>{showEmailJsConfig ? 'Hide Config' : 'Configure EmailJS Keys'}</span>
               </button>
             )}
           </div>
 
           {dispatchEngine === 'emailjs' && showEmailJsConfig && (
-            <div className="p-4 bg-amber-50/50 rounded-xl border border-amber-200 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="p-4 glass-inner rounded-xl border border-teal-500/30 grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1">EmailJS Service ID</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">EmailJS Service ID</label>
                 <input
                   type="text"
                   value={emailJsServiceId}
                   onChange={(e) => setEmailJsServiceId(e.target.value)}
                   placeholder="service_xxx"
-                  className="w-full px-3 py-1.5 bg-white border border-neutral-300 rounded text-xs font-mono"
+                  className="w-full px-3 py-1.5 glass-input rounded-xl text-xs font-mono"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1">EmailJS Template ID</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">EmailJS Template ID</label>
                 <input
                   type="text"
                   value={emailJsTemplateId}
                   onChange={(e) => setEmailJsTemplateId(e.target.value)}
                   placeholder="template_xxx"
-                  className="w-full px-3 py-1.5 bg-white border border-neutral-300 rounded text-xs font-mono"
+                  className="w-full px-3 py-1.5 glass-input rounded-xl text-xs font-mono"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1">EmailJS Public Key</label>
+                <label className="block text-[11px] font-bold text-slate-300 mb-1">EmailJS Public Key</label>
                 <input
                   type="text"
                   value={emailJsPublicKey}
                   onChange={(e) => setEmailJsPublicKey(e.target.value)}
                   placeholder="Public Key"
-                  className="w-full px-3 py-1.5 bg-white border border-neutral-300 rounded text-xs font-mono"
+                  className="w-full px-3 py-1.5 glass-input rounded-xl text-xs font-mono"
                 />
               </div>
             </div>
           )}
 
           {/* Live Filter Selection Summary Card */}
-          <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-3">
+          <div className="glass-inner p-4 rounded-xl border border-teal-500/20 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="font-bold text-neutral-800 text-xs flex items-center gap-1.5">
-                <FileCheck2 className="w-4 h-4 text-emerald-600" />
+              <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
+                <FileCheck2 className="w-4 h-4 text-emerald-400" />
                 <span>Selected Scorecards Batch Overview</span>
               </h4>
-              <div className="text-xs font-mono font-bold text-neutral-900">
+              <div className="text-xs font-mono font-bold text-teal-300">
                 {totalCount} Call Scorecard(s) Matching Criteria
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
-                <div className="text-[11px] text-neutral-500 font-medium">Selected Advisor</div>
-                <div className="font-bold text-neutral-900 truncate mt-0.5">{selectedAdvisor || '—'}</div>
+              <div className="glass-panel-subtle p-3 rounded-xl border border-teal-500/20 shadow-xs">
+                <div className="text-[11px] text-slate-400 font-medium">Selected Advisor</div>
+                <div className="font-bold text-white truncate mt-0.5">{selectedAdvisor || '—'}</div>
               </div>
-              <div className="bg-white p-3 rounded-xl border border-neutral-200 shadow-2xs">
-                <div className="text-[11px] text-neutral-500 font-medium">Date Scope &amp; Marker</div>
-                <div className="font-bold text-neutral-900 mt-0.5">
+              <div className="glass-panel-subtle p-3 rounded-xl border border-teal-500/20 shadow-xs">
+                <div className="text-[11px] text-slate-400 font-medium">Date Scope &amp; Marker</div>
+                <div className="font-bold text-white mt-0.5">
                   {markerFilter === 'all' ? 'All' : `${markerFilter} Marks`} · {fromDate || toDate ? `${fromDate || '—'} → ${toDate || '—'}` : 'All Dates'}
                 </div>
               </div>
-              <div className="bg-white p-3 rounded-xl border border-emerald-200 bg-emerald-50/50 shadow-2xs">
-                <div className="text-[11px] text-emerald-700 font-medium">Compliant Calls</div>
-                <div className="font-bold text-emerald-900 text-sm mt-0.5">{passCount} / {totalCount}</div>
+              <div className="glass-panel-subtle p-3 rounded-xl border border-emerald-500/20 bg-emerald-950/20 shadow-xs">
+                <div className="text-[11px] text-emerald-400 font-medium">Compliant Calls</div>
+                <div className="font-bold text-emerald-300 text-sm mt-0.5">{passCount} / {totalCount}</div>
               </div>
-              <div className="bg-white p-3 rounded-xl border border-rose-200 bg-rose-50/50 shadow-2xs">
-                <div className="text-[11px] text-rose-700 font-medium">Fatal Violations</div>
-                <div className="font-bold text-rose-900 text-sm mt-0.5">{fatalCount} ({avgScore} avg mark)</div>
+              <div className="glass-panel-subtle p-3 rounded-xl border border-rose-500/20 bg-rose-950/20 shadow-xs">
+                <div className="text-[11px] text-rose-400 font-medium">Fatal Violations</div>
+                <div className="font-bold text-rose-300 text-sm mt-0.5">{fatalCount} ({avgScore} avg mark)</div>
               </div>
             </div>
 
             {/* List of included calls preview */}
             {matchedScorecards.length > 0 ? (
-              <div className="max-h-48 overflow-y-auto border border-neutral-200 rounded-lg bg-white divide-y divide-neutral-100 text-[11px]">
+              <div className="max-h-48 overflow-y-auto border border-teal-500/20 rounded-xl glass-panel-subtle divide-y divide-teal-500/10 text-[11px]">
                 {matchedScorecards.map((sc) => (
-                  <div key={sc.id} className="p-2.5 flex items-center justify-between hover:bg-neutral-50">
+                  <div key={sc.id} className="p-2.5 flex items-center justify-between hover:bg-teal-500/10 transition-colors">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-amber-600">#{sc.id}</span>
-                      <span className="font-semibold text-neutral-900">{sc.client}</span>
-                      <span className="text-neutral-500">· {sc.trade_date || sc.call_date || 'Today'}</span>
+                      <span className="font-mono font-bold text-teal-400">#{sc.id}</span>
+                      <span className="font-semibold text-white">{sc.client}</span>
+                      <span className="text-slate-400">· {sc.trade_date || sc.call_date || 'Today'}</span>
                       {sc.dealer && (
-                        <span className="text-[10px] font-mono text-neutral-400 bg-neutral-100 px-1.5 py-0.2 rounded">
+                        <span className="text-[10px] font-mono text-slate-300 bg-slate-800/80 border border-teal-500/20 px-1.5 py-0.2 rounded">
                           {sc.dealer}
                         </span>
                       )}
                     </div>
                     <div className="flex items-center gap-2 font-mono">
                       {sc.is_fatal || sc.score === 0 ? (
-                        <span className="text-rose-700 font-bold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 text-[10px]">
+                        <span className="text-rose-300 font-bold bg-rose-500/20 px-2 py-0.5 rounded-full border border-rose-500/30 text-[10px]">
                           FATAL (0/5)
                         </span>
                       ) : sc.score === 5 ? (
-                        <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 text-[10px]">
+                        <span className="text-emerald-300 font-bold bg-emerald-500/20 px-2 py-0.5 rounded-full border border-emerald-500/30 text-[10px]">
                           5/5 MARKS (PERFECT)
                         </span>
                       ) : (
-                        <span className="text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200 text-[10px]">
+                        <span className="text-blue-300 font-bold bg-blue-500/20 px-2 py-0.5 rounded-full border border-blue-500/30 text-[10px]">
                           {sc.score}/5 MARKS
                         </span>
                       )}
@@ -954,7 +954,7 @@ export const MailView: React.FC<MailViewProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="p-4 text-center text-neutral-400 bg-white rounded-lg border border-neutral-200">
+              <div className="p-4 text-center text-slate-400 glass-inner rounded-xl border border-teal-500/15">
                 {selectedAdvisor === 'ALL'
                   ? `No scorecards found across all advisors with the current filter settings (${markerFilter === 'all' ? 'All Markers' : `Marker ${markerFilter}`}).`
                   : `No scorecards found for ${selectedAdvisor} with the current filter settings (${markerFilter === 'all' ? 'All Markers' : `Marker ${markerFilter}`}).`}
@@ -964,16 +964,16 @@ export const MailView: React.FC<MailViewProps> = ({
 
           {/* Action Trigger Button */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
-            <div className="text-[11px] text-neutral-500">
+            <div className="text-[11px] text-slate-400">
               Dispatches an encrypted HTML audit report containing complete 5-mark tables &amp; verbatim evidence.
             </div>
 
             <button
               type="submit"
               disabled={isSending || isLoading || totalCount === 0}
-              className="w-full sm:w-auto px-7 py-3 bg-black hover:bg-neutral-900 disabled:opacity-50 text-amber-400 font-bold rounded-xl text-xs shadow-md transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2 border border-amber-400/30"
+              className="w-full sm:w-auto px-7 py-3 bg-gradient-to-r from-teal-400 via-teal-500 to-emerald-500 hover:brightness-110 active:scale-95 disabled:opacity-50 text-slate-950 font-black rounded-xl text-xs shadow-[0_4px_20px_rgba(20,184,166,0.35)] transition-all cursor-pointer flex items-center justify-center gap-2 border border-teal-300/40"
             >
-              <Send className="w-4 h-4 text-amber-400" />
+              <Send className="w-4 h-4" />
               <span>
                 {isSending
                   ? 'Dispatching Scorecards…'
@@ -990,14 +990,14 @@ export const MailView: React.FC<MailViewProps> = ({
           <div
             className={`p-4 border-t flex items-center gap-2.5 text-xs font-medium ${
               statusMsg.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
+                ? 'bg-emerald-950/60 border-emerald-500/30 text-emerald-200'
+                : 'bg-rose-950/60 border-rose-500/30 text-rose-200'
             }`}
           >
             {statusMsg.type === 'success' ? (
-              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4.5 h-4.5 text-emerald-400 shrink-0" />
             ) : (
-              <AlertTriangle className="w-4.5 h-4.5 text-rose-600 shrink-0" />
+              <AlertTriangle className="w-4.5 h-4.5 text-rose-400 shrink-0" />
             )}
             <span>{statusMsg.text}</span>
           </div>
@@ -1005,20 +1005,20 @@ export const MailView: React.FC<MailViewProps> = ({
       </div>
 
       {/* Live SMTP Diagnostic & Dispatch Verification Card */}
-      <div className="bg-white rounded-2xl border border-neutral-200 shadow-xs p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-3 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-neutral-100 text-black rounded-lg">
-              <Server className="w-4 h-4 text-amber-500" />
+      <div className="glass-panel rounded-2xl border border-teal-500/20 shadow-xl p-5 backdrop-blur-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-teal-500/15 pb-3 mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-teal-500/10 text-teal-300 rounded-xl border border-teal-500/20">
+              <Server className="w-4 h-4 text-teal-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-neutral-900">Real SMTP Transport &amp; Delivery Verification</h3>
-              <p className="text-xs text-neutral-500">Test actual socket handshake or dispatch a live test email directly to any inbox.</p>
+              <h3 className="text-sm font-bold text-white">Real SMTP Transport &amp; Delivery Verification</h3>
+              <p className="text-xs text-slate-300">Test actual socket handshake or dispatch a live test email directly to any inbox.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[11px] font-semibold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               <span>SMTP Ready</span>
             </span>
           </div>
@@ -1026,15 +1026,15 @@ export const MailView: React.FC<MailViewProps> = ({
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
           <div className="md:col-span-6">
-            <label className="block text-xs font-semibold text-neutral-700 mb-1">
+            <label className="block text-xs font-semibold text-slate-200 mb-1.5">
               Destination Test Recipient Email
             </label>
             <input
               type="email"
               value={testEmail}
               onChange={(e) => setTestEmail(e.target.value)}
-              placeholder="e.g. ashutosh.kumar@fundsindia.com"
-              className="w-full text-xs px-3 py-2 border border-neutral-300 rounded-lg focus:border-amber-400 focus:outline-none font-mono"
+              placeholder="e.g. audit.lead@company.com"
+              className="w-full text-xs px-3 py-2.5 glass-input rounded-xl focus:border-teal-400 focus:outline-hidden font-mono text-white placeholder-slate-500"
             />
           </div>
 
@@ -1054,9 +1054,9 @@ export const MailView: React.FC<MailViewProps> = ({
                   setIsTestingSmtp(false);
                 }
               }}
-              className="w-full text-xs font-semibold py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl transition-colors flex items-center justify-center gap-1.5 border border-neutral-300 disabled:opacity-50 cursor-pointer"
+              className="w-full text-xs font-semibold py-2.5 px-3 glass-inner hover:bg-teal-500/15 text-slate-200 rounded-xl transition-all flex items-center justify-center gap-1.5 border border-teal-500/25 disabled:opacity-50 cursor-pointer active:scale-95"
             >
-              {isTestingSmtp ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5 text-amber-500" />}
+              {isTestingSmtp ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-400" /> : <Zap className="w-3.5 h-3.5 text-teal-400" />}
               <span>{isTestingSmtp ? 'Verifying...' : 'Test Connection'}</span>
             </button>
           </div>
@@ -1077,9 +1077,9 @@ export const MailView: React.FC<MailViewProps> = ({
                   setIsSendingTest(false);
                 }
               }}
-              className="w-full text-xs font-bold py-2 px-3 bg-black hover:bg-neutral-900 text-amber-400 rounded-xl transition-colors flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50 border border-amber-400/30 cursor-pointer"
+              className="w-full text-xs font-bold py-2.5 px-3 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50 border border-teal-300/40 cursor-pointer active:scale-95"
             >
-              {isSendingTest ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5 text-amber-400" />}
+              {isSendingTest ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
               <span>{isSendingTest ? 'Dispatching...' : 'Send Live Test Email'}</span>
             </button>
           </div>
@@ -1087,16 +1087,16 @@ export const MailView: React.FC<MailViewProps> = ({
 
         {smtpResult && (
           <div
-            className={`mt-3 p-3 rounded-lg border text-xs flex items-start gap-2 ${
+            className={`mt-3 p-3.5 rounded-xl border text-xs flex items-start gap-2.5 backdrop-blur-md ${
               smtpResult.ok
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                : 'bg-rose-50 border-rose-200 text-rose-900'
+                ? 'bg-emerald-950/50 border-emerald-500/30 text-emerald-200'
+                : 'bg-rose-950/50 border-rose-500/30 text-rose-200'
             }`}
           >
             {smtpResult.ok ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
             )}
             <div className="flex-1 font-mono text-[11px] leading-relaxed">
               {smtpResult.message}
@@ -1106,14 +1106,14 @@ export const MailView: React.FC<MailViewProps> = ({
       </div>
 
       {/* Mail Delivery History Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
+      <div className="glass-panel rounded-2xl border border-teal-500/20 shadow-xl overflow-hidden backdrop-blur-xl">
+        <div className="p-4 border-b border-teal-500/15 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-amber-500" />
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Clock className="w-4 h-4 text-teal-400" />
               <span>Dispatched Mail History ({mailHistory.length})</span>
             </h3>
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-slate-400 mt-0.5">
               Immutable audit trail of all scorecard emails sent to advisors and CC recipients.
             </p>
           </div>
@@ -1121,54 +1121,54 @@ export const MailView: React.FC<MailViewProps> = ({
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#111115] text-neutral-200 font-semibold border-b border-neutral-800 text-[11px] uppercase tracking-wider">
+            <thead className="bg-slate-950/80 text-teal-300 font-semibold border-b border-teal-500/20 text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="py-2.5 px-3 text-amber-400">Sent Time</th>
-                <th className="py-2.5 px-3">Type</th>
-                <th className="py-2.5 px-3">Advisor</th>
-                <th className="py-2.5 px-3 text-center">Scorecards</th>
-                <th className="py-2.5 px-3">Recipient (To)</th>
-                <th className="py-2.5 px-3">CC</th>
-                <th className="py-2.5 px-3">Subject</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
+                <th className="py-3 px-3 text-teal-400">Sent Time</th>
+                <th className="py-3 px-3">Type</th>
+                <th className="py-3 px-3">Advisor</th>
+                <th className="py-3 px-3 text-center">Scorecards</th>
+                <th className="py-3 px-3">Recipient (To)</th>
+                <th className="py-3 px-3">CC</th>
+                <th className="py-3 px-3">Subject</th>
+                <th className="py-3 px-3 text-center">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-teal-500/10 text-slate-200">
               {mailHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-neutral-400">
+                  <td colSpan={8} className="py-8 text-center text-slate-400">
                     No scorecard emails have been dispatched yet. Use the 1-Click dispatch panel above to send scorecards.
                   </td>
                 </tr>
               ) : (
                 mailHistory.map((m) => (
-                  <tr key={m.id} className="hover:bg-amber-50/30 transition-colors">
-                    <td className="py-2.5 px-3 font-mono text-neutral-500 text-[11px]">
+                  <tr key={m.id} className="hover:bg-teal-500/10 transition-colors">
+                    <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">
                       {m.sent_at || m.created_at}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span className="font-bold text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded text-[10px] uppercase font-mono">
+                      <span className="font-bold text-teal-200 bg-teal-500/15 border border-teal-500/20 px-2 py-0.5 rounded-full text-[10px] uppercase font-mono">
                         {m.mail_type || 'single'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-neutral-900">
+                    <td className="py-2.5 px-3 font-bold text-white">
                       {m.caller_name || '—'}
                     </td>
-                    <td className="py-2.5 px-3 text-center font-mono font-bold text-neutral-900">
+                    <td className="py-2.5 px-3 text-center font-mono font-bold text-teal-300">
                       {m.scorecard_count}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-800">
+                    <td className="py-2.5 px-3 font-mono text-slate-300">
                       {m.recipient_to}
                     </td>
-                    <td className="py-2.5 px-3 font-mono text-neutral-500 text-[11px]">
+                    <td className="py-2.5 px-3 font-mono text-slate-400 text-[11px]">
                       {m.recipient_cc || '—'}
                     </td>
-                    <td className="py-2.5 px-3 max-w-[220px] truncate font-medium text-neutral-700" title={m.subject}>
+                    <td className="py-2.5 px-3 max-w-[220px] truncate font-medium text-slate-300" title={m.subject}>
                       {m.subject}
                     </td>
                     <td className="py-2.5 px-3 text-center">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        <CheckCircle2 className="w-3 h-3" />
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                         <span>Sent</span>
                       </span>
                     </td>

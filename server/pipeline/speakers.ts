@@ -21,7 +21,7 @@ import type { CallRecord } from '../../src/types';
 const ADVISOR_MARKERS = [
   /\b(?:good morning|good afternoon|good evening|hello)\s*(?:sir|madam|mr|mrs|dr)?\b/i,
   /\b(?:calling from|this is\s+[a-z\s]+from|relationship manager|wealth advisor|dealer)\b/i,
-  /\b(?:fundsindia|funds\s*india|equity\s*desk|broking\s*desk)\b/i,
+  /\b(?:equity\s*desk|broking\s*desk)\b/i,
   /\b(?:how can i help|can we buy|we can purchase|we recommend|current market price is|cmp is|limit price is)\b/i,
   /\b(?:confirming your order|order has been placed|executing on nse|executing on bse)\b/i,
   /\b(?:can you confirm your client code|your ucc is|confirming account|registered mobile)\b/i,
@@ -111,7 +111,7 @@ export function stage3_5AttributeSpeakers(
         }
 
         // Check for speaker labels (Advisor, Client, Dealer, etc.)
-        const speakerMatch = cleanText.match(/^(?:(advisor|dealer|agent|fundsindia|rep)|(client|customer|caller|user)):\s*(.*)/i);
+        const speakerMatch = cleanText.match(/^(?:(advisor|dealer|agent|rep)|(client|customer|caller|user)):\s*(.*)/i);
         if (speakerMatch) {
           if (speakerMatch[1]) {
             role = 'ADVISOR';
@@ -195,7 +195,7 @@ export function stage3_5AttributeSpeakers(
     const isAdvisorCue = ADVISOR_MARKERS.some((re) => re.test(text));
     const isClientCue = CLIENT_MARKERS.some((re) => re.test(text));
 
-    if (index === 0 && (isAdvisorCue || /\b(?:good morning|hello|calling|fundsindia)\b/i.test(text))) {
+    if (index === 0 && (isAdvisorCue || /\b(?:good morning|hello|calling)\b/i.test(text))) {
       seg.speaker = 'ADVISOR';
       currentSpeaker = 'ADVISOR';
       return;

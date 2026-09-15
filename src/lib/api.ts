@@ -80,7 +80,14 @@ export async function apiRequest<T = any>(
       const parsed = JSON.parse(errorText);
       errorMessage = parsed.error || parsed.message || errorMessage;
     } catch {
-      errorMessage = errorText.slice(0, 300) || errorMessage;
+      if (response.status === 413 || errorText.includes('413 Request Entity Too Large') || errorText.includes('Entity Too Large')) {
+        errorMessage = '413 Request Entity Too Large: The upload payload exceeded the reverse proxy limit. The app will automatically chunk the upload.';
+      } else if (errorText.includes('<html') || errorText.includes('<!DOCTYPE')) {
+        const titleMatch = errorText.match(/<title>([^<]+)<\/title>/i);
+        errorMessage = titleMatch ? `HTTP ${response.status}: ${titleMatch[1]}` : `HTTP ${response.status} ${response.statusText}`;
+      } else {
+        errorMessage = errorText.slice(0, 300) || errorMessage;
+      }
     }
     throw new Error(errorMessage);
   }
@@ -115,20 +122,20 @@ export const api = {
 
   // Data endpoints
   getStats: () => apiRequest<PipelineStats>('/api/stats'),
-  getCalls: (perPage = 100) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
+  getCalls: (perPage = 5000) => apiRequest<CallRecord[]>(`/api/calls?per_page=${perPage}`),
   getCall: (id: number) => apiRequest<CallRecord & { segments?: any[]; orders?: any[]; executions?: any[] }>(`/api/calls/${id}`),
-  getTrades: (perPage = 100) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
+  getTrades: (perPage = 5000) => apiRequest<TradeRecord[]>(`/api/trades?per_page=${perPage}`),
   getPreOrdersSummary: () =>
     apiRequest<{ ok: boolean; summary: TradePreOrdersSummary }>('/api/trades/pre-orders-summary'),
   matchPreOrdersWithCalls: () =>
     apiRequest<{ ok: boolean; summary: TradePreOrdersSummary; message: string }>('/api/trades/match-pre-orders-with-calls', {
       method: 'POST',
     }),
-  getMatches: (perPage = 100) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
-  getAudits: (perPage = 100) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),
-  getScorecards: (perPage = 100) => apiRequest<ScorecardRecord[]>(`/api/scorecards?per_page=${perPage}`),
+  getMatches: (perPage = 5000) => apiRequest<MatchRecord[]>(`/api/matches?per_page=${perPage}`),
+  getAudits: (perPage = 5000) => apiRequest<AuditRecord[]>(`/api/audits?per_page=${perPage}`),
+  getScorecards: (perPage = 5000) => apiRequest<ScorecardRecord[]>(`/api/scorecards?per_page=${perPage}`),
   getAdvisors: () => apiRequest<string[]>('/api/scorecards/advisors'),
-  getMailHistory: (perPage = 100) => apiRequest<MailHistoryRecord[]>(`/api/mail-history?per_page=${perPage}`),
+  getMailHistory: (perPage = 1000) => apiRequest<MailHistoryRecord[]>(`/api/mail-history?per_page=${perPage}`),
   getArchives: () => apiRequest<ReportArchive[]>('/api/reports/archives'),
   getIntegrations: () => apiRequest<SystemIntegrations>('/api/integrations'),
   saveIntegrations: (settings: Record<string, string>) =>
@@ -293,6 +300,12 @@ export const api = {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params || {}),
+    }),
+  simulateTataWebhook: (payload?: { client_number?: string; agent_name?: string; duration?: number }) =>
+    apiRequest<{ ok: boolean; message: string; call_id: number; is_scrap: boolean }>('/api/tata/simulate-webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload || {}),
     }),
   sendChatMessage: (query: string, mode: 'internal' | 'general' = 'internal') =>
     apiRequest<{ ok: boolean; answer: string; mode?: string; error?: string }>('/api/chat', {

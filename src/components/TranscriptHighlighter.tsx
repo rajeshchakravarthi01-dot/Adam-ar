@@ -79,7 +79,7 @@ const CLIENT_PATTERNS = [
 const ADVISOR_CUES = [
   /\b(?:good morning|good afternoon|good evening|hello)\s*(?:sir|madam|mr|mrs|dr)?\b/i,
   /\b(?:calling from|this is\s+[a-z\s]+from|relationship manager|wealth advisor|dealer)\b/i,
-  /\b(?:fundsindia|funds\s*india|equity\s*desk|broking\s*desk)\b/i,
+  /\b(?:equity\s*desk|broking\s*desk|trading\s*desk)\b/i,
   /\b(?:how can i help|can we buy|we can purchase|we recommend|current market price is|cmp is|limit price is)\b/i,
   /\b(?:confirming your order|order has been placed|executing on nse|executing on bse)\b/i,
   /\b(?:can you confirm your client code|your ucc is|confirming account|registered mobile)\b/i,
@@ -315,7 +315,7 @@ function highlightEntities(
       client: 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 rounded px-1 font-bold',
       stock: 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 rounded px-1 font-bold',
       price: 'bg-purple-500/20 text-purple-300 border border-purple-400/40 rounded px-1 font-bold',
-      quantity: 'bg-amber-500/20 text-amber-300 border border-amber-400/40 rounded px-1 font-bold',
+      quantity: 'bg-sky-500/20 text-sky-300 border border-sky-400/40 rounded px-1 font-bold',
       guarantee: 'bg-rose-500/30 text-rose-300 border border-rose-500/60 rounded px-1 font-bold underline decoration-rose-500 decoration-2',
     }[span.type];
 
@@ -401,7 +401,7 @@ function parseDialogueTurns(transcript: string, segments?: CallSegmentItem[]): D
     }
 
     // 2. Check for explicit speaker labels: Advisor:, Client:, Dealer:, etc.
-    const speakerMatch = cleanText.match(/^(?:(advisor|dealer|agent|fundsindia|broker)|(client|customer|caller|user)|(system|ivr|telephony)):\s*(.*)/i);
+    const speakerMatch = cleanText.match(/^(?:(advisor|dealer|agent|broker)|(client|customer|caller|user)|(system|ivr|telephony)):\s*(.*)/i);
     if (speakerMatch) {
       if (speakerMatch[1]) {
         explicitSpeaker = 'ADVISOR';
@@ -420,7 +420,7 @@ function parseDialogueTurns(transcript: string, segments?: CallSegmentItem[]): D
       const isAdvisorCue = ADVISOR_CUES.some((re) => re.test(cleanText));
       const isClientCue = CLIENT_CUES.some((re) => re.test(cleanText));
 
-      if (i === 0 && (isAdvisorCue || /\b(?:good morning|hello|calling|fundsindia)\b/i.test(cleanText))) {
+      if (i === 0 && (isAdvisorCue || /\b(?:good morning|hello|calling)\b/i.test(cleanText))) {
         determinedSpeaker = 'ADVISOR';
       } else if (isAdvisorCue && !isClientCue) {
         determinedSpeaker = 'ADVISOR';
@@ -688,7 +688,7 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
             <span>Price / CMP</span>
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+            <span className="w-2 h-2 rounded-full bg-sky-400"></span>
             <span>Quantity</span>
           </span>
           <span className="flex items-center gap-1">
@@ -698,8 +698,8 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
         </div>
 
         {currentTime !== undefined && (
-          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-medium animate-pulse">
-            <Volume2 className="w-3 h-3 text-amber-400" />
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-medium animate-pulse">
+            <Volume2 className="w-3 h-3 text-teal-400" />
             <span>Audio Tracking Active · Click line to jump</span>
           </div>
         )}
@@ -730,7 +730,7 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
                   }}
                   className={`p-3 rounded-xl border transition-all text-xs cursor-pointer ${
                     isActive
-                      ? 'bg-amber-500/15 border-amber-400 text-neutral-100 shadow-[0_4px_20px_rgba(251,191,36,0.18)] ring-2 ring-amber-400/60 scale-[1.006]'
+                      ? 'bg-teal-500/15 border-teal-400 text-neutral-100 shadow-[0_4px_20px_rgba(20,184,166,0.25)] ring-2 ring-teal-400/60 scale-[1.006]'
                       : isAdvisor
                       ? 'bg-neutral-900/90 border-indigo-500/30 shadow-[0_2px_8px_rgba(79,70,229,0.06)] hover:border-indigo-500/60'
                       : isClient
@@ -761,7 +761,7 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
 
                       {/* Playing Now Badge */}
                       {isActive && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-400 text-black font-bold text-[10px] animate-pulse">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-400 text-slate-950 font-bold text-[10px] animate-pulse">
                           <Volume2 className="w-3 h-3" />
                           PLAYING NOW
                         </span>
@@ -772,7 +772,7 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
                     <div className="flex items-center gap-1">
                       <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
                         isActive
-                          ? 'bg-amber-400 text-neutral-950 font-bold border-amber-300'
+                          ? 'bg-teal-400 text-neutral-950 font-bold border-teal-300'
                           : 'text-neutral-500 bg-neutral-950 border-neutral-800/80 hover:text-white'
                       }`}>
                         {turn.timestamp || '00:00'}
@@ -802,7 +802,7 @@ export const TranscriptHighlighter: React.FC<TranscriptHighlighterProps> = ({
                   key={turn.id}
                   onClick={() => turn.startTime !== undefined && onSeek && onSeek(turn.startTime)}
                   className={`p-1.5 rounded transition-colors cursor-pointer ${
-                    isActive ? 'bg-amber-500/25 border-l-4 border-amber-400 text-white font-medium pl-2' : 'hover:bg-neutral-900/60'
+                    isActive ? 'bg-teal-500/25 border-l-4 border-teal-400 text-white font-medium pl-2' : 'hover:bg-neutral-900/60'
                   }`}
                 >
                   <span className="text-neutral-500 mr-2 text-[10px]">[{turn.timestamp || '00:00'}]</span>

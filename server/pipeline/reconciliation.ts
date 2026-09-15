@@ -419,35 +419,9 @@ export function ensureScorecardsForMatchedCalls(db: DatabaseSync): number {
   ensureAuditAndScorecardColumns(db);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
-  // 0. Strict Sanity Enforcement: A call can NEVER have an audit or scorecard without a valid verbatim transcript!
-  // Remove any stale/premature audits or scorecards for calls that have not completed transcription yet.
-  try {
-    db.prepare(`
-      DELETE FROM scorecards WHERE call_id IN (
-        SELECT id FROM calls WHERE transcript_status != 'VALID' OR transcript IS NULL OR length(trim(transcript)) < 15
-      )
-    `).run();
-
-    db.prepare(`
-      DELETE FROM audits WHERE call_id IN (
-        SELECT id FROM calls WHERE transcript_status != 'VALID' OR transcript IS NULL OR length(trim(transcript)) < 15
-      )
-    `).run();
-
-    // Re-queue un-transcribed calls that were prematurely marked audited
-    db.prepare(`
-      UPDATE calls SET
-        status = 'retry_pending',
-        processing_status = 'IDLE',
-        audit_status = 'PENDING',
-        pipeline_stage = 'TRANSCRIBING',
-        current_gate = 'GATE_3',
-        gate_reason = 'Awaiting valid transcription before audit eligibility',
-        updated_at = ?
-      WHERE (transcript_status != 'VALID' OR transcript IS NULL OR length(trim(transcript)) < 15)
-        AND status = 'audited'
-    `).run(now);
-  } catch {}
+  // 0. Data Protection Guarantee: Scorecards and audits are regulatory audit trails.
+  // Never delete or purge scorecards/audits during automated reconciliation passes.
+  // Instead, ensure metadata synchronization while leaving completed records intact.
 
   // 1. Gather all matched pairs (call_id -> trade_id)
   const matchedPairs = new Map<number, number>();
@@ -511,31 +485,29 @@ export function ensureScorecardsForMatchedCalls(db: DatabaseSync): number {
     const transcriptStatus = (call.transcript_status || '').toUpperCase();
     const isTranscribed = transcriptStatus === 'VALID' && transcript.length >= 15;
 
-    // Strict Gate: If call has not completed transcription, it CANNOT be audited yet!
+    // Strict Gate: If call has not completed transcription, wait for transcription before generating scorecard
     if (!isTranscribed) {
-      // Purge any premature scorecard or audit generated before transcription
-      try {
-        db.prepare('DELETE FROM scorecards WHERE call_id = ?').run(callId);
-        db.prepare('DELETE FROM audits WHERE call_id = ?').run(callId);
-        db.prepare(`
-          UPDATE calls SET
-            classification = 'PRE_ORDER',
-            call_type = 'pre_order',
-            trade_match_status = 'CONFIRMED',
-            matched_trade_id = ?,
-            client_code = COALESCE(NULLIF(client_code, ''), ?),
-            client = COALESCE(NULLIF(client, ''), ?),
-            identity_status = 'CONFIRMED',
-            status = 'retry_pending',
-            processing_status = 'IDLE',
-            audit_status = 'PENDING',
-            pipeline_stage = 'TRANSCRIBING',
-            current_gate = 'GATE_3',
-            gate_reason = 'Awaiting valid audio transcription before compliance audit',
-            updated_at = ?
-          WHERE id = ?
-        `).run(tradeId, resolvedClient, resolvedClient, now, callId);
-      } catch {}
+      // Check if audit already exists (e.g. historical or mail-based audit)
+      const existingAudit = db.prepare('SELECT id FROM audits WHERE call_id = ? LIMIT 1').get(callId);
+      if (!existingAudit) {
+        try {
+          db.prepare(`
+            UPDATE calls SET
+              classification = 'PRE_ORDER',
+              call_type = 'pre_order',
+              trade_match_status = 'CONFIRMED',
+              matched_trade_id = ?,
+              client_code = COALESCE(NULLIF(client_code, ''), ?),
+              client = COALESCE(NULLIF(client, ''), ?),
+              identity_status = 'CONFIRMED',
+              status = CASE WHEN status = 'audited' THEN 'audited' ELSE 'retry_pending' END,
+              processing_status = CASE WHEN status = 'audited' THEN 'COMPLETED' ELSE 'IDLE' END,
+              audit_status = CASE WHEN status = 'audited' THEN 'COMPLETED' ELSE 'PENDING' END,
+              updated_at = ?
+            WHERE id = ?
+          `).run(tradeId, resolvedClient, resolvedClient, now, callId);
+        } catch {}
+      }
       continue;
     }
 

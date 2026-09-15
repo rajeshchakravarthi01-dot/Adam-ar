@@ -44,16 +44,16 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Control Banner - Classy Black & Yellow */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Control Banner */}
+      <div className="glass-panel p-5 rounded-2xl shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+          <h2 className="text-base font-bold text-neutral-100 flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20">
               <GitCompare className="w-4 h-4" />
             </span>
             <span>Deterministic Call &harr; Trade Correlation Engine</span>
           </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
+          <p className="text-xs text-neutral-400 mt-0.5">
             Correlates trades to call recordings using 4 primary audit anchors: <b>Client Code</b>, <b>Stock Symbol</b>, <b>Executed Price</b>, and <b>Quantity</b>.
           </p>
         </div>
@@ -61,15 +61,15 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
         <button
           onClick={handleRunClick}
           disabled={isLoading}
-          className="px-6 py-2.5 bg-black hover:bg-neutral-900 disabled:opacity-50 text-amber-400 font-bold rounded-xl text-xs shadow-md transition-transform active:scale-95 cursor-pointer flex items-center justify-center gap-2 border border-amber-400/30 shrink-0"
+          className="px-6 py-2.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-teal-500/20 transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2 shrink-0"
         >
-          <Play className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+          <Play className="w-3.5 h-3.5 fill-slate-950 text-slate-950" />
           <span>{isLoading ? 'Running Matching…' : 'Run Matching Now'}</span>
         </button>
       </div>
 
       {matchingStatusText && (
-        <div className="text-xs font-medium text-neutral-800 bg-amber-50 p-3 rounded-xl border border-amber-200">
+        <div className="text-xs font-medium text-teal-200 bg-teal-500/10 p-3 rounded-xl border border-teal-500/25 shadow-inner">
           {matchingStatusText}
         </div>
       )}
@@ -80,64 +80,64 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
           onClick={() => setFilterStatus('matched')}
           className={`p-4 rounded-xl border transition-all cursor-pointer ${
             filterStatus === 'matched'
-              ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20'
-              : 'bg-white border-neutral-200 hover:border-neutral-300'
+              ? 'bg-emerald-500/15 border-emerald-400/40 ring-2 ring-emerald-500/30'
+              : 'glass-panel border-white/10 hover:border-emerald-400/30'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-800">Confirmed Matched</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span className="text-xs font-semibold text-emerald-300">Confirmed Matched</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
           </div>
-          <div className="text-xl font-black text-emerald-950 mt-1">{matchedCount}</div>
-          <div className="text-[11px] text-emerald-700 mt-0.5">Anchors verified &amp; ready for audit</div>
+          <div className="text-xl font-black text-white mt-1">{matchedCount}</div>
+          <div className="text-[11px] text-emerald-400/80 mt-0.5">Anchors verified &amp; ready for audit</div>
         </div>
 
         <div
           onClick={() => setFilterStatus('review')}
           className={`p-4 rounded-xl border transition-all cursor-pointer ${
             filterStatus === 'review'
-              ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-500/20'
-              : 'bg-white border-neutral-200 hover:border-neutral-300'
+              ? 'bg-cyan-500/15 border-cyan-400/40 ring-2 ring-cyan-500/30'
+              : 'glass-panel border-white/10 hover:border-cyan-400/30'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">Review Candidate</span>
-            <HelpCircle className="w-4 h-4 text-amber-600" />
+            <span className="text-xs font-semibold text-cyan-300">Review Candidate</span>
+            <HelpCircle className="w-4 h-4 text-cyan-400" />
           </div>
-          <div className="text-xl font-black text-amber-950 mt-1">{reviewCount}</div>
-          <div className="text-[11px] text-amber-700 mt-0.5">Partial anchor hit (awaiting review)</div>
+          <div className="text-xl font-black text-white mt-1">{reviewCount}</div>
+          <div className="text-[11px] text-cyan-400/80 mt-0.5">Partial anchor hit (awaiting review)</div>
         </div>
 
         <div
           onClick={() => setFilterStatus('all')}
           className={`p-4 rounded-xl border transition-all cursor-pointer ${
             filterStatus === 'all'
-              ? 'bg-neutral-100 border-neutral-300 ring-2 ring-neutral-500/20'
-              : 'bg-white border-neutral-200 hover:border-neutral-300'
+              ? 'glass-inner border-teal-400/40 ring-2 ring-teal-400/20'
+              : 'glass-panel border-white/10 hover:border-white/20'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-neutral-700">All Proposals</span>
-            <Layers className="w-4 h-4 text-neutral-500" />
+            <span className="text-xs font-semibold text-neutral-300">All Proposals</span>
+            <Layers className="w-4 h-4 text-neutral-400" />
           </div>
-          <div className="text-xl font-black text-neutral-900 mt-1">{matches.length}</div>
-          <div className="text-[11px] text-neutral-500 mt-0.5">Total matching correlations recorded</div>
+          <div className="text-xl font-black text-white mt-1">{matches.length}</div>
+          <div className="text-[11px] text-neutral-400 mt-0.5">Total matching correlations recorded</div>
         </div>
       </div>
 
       {/* Matches Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-neutral-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="glass-panel rounded-2xl shadow-xl overflow-hidden">
+        <div className="p-4 border-b border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-semibold text-neutral-800 focus:outline-hidden focus:border-amber-400"
+              className="px-3 py-1.5 glass-input rounded-xl text-xs font-semibold"
             >
-              <option value="all">All Statuses ({matches.length})</option>
-              <option value="matched">Matched ({matchedCount})</option>
-              <option value="review">Review ({reviewCount})</option>
-              <option value="unmatched">Unmatched ({unmatchedCount})</option>
+              <option value="all" className="bg-[#10131c] text-white">All Statuses ({matches.length})</option>
+              <option value="matched" className="bg-[#10131c] text-white">Matched ({matchedCount})</option>
+              <option value="review" className="bg-[#10131c] text-white">Review ({reviewCount})</option>
+              <option value="unmatched" className="bg-[#10131c] text-white">Unmatched ({unmatchedCount})</option>
             </select>
           </div>
 
@@ -148,16 +148,16 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by client, symbol, or filename…"
-              className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 placeholder:text-neutral-400 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+              className="w-full pl-8 pr-3 py-1.5 glass-input rounded-xl text-xs"
             />
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#111115] text-neutral-200 font-semibold border-b border-neutral-800 text-[11px] uppercase tracking-wider">
+            <thead className="glass-inner text-neutral-300 font-semibold border-b border-white/10 text-[11px] uppercase tracking-wider">
               <tr>
-                <th className="py-2.5 px-3 text-amber-400">Match ID</th>
+                <th className="py-2.5 px-3 text-teal-400">Match ID</th>
                 <th className="py-2.5 px-3">Call Recording</th>
                 <th className="py-2.5 px-3">Client Code</th>
                 <th className="py-2.5 px-3">Symbol</th>
@@ -168,7 +168,7 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
                 <th className="py-2.5 px-3">Matching Anchors / Reason</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-white/5 text-neutral-200">
               {filteredMatches.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-8 text-center text-neutral-400">
@@ -177,46 +177,46 @@ export const MatchingView: React.FC<MatchingViewProps> = ({
                 </tr>
               ) : (
                 filteredMatches.map((m) => (
-                  <tr key={m.id} className="hover:bg-amber-50/30 transition-colors">
-                    <td className="py-2.5 px-3 font-mono font-bold text-amber-600">#{m.id}</td>
-                    <td className="py-2.5 px-3 font-medium text-neutral-900 max-w-[180px] truncate" title={m.recording_name}>
+                  <tr key={m.id} className="hover:bg-white/5 transition-colors">
+                    <td className="py-2.5 px-3 font-mono font-bold text-teal-400">#{m.id}</td>
+                    <td className="py-2.5 px-3 font-medium text-neutral-100 max-w-[180px] truncate" title={m.recording_name}>
                       {m.recording_name || `Call #${m.call_id}`}
                     </td>
                     <td className="py-2.5 px-3">
-                      <span className="font-mono font-bold px-2 py-0.5 rounded bg-neutral-100 text-neutral-900 border border-neutral-200">
+                      <span className="font-mono font-bold px-2 py-0.5 rounded glass-inner text-teal-300 border border-white/10">
                         {m.trade_client || m.call_client || '—'}
                       </span>
                     </td>
-                    <td className="py-2.5 px-3 font-bold text-neutral-900">{m.symbol || '—'}</td>
-                    <td className="py-2.5 px-3 font-mono">
+                    <td className="py-2.5 px-3 font-bold text-neutral-100">{m.symbol || '—'}</td>
+                    <td className="py-2.5 px-3 font-mono text-neutral-200">
                       {m.quantity !== undefined && m.quantity !== null ? m.quantity : '—'} @ {m.price !== undefined && m.price !== null ? `₹${m.price.toFixed(2)}` : '—'}
                     </td>
-                    <td className="py-2.5 px-3 text-neutral-500">
+                    <td className="py-2.5 px-3 text-neutral-400">
                       {m.trade_date || m.call_date || '—'}
                     </td>
                     <td className="py-2.5 px-3 font-mono font-bold">
-                      <span className={m.confidence >= 0.75 ? 'text-emerald-600' : 'text-amber-600'}>
+                      <span className={m.confidence >= 0.75 ? 'text-emerald-400' : 'text-cyan-400'}>
                         {Math.round((m.confidence || 0) * 100)}%
                       </span>
                     </td>
                     <td className="py-2.5 px-3">
                       {m.status === 'matched' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>Matched</span>
                         </span>
                       ) : m.status === 'review' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-300">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                           <AlertCircle className="w-3 h-3" />
                           <span>Review</span>
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium glass-inner text-neutral-300 border border-white/10">
                           <span>Unmatched</span>
                         </span>
                       )}
                     </td>
-                    <td className="py-2.5 px-3 text-neutral-600 max-w-[280px] truncate" title={m.reason}>
+                    <td className="py-2.5 px-3 text-neutral-400 max-w-[280px] truncate" title={m.reason}>
                       {m.reason || 'Deterministic anchors corroborated.'}
                     </td>
                   </tr>

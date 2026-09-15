@@ -378,49 +378,49 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
     <div className="space-y-5">
       {/* Notifications */}
       {actionMessage && (
-        <div className="bg-amber-400 text-black px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs">
+        <div className="glass-panel border border-emerald-500/30 text-emerald-300 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-lg shadow-emerald-500/10">
           <div className="flex items-center gap-2">
-            <Check className="w-4 h-4" />
+            <Check className="w-4 h-4 text-emerald-400" />
             <span>{actionMessage}</span>
           </div>
-          <button onClick={() => setActionMessage(null)} className="hover:opacity-75 cursor-pointer">
+          <button onClick={() => setActionMessage(null)} className="hover:opacity-75 cursor-pointer text-emerald-400">
             &times;
           </button>
         </div>
       )}
 
       {errorMessage && (
-        <div className="bg-rose-50 text-rose-800 border border-rose-200 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between shadow-xs">
+        <div className="glass-panel border border-rose-500/30 text-rose-300 px-4 py-2.5 rounded-xl text-xs flex items-center justify-between shadow-lg shadow-rose-500/10">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-600" />
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
             <span>{errorMessage}</span>
           </div>
-          <button onClick={() => setErrorMessage(null)} className="hover:opacity-75 cursor-pointer">
+          <button onClick={() => setErrorMessage(null)} className="hover:opacity-75 cursor-pointer text-rose-400">
             &times;
           </button>
         </div>
       )}
 
       {/* Header Banner */}
-      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="glass-panel p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xl">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30">
+            <span className="p-1.5 rounded-lg bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20">
               <MailCheck className="w-4 h-4" />
             </span>
-            <h2 className="text-base font-bold text-slate-100">
+            <h2 className="text-base font-bold text-neutral-100">
               Manual Trade Audit (Missing Call / Mail Confirmation)
             </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-slate-800 text-teal-300 border border-teal-500/20">
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded-md glass-inner text-teal-300 border border-white/10">
               {trades.length} Executed Trades
             </span>
             {pendingCount > 0 && (
-              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30">
                 {pendingCount} Pending Mail Audit
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-neutral-400 mt-1">
             Reconcile executed trades that have missing telephony call recordings. Enter authorized client email
             confirmation references, adjust rubric criteria (Q1–Q5), and publish directly to Scorecards.
           </p>
@@ -442,16 +442,16 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingPdfs}
-            className="px-3.5 py-2 bg-gradient-to-r from-teal-500/20 to-cyan-500/20 hover:from-teal-500/30 hover:to-cyan-500/30 text-teal-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-teal-500/30 transition-all cursor-pointer"
+            className="px-3.5 py-2 glass-panel hover:bg-teal-500/20 text-teal-300 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-teal-400/30 transition-all cursor-pointer shadow-md shadow-teal-500/10"
           >
-            <UploadCloud className={`w-3.5 h-3.5 text-teal-300 ${isUploadingPdfs ? 'animate-bounce' : ''}`} />
+            <UploadCloud className={`w-3.5 h-3.5 text-teal-400 ${isUploadingPdfs ? 'animate-bounce' : ''}`} />
             <span>{isUploadingPdfs ? 'Processing PDFs...' : 'Upload Mail / PDF Confirmations'}</span>
           </button>
 
           <button
             onClick={handleAutoResolveReviews}
             disabled={isResolvingReviews}
-            className="px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-500/20 transition-colors cursor-pointer"
+            className="px-3 py-2 glass-inner hover:bg-emerald-500/20 text-emerald-300 font-semibold text-xs rounded-xl flex items-center gap-1.5 border border-emerald-500/30 transition-colors cursor-pointer"
             title="Auto-resolve calls in Review Required state"
           >
             <Sparkles className={`w-3.5 h-3.5 text-emerald-400 ${isResolvingReviews ? 'animate-spin' : ''}`} />
@@ -462,7 +462,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
             <button
               onClick={handleBulkApprovePending}
               disabled={isBulkSubmitting}
-              className="px-3.5 py-2 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-lg shadow-teal-500/20 cursor-pointer"
+              className="px-3.5 py-2 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-lg shadow-teal-500/20 cursor-pointer"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>{isBulkSubmitting ? 'Auditing...' : `Approve & Publish All (${pendingCount})`}</span>
@@ -471,19 +471,19 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
 
           <button
             onClick={exportCSV}
-            className="px-3 py-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-slate-700 transition-colors cursor-pointer"
+            className="px-3 py-2 glass-inner hover:bg-white/10 text-neutral-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-white/10 transition-colors cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-slate-400" />
+            <Download className="w-3.5 h-3.5 text-neutral-400" />
             <span>Export CSV</span>
           </button>
 
           <button
             onClick={fetchMissingTrades}
             disabled={isLoading}
-            className="p-2 bg-slate-800/80 hover:bg-slate-700/80 text-slate-300 rounded-xl border border-slate-700 cursor-pointer"
+            className="p-2 glass-inner hover:bg-white/10 text-neutral-300 rounded-xl border border-white/10 cursor-pointer transition-colors"
             title="Refresh list"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-teal-400' : ''}`} />
           </button>
         </div>
       </div>
@@ -502,22 +502,22 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
         }}
         className={`border-2 border-dashed rounded-2xl p-4 transition-all flex flex-col sm:flex-row items-center justify-between gap-4 ${
           isDragOver
-            ? 'border-teal-400 bg-teal-500/10'
-            : 'border-slate-700 hover:border-teal-500/40 bg-slate-900/40 backdrop-blur-md'
+            ? 'border-teal-400 bg-teal-400/10 shadow-lg shadow-teal-400/10'
+            : 'border-white/15 hover:border-teal-400/40 glass-panel shadow-xl'
         }`}
       >
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-300 flex items-center justify-center shrink-0 border border-teal-500/30">
+          <div className="w-10 h-10 rounded-xl bg-teal-400/20 text-teal-400 flex items-center justify-center shrink-0 border border-teal-400/30">
             <FileUp className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+            <div className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
               <span>Automatic Mail / PDF Trade Audit Upload</span>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-teal-400/20 text-teal-300 border border-teal-400/30">
                 SEBI Matching Rules
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-neutral-400 mt-0.5">
               Drag and drop client confirmation PDFs or email exports (.pdf, .eml, .txt). Matches stock name,
               quantity, and price. If CMP (Current Market Price) is mentioned, price is automatically accepted.
             </p>
@@ -529,7 +529,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploadingPdfs}
-            className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
+            className="px-3.5 py-1.5 glass-inner hover:bg-white/10 text-neutral-200 font-bold text-xs rounded-xl border border-white/10 shadow-xs cursor-pointer flex items-center gap-1.5 transition-colors"
           >
             <UploadCloud className="w-3.5 h-3.5 text-teal-400" />
             <span>Select PDF Files</span>
@@ -539,17 +539,17 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
 
       {/* Upload Results Summary Modal / Card */}
       {uploadSummary && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-3">
+        <div className="glass-panel border border-emerald-500/30 rounded-2xl p-4 space-y-3 shadow-xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileCheck2 className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-xs font-bold text-emerald-900">
+              <FileCheck2 className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold text-emerald-300">
                 Mail Confirmation Matching Results ({uploadSummary.matchedCount} Matched / {uploadSummary.filesProcessed} Files Processed)
               </h3>
             </div>
             <button
               onClick={() => setUploadSummary(null)}
-              className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer"
+              className="text-emerald-400 hover:text-emerald-300 p-1 cursor-pointer"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -558,20 +558,20 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           {uploadSummary.matches && uploadSummary.matches.length > 0 && (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
               {uploadSummary.matches.map((m: any, idx: number) => (
-                <div key={idx} className="bg-white p-2.5 rounded-xl border border-emerald-200 text-[11px] space-y-1">
-                  <div className="flex items-center justify-between font-bold text-neutral-900">
+                <div key={idx} className="glass-inner p-2.5 rounded-xl border border-emerald-500/30 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between font-bold text-neutral-200">
                     <span>Trade #{m.tradeId} &bull; {m.symbol}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] border border-emerald-500/30">
                       Score: 5 / 5
                     </span>
                   </div>
-                  <div className="text-neutral-600">
-                    Qty: <span className="font-semibold text-neutral-900">{m.quantity}</span> | Price:{' '}
-                    <span className="font-semibold text-neutral-900">
+                  <div className="text-neutral-400">
+                    Qty: <span className="font-semibold text-neutral-200">{m.quantity}</span> | Price:{' '}
+                    <span className="font-semibold text-neutral-200">
                       {m.isCmp ? 'CMP (Market Price Passed)' : `₹${m.price}`}
                     </span>
                   </div>
-                  <div className="text-[10px] text-neutral-500 truncate" title={m.fileName}>
+                  <div className="text-[10px] text-neutral-400 truncate" title={m.fileName}>
                     File: {m.fileName}
                   </div>
                 </div>
@@ -580,7 +580,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
           )}
 
           {uploadSummary.unmatchedFiles && uploadSummary.unmatchedFiles.length > 0 && (
-            <div className="text-[11px] text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
+            <div className="text-[11px] text-amber-300 glass-inner p-2 rounded-lg border border-amber-400/30">
               <span className="font-semibold">Unmatched files ({uploadSummary.unmatchedFiles.length}):</span>{' '}
               {uploadSummary.unmatchedFiles.join(', ')}
             </div>
@@ -590,33 +590,33 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
+        <div className="glass-panel p-4 rounded-xl flex items-center justify-between shadow-lg">
           <div>
-            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
               Total Trades Missing Calls
             </div>
-            <div className="text-xl font-bold text-slate-100 mt-0.5">{trades.length}</div>
+            <div className="text-xl font-bold text-neutral-100 mt-0.5">{trades.length}</div>
           </div>
-          <div className="p-2.5 rounded-xl bg-slate-800/80 text-teal-400 border border-teal-500/20">
+          <div className="p-2.5 rounded-xl glass-inner text-teal-400 border border-white/10">
             <Layers className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
+        <div className="glass-panel p-4 rounded-xl flex items-center justify-between shadow-lg">
           <div>
-            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
               Pending Mail Audit
             </div>
-            <div className="text-xl font-bold text-amber-400 mt-0.5">{pendingCount}</div>
+            <div className="text-xl font-bold text-teal-400 mt-0.5">{pendingCount}</div>
           </div>
-          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <div className="p-2.5 rounded-xl bg-teal-500/10 text-teal-400 border border-teal-400/20">
             <Clock className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="glass-card p-4 rounded-xl flex items-center justify-between">
+        <div className="glass-panel p-4 rounded-xl flex items-center justify-between shadow-lg">
           <div>
-            <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">
+            <div className="text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
               Audited &amp; Sent to Scorecards
             </div>
             <div className="text-xl font-bold text-emerald-400 mt-0.5">{auditedCount}</div>
@@ -628,24 +628,24 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
       </div>
 
       {/* Filters Bar */}
-      <div className="glass-panel p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="glass-panel p-3.5 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
         <div className="relative w-full sm:w-80">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search by Trade ID, Client UCC, Symbol, Advisor..."
-            className="w-full pl-8 pr-3 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-lg text-xs text-slate-100 placeholder:text-slate-500 focus:outline-hidden focus:border-teal-400"
+            className="w-full pl-8 pr-3 py-1.5 glass-input rounded-lg text-xs"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto">
-          <span className="text-xs text-slate-400 whitespace-nowrap">Filter Status:</span>
+          <span className="text-xs text-neutral-400 whitespace-nowrap">Filter Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as any)}
-            className="px-2.5 py-1.5 bg-slate-900/80 border border-slate-700/80 rounded-lg text-xs text-slate-200 font-medium focus:outline-hidden focus:border-teal-400"
+            className="px-2.5 py-1.5 glass-input rounded-lg text-xs font-medium"
           >
             <option value="ALL">All ({trades.length})</option>
             <option value="PENDING">Pending Audit ({pendingCount})</option>
@@ -655,121 +655,121 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
       </div>
 
       {/* Table Container */}
-      <div className="glass-panel rounded-xl overflow-hidden border border-teal-500/20">
+      <div className="glass-panel rounded-xl overflow-hidden border border-white/10 shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
-            <thead className="bg-slate-950/80 text-teal-300 text-[11px] uppercase tracking-wider font-semibold border-b border-teal-500/20">
+            <thead className="glass-inner text-neutral-300 text-[11px] uppercase tracking-wider font-semibold border-b border-white/10">
               <tr>
                 <th
                   onClick={() => toggleSort('id')}
-                  className="py-3 px-3 cursor-pointer hover:text-teal-200 text-teal-400 select-none whitespace-nowrap"
+                  className="py-3 px-3 cursor-pointer hover:text-white text-teal-400 select-none whitespace-nowrap"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade #</span>
                     {sortField === 'id' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('client')}
-                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[110px]"
+                  className="py-3 px-3 cursor-pointer hover:text-white select-none whitespace-nowrap min-w-[110px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Client UCC</span>
                     {sortField === 'client' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('advisor_name')}
-                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[130px]"
+                  className="py-3 px-3 cursor-pointer hover:text-white select-none whitespace-nowrap min-w-[130px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Advisor</span>
                     {sortField === 'advisor_name' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th
                   onClick={() => toggleSort('trade_date')}
-                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[100px]"
+                  className="py-3 px-3 cursor-pointer hover:text-white select-none whitespace-nowrap min-w-[100px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade Date</span>
                     {sortField === 'trade_date' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 whitespace-nowrap min-w-[110px]">Phone CLI</th>
                 <th
                   onClick={() => toggleSort('symbol')}
-                  className="py-3 px-3 cursor-pointer hover:text-teal-200 select-none whitespace-nowrap min-w-[130px]"
+                  className="py-3 px-3 cursor-pointer hover:text-white select-none whitespace-nowrap min-w-[130px]"
                 >
                   <div className="flex items-center gap-1">
                     <span>Trade Details</span>
                     {sortField === 'symbol' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 min-w-[240px]">Mail Confirmation Ref / Proof</th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q1: Registered Number / Authorised (Fatal)">
-                  <div className="text-teal-300 font-bold">Q1</div>
+                  <div className="text-teal-400 font-bold">Q1</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q2: Client UCC explicitly stated (Fatal)">
-                  <div className="text-teal-300 font-bold">Q2</div>
+                  <div className="text-teal-400 font-bold">Q2</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q3: Stock, Quantity & Price confirmed (1 Pt)">
-                  <div className="text-teal-300 font-bold">Q3</div>
-                  <div className="text-[9px] text-slate-400 normal-case">1 Pt</div>
+                  <div className="text-teal-400 font-bold">Q3</div>
+                  <div className="text-[9px] text-neutral-400 normal-case">1 Pt</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q4: Customer Acknowledgement (Compliant per regulatory rubric)">
-                  <div className="text-teal-300 font-bold">Q4</div>
+                  <div className="text-teal-400 font-bold">Q4</div>
                   <div className="text-[9px] text-emerald-400 font-bold normal-case">PASS</div>
                 </th>
                 <th className="py-3 px-1.5 text-center whitespace-nowrap" title="Q5: Return / Profit Guarantee Prohibition (Fatal)">
-                  <div className="text-teal-300 font-bold">Q5</div>
+                  <div className="text-teal-400 font-bold">Q5</div>
                   <div className="text-[9px] text-rose-400 font-semibold normal-case">Fatal</div>
                 </th>
                 <th
                   onClick={() => toggleSort('score')}
-                  className="py-3 px-2 text-center cursor-pointer hover:text-teal-200 select-none whitespace-nowrap"
+                  className="py-3 px-2 text-center cursor-pointer hover:text-white select-none whitespace-nowrap"
                 >
                   <div className="flex items-center justify-center gap-1">
                     <span>Score</span>
                     {sortField === 'score' ? (
                       sortOrder === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />
                     ) : (
-                      <ChevronsUpDown className="w-3 h-3 text-slate-500" />
+                      <ChevronsUpDown className="w-3 h-3 text-neutral-500" />
                     )}
                   </div>
                 </th>
                 <th className="py-3 px-3 text-right whitespace-nowrap min-w-[140px]">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/40 text-slate-200">
+            <tbody className="divide-y divide-white/5 text-neutral-200">
               {filteredTrades.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-400">
-                    <Mail className="w-8 h-8 mx-auto text-slate-600 mb-2" />
-                    <div className="text-sm font-semibold text-slate-300">No Missing Call Trades Found</div>
-                    <div className="text-xs text-slate-500 mt-0.5">
+                  <td colSpan={14} className="py-12 text-center text-neutral-400">
+                    <Mail className="w-8 h-8 mx-auto text-neutral-600 mb-2" />
+                    <div className="text-sm font-semibold text-neutral-300">No Missing Call Trades Found</div>
+                    <div className="text-xs text-neutral-500 mt-0.5">
                       All uploaded trades currently have linked audio call recordings or no trades match filters.
                     </div>
                   </td>
@@ -784,12 +784,12 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                   return (
                     <tr
                       key={t.id}
-                      className={`transition-colors hover:bg-teal-500/5 ${
+                      className={`transition-colors hover:bg-white/5 ${
                         isSuccess
                           ? 'bg-emerald-500/10'
                           : isFatal
                           ? 'border-l-4 border-l-rose-500'
-                          : 'border-l-4 border-l-amber-500'
+                          : 'border-l-4 border-l-teal-500'
                       }`}
                     >
                       {/* Trade ID */}
@@ -816,7 +816,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.client}
                           onChange={(e) => handleCellChange(t, 'client', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono font-bold text-teal-300 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white/5 focus:bg-black/50 border border-transparent hover:border-white/10 focus:border-teal-400 rounded-md text-xs font-mono font-bold text-teal-300 focus:outline-hidden"
                         />
                       </td>
 
@@ -826,12 +826,12 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.caller_name}
                           onChange={(e) => handleCellChange(t, 'caller_name', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs text-slate-200 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white/5 focus:bg-black/50 border border-transparent hover:border-white/10 focus:border-teal-400 rounded-md text-xs text-neutral-200 focus:outline-hidden"
                         />
                       </td>
 
                       {/* Trade Date */}
-                      <td className="py-2 px-3 text-slate-400 whitespace-nowrap font-mono text-[11px]">
+                      <td className="py-2 px-3 text-neutral-400 whitespace-nowrap font-mono text-[11px]">
                         {t.trade_date ? String(t.trade_date).slice(0, 10) : '—'}
                       </td>
 
@@ -841,14 +841,14 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           type="text"
                           value={state.phone}
                           onChange={(e) => handleCellChange(t, 'phone', e.target.value)}
-                          className="w-full px-1.5 py-1 bg-transparent hover:bg-slate-900/60 focus:bg-slate-950 border border-transparent hover:border-slate-700/50 focus:border-teal-400 rounded-md text-xs font-mono text-slate-300 focus:outline-hidden"
+                          className="w-full px-1.5 py-1 bg-transparent hover:bg-white/5 focus:bg-black/50 border border-transparent hover:border-white/10 focus:border-teal-400 rounded-md text-xs font-mono text-neutral-300 focus:outline-hidden"
                         />
                       </td>
 
                       {/* Trade Details */}
                       <td className="py-2 px-3 whitespace-nowrap">
-                        <div className="font-semibold text-slate-100">{t.symbol || '—'}</div>
-                        <div className="text-[11px] text-slate-400 font-mono">
+                        <div className="font-semibold text-neutral-100">{t.symbol || '—'}</div>
+                        <div className="text-[11px] text-neutral-400 font-mono">
                           {t.quantity || 0} qty @ ₹{t.price || 0}
                         </div>
                       </td>
@@ -860,8 +860,8 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                             type="text"
                             value={state.mail_reference}
                             onChange={(e) => handleCellChange(t, 'mail_reference', e.target.value)}
-                            placeholder="e.g. Email from client@fundsindia.com on 2026-09-07..."
-                            className="w-full px-2 py-1 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-950 border border-slate-700/80 focus:border-teal-400 rounded-md text-xs text-slate-100 placeholder:text-slate-500 focus:outline-hidden"
+                            placeholder="e.g. Email from client@auditeq.com on 2026-09-07..."
+                            className="w-full px-2 py-1 glass-input rounded-md text-xs"
                           />
                         </div>
                       </td>
@@ -877,8 +877,8 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                               : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
-                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
+                          <option value="PASS" className="bg-neutral-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-neutral-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -893,8 +893,8 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                               : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
-                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
+                          <option value="PASS" className="bg-neutral-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-neutral-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -909,8 +909,8 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                               : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
-                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
+                          <option value="PASS" className="bg-neutral-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-neutral-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -933,8 +933,8 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                               : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                           }`}
                         >
-                          <option value="PASS" className="bg-slate-900 text-emerald-300">PASS</option>
-                          <option value="FAIL" className="bg-slate-900 text-rose-300">FAIL</option>
+                          <option value="PASS" className="bg-neutral-900 text-emerald-300">PASS</option>
+                          <option value="FAIL" className="bg-neutral-900 text-rose-300">FAIL</option>
                         </select>
                       </td>
 
@@ -945,7 +945,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                             state.score === 5
                               ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                               : state.score === 4
-                              ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
                               : 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-black'
                           }`}
                         >
@@ -964,7 +964,7 @@ export const ManualTradeAuditView: React.FC<ManualTradeAuditViewProps> = ({
                           <button
                             onClick={() => handleAuditSingle(t)}
                             disabled={isSubmitting}
-                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-cyan-500 hover:from-teal-300 hover:to-cyan-400 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-teal-500/20 disabled:opacity-50"
+                            className="px-3 py-1.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold text-xs rounded-lg inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-teal-500/20 disabled:opacity-50"
                           >
                             <Send className="w-3 h-3 text-slate-950" />
                             <span>{isSubmitting ? 'Sending...' : 'Audit & Send'}</span>

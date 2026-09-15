@@ -23,7 +23,7 @@ import { stage8CalculateScore } from './scoring';
 import { stage9PublishAudit, stage9ReconcileMissingCalls } from './reconciliation';
 import type { CallRecord } from '../../src/types';
 import type { ClassificationResult } from './types';
-import { geminiTranscribeLimiter } from '../asr-engine';
+import { groqWhisperRateLimiter } from '../asr-engine';
 import { detectHighRecallPreOrderCandidate } from '../classifier';
 
 export interface PipelineWorkerStatus {
@@ -40,8 +40,8 @@ export interface PipelineWorkerStatus {
 let isWorkerLoopActive = false;
 let isHeartbeatRunning = false;
 const activeProcessingCallIds = new Set<number>();
-// Robust concurrency: 4 parallel workers prevents SQLite write lock contention and memory thrashing
-const MAX_CONCURRENT_PIPELINE_WORKERS = 4;
+// High-throughput concurrency for 1000+ batch audits with WAL-mode SQLite
+const MAX_CONCURRENT_PIPELINE_WORKERS = 6;
 let lastHeartbeatTime = new Date().toISOString();
 let totalProcessedCount = 0;
 let rateLimitPauseUntil = 0;
@@ -173,11 +173,11 @@ export async function runFullPipelineForCall(
     `).run(now, callId);
 
     // ---------------------------------------------------------
-    // STAGE 3: TRANSCRIPTION (Google Gemini 3.5 Transcribe)
+    // STAGE 3: TRANSCRIPTION (Groq Whisper Large-v3)
     // ---------------------------------------------------------
     let currentCall = db.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord;
     if (currentCall.transcript_status !== 'VALID' || !currentCall.transcript) {
-      console.log(`[Pipeline] Call #${callId} -> Stage 3: Transcription (Gemini 3.5 Transcribe)`);
+      console.log(`[Pipeline] Call #${callId} -> Stage 3: Transcription (Groq Whisper Large-v3)`);
       await stage3TranscribeCall(db, callId, groqApiKey, activeGeminiKey);
     }
     db.prepare(`
@@ -250,16 +250,15 @@ export async function runFullPipelineForCall(
     }
 
     // 2. High-Recall Pre-Order Cross-Check before finalizing REGULAR or REVIEW:
-    // Probe trade execution existence & distributed conversational order parameters
-    const highRecallCandidate = detectHighRecallPreOrderCandidate(call.transcript);
+    // Only rescue if genuine trading activity is corroborated by an actual executed trade match!
     const tradeProbe = stage5MatchTrade(db, callId);
     const hasCorroboratingTrade = tradeProbe.status === 'CONFIRMED' || (tradeProbe.matched_trade_id !== null && tradeProbe.matched_trade_id !== undefined);
 
     if (classificationResult.classification === 'REGULAR' || classificationResult.classification === 'REVIEW') {
-      if (highRecallCandidate.isCandidate || hasCorroboratingTrade) {
-        // RESCUE: Genuine trading activity corroborated by distributed speech evidence or matching trade record!
-        console.log(`[Pipeline] Call #${callId} -> Rescued from ${classificationResult.classification} to PRE_ORDER (Candidate: ${highRecallCandidate.isCandidate}, TradeMatch: ${hasCorroboratingTrade})`);
-        const evidenceText = highRecallCandidate.evidence || `Corroborating trade #${tradeProbe.matched_trade_id} execution matched.`;
+      if (hasCorroboratingTrade) {
+        // RESCUE: Genuine trading activity corroborated by authoritative matching trade record!
+        console.log(`[Pipeline] Call #${callId} -> Rescued from ${classificationResult.classification} to PRE_ORDER (TradeMatch: #${tradeProbe.matched_trade_id})`);
+        const evidenceText = `Corroborating trade #${tradeProbe.matched_trade_id} execution matched in trade log.`;
         classificationResult = {
           classification: 'PRE_ORDER',
           confidence: 0.95,
@@ -272,8 +271,8 @@ export async function runFullPipelineForCall(
               text: evidenceText,
             },
           ],
-          reason: highRecallCandidate.reason || `Corroborating trade #${tradeProbe.matched_trade_id} execution confirms order directive.`,
-          model: 'pre-order-recall-rescuer',
+          reason: `Corroborating trade #${tradeProbe.matched_trade_id} execution confirms actionable order directive.`,
+          model: 'trade-match-corroborator',
         };
       }
     }
@@ -566,15 +565,21 @@ export async function runFullPipelineForCall(
       err.message.includes('overloaded') ||
       err.message.includes('rate limit')
     );
-    const isTransient = isRateLimit || (err.message && (err.message.includes('ETIMEDOUT') || err.message.includes('ECONNRESET') || err.message.includes('fetch failed')));
+    const isTransient = isRateLimit || (err.message && (err.message.includes('ETIMEDOUT') || err.message.includes('ECONNRESET') || err.message.includes('fetch failed') || err.message.includes('network')));
+
+    if (isRateLimit) {
+      rateLimitPauseUntil = Date.now() + 15000;
+    }
 
     const currentRetry = ((call.retry_count as number) || 0) + 1;
-    // CRITICAL SELF-HEALING: Under no circumstances leave processing_status as 'PROCESSING'!
-    // Always release back to 'IDLE' and 'retry_pending' so the autonomous supervisor automatically re-does the failed job.
+    // Allow up to 10 retries for transient/rate-limit conditions so 1,000s of calls process smoothly
+    const maxAllowedRetries = isTransient ? 10 : 4;
+    const shouldRetry = currentRetry < maxAllowedRetries;
+
     db.prepare(`
       UPDATE calls SET
-        processing_status = 'IDLE',
-        status = 'retry_pending',
+        processing_status = ?,
+        status = ?,
         failure_reason = ?,
         pipeline_stage = 'FAILED',
         current_gate = 'GATE_ERROR',
@@ -583,6 +588,8 @@ export async function runFullPipelineForCall(
         updated_at = ?
       WHERE id = ?
     `).run(
+      shouldRetry ? 'IDLE' : 'FAILED',
+      shouldRetry ? 'retry_pending' : 'failed',
       err.message,
       err.message,
       currentRetry,
@@ -641,21 +648,22 @@ export async function stepAutonomousPipelineWorker(
     console.log(`[Watchdog] Auto-unblocked ${staleTranscribed.changes} call(s) with valid transcripts -> Ready for classification & audit`);
   }
 
-  // 1b. Self-Healing: Automatically re-queue ANY failed jobs (transcription errors, ASR rate limits, network drops) after 10s backoff
-  const tenSecAgo = new Date(Date.now() - 10000).toISOString().replace('T', ' ').slice(0, 19);
+  // 1b. Self-Healing: Automatically re-queue failed jobs that have not exceeded max retries (<10 attempts)
+  const thirtySecAgo = new Date(Date.now() - 30000).toISOString().replace('T', ' ').slice(0, 19);
   const autoRecovered = db.prepare(`
     UPDATE calls SET
       processing_status = 'IDLE',
       status = 'retry_pending',
       failure_reason = NULL,
       updated_at = ?
-    WHERE (processing_status IN ('FAILED', 'ERROR', 'AI_BLOCKED') OR status IN ('failed', 'retry_pending', 'ai_blocked', 'error'))
+    WHERE (processing_status IN ('FAILED', 'ERROR') OR status IN ('failed', 'error'))
       AND status NOT IN ('audited', 'scrap', 'regular', 'review')
+      AND COALESCE(retry_count, 0) < 10
       AND (updated_at < ? OR updated_at IS NULL)
-  `).run(nowIso, tenSecAgo);
+  `).run(nowIso, thirtySecAgo);
 
   if (autoRecovered.changes > 0) {
-    console.log(`[Watchdog] Auto-retrying ${autoRecovered.changes} failed/stalled job(s) for automatic re-processing`);
+    console.log(`[Watchdog] Auto-retrying ${autoRecovered.changes} recoverable job(s) for automatic re-processing`);
   }
 
   const groqKey = getGroqKey();
@@ -725,13 +733,18 @@ export async function stepAutonomousPipelineWorker(
         AND transcript_status = 'VALID'
         AND transcript IS NOT NULL AND length(transcript) > 0
         AND (audit_status != 'AUDITED' OR audit_status IS NULL)
-      ORDER BY id ASC
+      ORDER BY
+        CASE
+          WHEN (call_time >= '09:15:00' AND call_time <= '15:40:00') OR (call_time >= '09:15' AND call_time <= '15:40') THEN 0
+          ELSE 1
+        END ASC,
+        id ASC
       LIMIT 1
     `).get() as { id: number } | undefined;
   }
 
   // Priority C: General pending calls needing ASR transcription
-  const isAsrRateLimited = Date.now() < rateLimitPauseUntil || geminiTranscribeLimiter.isRateLimited();
+  const isAsrRateLimited = Date.now() < rateLimitPauseUntil || groqWhisperRateLimiter.isRateLimited();
   if (!nextCall && !isAsrRateLimited) {
     nextCall = db.prepare(`
       SELECT id FROM calls
@@ -740,7 +753,12 @@ export async function stepAutonomousPipelineWorker(
         AND status NOT IN ('audited', 'scrap', 'regular', 'review', 'blocked', 'rejected')
         AND (pipeline_stage IS NULL OR pipeline_stage NOT IN ('COMPLETED', 'SCRAP_EXIT', 'REGULAR_EXIT', 'REVIEW_PENDING', 'AUDIT_GATE_BLOCKED'))
         AND (audit_status != 'AUDITED' OR audit_status IS NULL)
-      ORDER BY id ASC
+      ORDER BY
+        CASE
+          WHEN (call_time >= '09:15:00' AND call_time <= '15:40:00') OR (call_time >= '09:15' AND call_time <= '15:40') THEN 0
+          ELSE 1
+        END ASC,
+        id ASC
       LIMIT 1
     `).get() as { id: number } | undefined;
   }
@@ -749,9 +767,9 @@ export async function stepAutonomousPipelineWorker(
     return false;
   }
 
-  // For non-scrap calls needing ASR, verify API keys.
-  // If keys are missing, mark calls as AI_BLOCKED so UI/Diagnostics clearly report it!
-  if ((!groqKey || !groqKey.trim()) && (!geminiKey || !geminiKey.trim())) {
+  // For non-scrap calls needing ASR, verify Groq API key.
+  // If key is missing, mark calls as AI_BLOCKED so UI/Diagnostics clearly report it!
+  if (!groqKey || !groqKey.trim()) {
     const callRec = db.prepare('SELECT duration_seconds, transcript FROM calls WHERE id = ?').get(nextCall.id) as { duration_seconds: number; transcript?: string } | undefined;
     const needsAsr = !callRec?.transcript && (!callRec || callRec.duration_seconds === 0 || callRec.duration_seconds >= 6);
     if (needsAsr) {
@@ -759,7 +777,7 @@ export async function stepAutonomousPipelineWorker(
         UPDATE calls SET
           processing_status = 'AI_BLOCKED',
           status = 'ai_blocked',
-          failure_reason = 'AWAITING_API_KEY: Gemini or Groq API key is required to transcribe audio recordings.',
+          failure_reason = 'AWAITING_API_KEY: GROQ_API_KEY is required to transcribe audio recordings with Groq Whisper.',
           updated_at = ?
         WHERE (processing_status = 'IDLE' OR status = 'retry_pending')
           AND (transcript IS NULL OR length(trim(transcript)) = 0)
@@ -819,7 +837,7 @@ export function start24x7WorkerSupervisor(
   if (isHeartbeatRunning) return;
   isHeartbeatRunning = true;
 
-  console.log('[AuditEQ] 24/7 Autonomous Pipeline Supervisor initialized with Gemini 3.5 Transcribe protection & multi-worker concurrency.');
+  console.log('[AuditEQ] 24/7 Autonomous Pipeline Supervisor initialized with Groq Whisper Large-v3 STT & multi-worker concurrency.');
   ensureCallColumns(db);
 
   let isTickRunning = false;
@@ -833,10 +851,13 @@ export function start24x7WorkerSupervisor(
         const promises: Promise<boolean>[] = [];
         for (let i = 0; i < needed; i++) {
           promises.push(
-            stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey).catch((err: any) => {
-              console.error('[Autonomous Worker Async Error]:', err?.message);
-              return false;
-            })
+            (async () => {
+              if (i > 0) await new Promise((r) => setTimeout(r, i * 250));
+              return stepAutonomousPipelineWorker(db, getGroqKey, getGeminiKey).catch((err: any) => {
+                console.error('[Autonomous Worker Async Error]:', err?.message);
+                return false;
+              });
+            })()
           );
         }
         await Promise.allSettled(promises);
@@ -870,12 +891,12 @@ export function getPipelineWorkerStatus(
   const activeGeminiKey = geminiKey || process.env.GEMINI_API_KEY;
   const hasGemini = Boolean(activeGeminiKey && activeGeminiKey.trim());
 
-  let statusMessage = '24/7 Autonomous AI Worker Active (Gemini 3.5 Transcribe Protected)';
-  if (!hasGemini && !hasGroq) {
-    statusMessage = 'Awaiting API Key (enter GEMINI_API_KEY or GROQ_API_KEY in Settings to activate AI processing)';
-  } else if (geminiTranscribeLimiter.isRateLimited()) {
-    const remaining = geminiTranscribeLimiter.getRemainingCooldownSec();
-    statusMessage = `Gemini 3.5 rate-limit cooldown active (${remaining}s remaining). Resuming automatically.`;
+  let statusMessage = '24/7 Autonomous AI Worker Active (Groq Whisper Large-v3 STT)';
+  if (!hasGroq) {
+    statusMessage = 'Awaiting GROQ_API_KEY (enter in Settings or .env to activate high-throughput Groq Whisper transcription)';
+  } else if (groqWhisperRateLimiter.isRateLimited()) {
+    const remaining = groqWhisperRateLimiter.getRemainingCooldownSec();
+    statusMessage = `Groq Whisper rate-limit cooldown active (${remaining}s remaining). Resuming automatically.`;
   } else if (Date.now() < rateLimitPauseUntil) {
     statusMessage = 'Rate limit backoff active (resuming automatically in seconds)';
   } else if (activeProcessingCallIds.size > 0) {

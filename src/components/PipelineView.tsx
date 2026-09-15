@@ -162,10 +162,10 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       stage: 3,
       name: 'Transcription',
       icon: Cpu,
-      desc: 'Google Gemini 3.5 Transcribe API with 24/7 continuous quota and rate-limit protection',
+      desc: 'Groq Whisper Large-v3 STT Engine with custom concurrency & rate-limiting for 1000+ call batch capacity',
       metric: `${stats?.transcribed || 0}/${stats?.calls || 0} transcribed`,
       active: (stats?.transcribed || 0) > 0,
-      badge: 'Gemini 3.5 Transcribe',
+      badge: 'Groq Whisper Large-v3',
     },
     {
       stage: 4,
@@ -226,11 +226,11 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
   return (
     <div className="space-y-6">
       {/* 24/7 Worker Hero & Autonomous Controls */}
-      <div className="bg-neutral-900 text-white p-6 rounded-2xl border border-neutral-800 shadow-sm">
+      <div className="glass-panel text-white p-6 rounded-2xl shadow-xl">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <span className="p-2 rounded-xl bg-amber-400 text-black shadow-sm font-bold">
+              <span className="p-2 rounded-xl bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20 font-bold">
                 <Activity className="w-5 h-5 animate-pulse" />
               </span>
               <div>
@@ -250,23 +250,23 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
             </div>
 
             {/* Live Telemetry Bar */}
-            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-300 pt-2 border-t border-neutral-800">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-300 pt-2 border-t border-white/10">
               <div className="flex items-center gap-1.5">
-                <span className="text-neutral-500">Active Queue:</span>
-                <span className="font-mono font-bold text-amber-400">
+                <span className="text-neutral-400">Active Queue:</span>
+                <span className="font-mono font-bold text-teal-400">
                   {workerStatus?.queue_summary?.idle || 0} idle / {workerStatus?.queue_summary?.processing || 0} processing
                 </span>
               </div>
-              <span className="text-neutral-700">•</span>
+              <span className="text-neutral-600">•</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-neutral-500">Self-Healing Watchdog:</span>
+                <span className="text-neutral-400">Self-Healing Watchdog:</span>
                 <span className="font-mono font-bold text-emerald-400">Armed (2 min timeout)</span>
               </div>
-              <span className="text-neutral-700">•</span>
+              <span className="text-neutral-600">•</span>
               <div className="flex items-center gap-1.5">
-                <span className="text-neutral-500">Speech Engine:</span>
-                <span className={`font-mono font-bold ${workerStatus?.has_gemini_key || workerStatus?.has_groq_key ? 'text-emerald-400' : 'text-amber-400'}`}>
-                  {workerStatus?.has_gemini_key || workerStatus?.has_groq_key ? 'Acoustic Speech-to-Text Active' : 'API Key Pending'}
+                <span className="text-neutral-400">Speech Engine:</span>
+                <span className={`font-mono font-bold ${workerStatus?.has_groq_key ? 'text-emerald-400' : 'text-teal-400'}`}>
+                  {workerStatus?.has_groq_key ? 'Groq Whisper Active' : 'GROQ_API_KEY Pending'}
                 </span>
               </div>
             </div>
@@ -276,7 +276,7 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
             <button
               onClick={handleManualSweep}
               disabled={isLoading || isRefreshingWorker}
-              className="px-4 py-2.5 bg-neutral-800 hover:bg-neutral-700 disabled:opacity-50 text-neutral-200 font-semibold rounded-xl text-xs transition border border-neutral-700 cursor-pointer flex items-center gap-2"
+              className="px-4 py-2.5 glass-inner hover:bg-white/10 disabled:opacity-50 text-neutral-200 font-semibold rounded-xl text-xs transition border border-white/10 cursor-pointer flex items-center gap-2"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingWorker ? 'animate-spin' : ''}`} />
               <span>{isRefreshingWorker ? 'Sweeping...' : 'Reconcile Trades'}</span>
@@ -285,9 +285,9 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
             <button
               onClick={onStartPipeline}
               disabled={isLoading}
-              className="px-6 py-2.5 bg-amber-400 hover:bg-amber-300 disabled:opacity-50 text-neutral-950 font-bold rounded-xl text-xs shadow-md transition active:scale-95 cursor-pointer flex items-center gap-2"
+              className="px-6 py-2.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 disabled:opacity-50 text-slate-950 font-bold rounded-xl text-xs shadow-lg shadow-teal-500/20 transition active:scale-95 cursor-pointer flex items-center gap-2"
             >
-              <Play className="w-4 h-4 fill-neutral-950 text-neutral-950" />
+              <Play className="w-4 h-4 fill-slate-950 text-slate-950" />
               <span>{isLoading ? 'Running Pipeline...' : 'Run Pipeline Now'}</span>
             </button>
           </div>
@@ -295,13 +295,13 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-neutral-200 pb-2">
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
         <button
           onClick={() => setActiveTab('stages')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             activeTab === 'stages'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+              ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/20 font-bold'
+              : 'glass-panel-subtle text-neutral-300 hover:bg-white/10 border border-white/10'
           }`}
         >
           <Layers className="w-3.5 h-3.5" />
@@ -312,8 +312,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
           onClick={() => setActiveTab('metrics')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             activeTab === 'metrics'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+              ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/20 font-bold'
+              : 'glass-panel-subtle text-neutral-300 hover:bg-white/10 border border-white/10'
           }`}
         >
           <TrendingUp className="w-3.5 h-3.5" />
@@ -324,8 +324,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
           onClick={() => setActiveTab('reconciliation')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             activeTab === 'reconciliation'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+              ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/20 font-bold'
+              : 'glass-panel-subtle text-neutral-300 hover:bg-white/10 border border-white/10'
           }`}
         >
           <AlertCircle className="w-3.5 h-3.5" />
@@ -341,8 +341,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
           onClick={() => setActiveTab('worker')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
             activeTab === 'worker'
-              ? 'bg-neutral-900 text-white shadow-xs'
-              : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
+              ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-lg shadow-teal-500/20 font-bold'
+              : 'glass-panel-subtle text-neutral-300 hover:bg-white/10 border border-white/10'
           }`}
         >
           <Cpu className="w-3.5 h-3.5" />
@@ -353,18 +353,18 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       {/* TAB 1: 9-STAGE ARCHITECTURE */}
       {activeTab === 'stages' && (
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-teal-400" />
                   <span>Strict 9-Stage Execution Chain</span>
                 </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
+                <p className="text-xs text-neutral-400 mt-0.5">
                   Stages are strictly isolated. No stage is allowed to manufacture missing information from subsequent stages.
                 </p>
               </div>
-              <span className="text-[11px] font-mono text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-lg">
+              <span className="text-[11px] font-mono text-teal-400 glass-inner px-2.5 py-1 rounded-lg border border-white/10">
                 Stage 1 → Stage 9
               </span>
             </div>
@@ -377,8 +377,8 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
                     key={s.stage}
                     className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
                       s.active
-                        ? 'bg-amber-50/30 border-amber-300 text-neutral-900 shadow-xs'
-                        : 'bg-neutral-50 border-neutral-200 text-neutral-400'
+                        ? 'bg-teal-500/10 border-teal-400/30 text-white shadow-md'
+                        : 'glass-inner border-white/5 text-neutral-500'
                     }`}
                   >
                     <div>
@@ -386,27 +386,27 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
                         <div className="flex items-center gap-2">
                           <span
                             className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                              s.active ? 'bg-neutral-900 text-amber-400' : 'bg-neutral-200 text-neutral-600'
+                              s.active ? 'bg-teal-400 text-slate-950 shadow-xs' : 'glass-panel text-neutral-400'
                             }`}
                           >
                             {s.stage}
                           </span>
-                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md bg-neutral-200/60 text-neutral-700">
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-md glass-panel text-teal-300 border border-white/10">
                             {s.badge}
                           </span>
                         </div>
-                        <span className={`text-[11px] font-mono font-bold ${s.active ? 'text-amber-800' : 'text-neutral-400'}`}>
+                        <span className={`text-[11px] font-mono font-bold ${s.active ? 'text-teal-400' : 'text-neutral-500'}`}>
                           {s.metric}
                         </span>
                       </div>
 
                       <div className="flex items-center gap-2 mb-1">
-                        <Icon className={`w-4 h-4 ${s.active ? 'text-amber-600' : 'text-neutral-400'}`} />
-                        <span className={`text-xs font-bold ${s.active ? 'text-neutral-900' : 'text-neutral-600'}`}>
+                        <Icon className={`w-4 h-4 ${s.active ? 'text-teal-400' : 'text-neutral-500'}`} />
+                        <span className={`text-xs font-bold ${s.active ? 'text-white' : 'text-neutral-400'}`}>
                           Stage {s.stage}: {s.name}
                         </span>
                       </div>
-                      <p className="text-[11px] text-neutral-500 leading-snug">{s.desc}</p>
+                      <p className="text-[11px] text-neutral-400 leading-snug">{s.desc}</p>
                     </div>
                   </div>
                 );
@@ -420,58 +420,58 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       {activeTab === 'metrics' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-              <div className="text-xs font-semibold text-neutral-500 mb-1">Classification Accuracy</div>
-              <div className="text-2xl font-black text-neutral-900">{metrics?.classification_accuracy ?? 100}%</div>
+            <div className="glass-panel p-5 rounded-2xl shadow-xl">
+              <div className="text-xs font-semibold text-neutral-400 mb-1">Classification Accuracy</div>
+              <div className="text-2xl font-black text-white">{metrics?.classification_accuracy ?? 100}%</div>
               <div className="text-[11px] text-neutral-400 mt-1">
-                {metrics?.classification_breakdown.pre_order || 0} Pre-Order • {metrics?.classification_breakdown.regular || 0} Regular • {metrics?.classification_breakdown.scrap || 0} Scrap
+                {metrics?.classification_breakdown?.pre_order || 0} Pre-Order • {metrics?.classification_breakdown?.regular || 0} Regular • {metrics?.classification_breakdown?.scrap || 0} Scrap
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-              <div className="text-xs font-semibold text-neutral-500 mb-1">Trade Match Accuracy</div>
-              <div className="text-2xl font-black text-emerald-600">{metrics?.trade_matching_accuracy ?? 100}%</div>
+            <div className="glass-panel p-5 rounded-2xl shadow-xl">
+              <div className="text-xs font-semibold text-neutral-400 mb-1">Trade Match Accuracy</div>
+              <div className="text-2xl font-black text-emerald-400">{metrics?.trade_matching_accuracy ?? 100}%</div>
               <div className="text-[11px] text-neutral-400 mt-1">
-                {metrics?.trade_match_breakdown.confirmed || 0} Confirmed • {metrics?.trade_match_breakdown.review || 0} Under Review
+                {metrics?.trade_match_breakdown?.confirmed || 0} Confirmed • {metrics?.trade_match_breakdown?.review || 0} Under Review
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-              <div className="text-xs font-semibold text-neutral-500 mb-1">False Fatal Rate</div>
-              <div className="text-2xl font-black text-emerald-600">0.00%</div>
-              <div className="text-[11px] text-emerald-700 mt-1 font-medium">
+            <div className="glass-panel p-5 rounded-2xl shadow-xl">
+              <div className="text-xs font-semibold text-neutral-400 mb-1">False Fatal Rate</div>
+              <div className="text-2xl font-black text-emerald-400">0.00%</div>
+              <div className="text-[11px] text-emerald-400 mt-1 font-medium">
                 Mandate enforced: Zero false fail on conservative rules
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
-              <div className="text-xs font-semibold text-neutral-500 mb-1">Review Rate</div>
-              <div className="text-2xl font-black text-amber-600">{metrics?.review_rate ?? 0}%</div>
+            <div className="glass-panel p-5 rounded-2xl shadow-xl">
+              <div className="text-xs font-semibold text-neutral-400 mb-1">Review Rate</div>
+              <div className="text-2xl font-black text-amber-400">{metrics?.review_rate ?? 0}%</div>
               <div className="text-[11px] text-neutral-400 mt-1">
                 Ambiguous audio flagged for human safety
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
-            <h3 className="text-sm font-bold text-neutral-900">Stage Health Summary</h3>
+          <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
+            <h3 className="text-sm font-bold text-neutral-100">Stage Health Summary</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-                <div className="text-xs font-semibold text-neutral-500">Identity Resolution Rate</div>
-                <div className="text-xl font-bold text-neutral-900 mt-1">{metrics?.identity_resolution_rate ?? 100}%</div>
-                <p className="text-[11px] text-neutral-500 mt-1">Telephony metadata to verified UCC client code</p>
+              <div className="p-4 rounded-xl glass-inner border border-white/10">
+                <div className="text-xs font-semibold text-neutral-400">Identity Resolution Rate</div>
+                <div className="text-xl font-bold text-white mt-1">{metrics?.identity_resolution_rate ?? 100}%</div>
+                <p className="text-[11px] text-neutral-400 mt-1">Telephony metadata to verified UCC client code</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-                <div className="text-xs font-semibold text-neutral-500">Transcription Success Rate</div>
-                <div className="text-xl font-bold text-neutral-900 mt-1">{metrics?.transcription_success_rate ?? 100}%</div>
-                <p className="text-[11px] text-neutral-500 mt-1">Ensemble Groq Whisper Large V3</p>
+              <div className="p-4 rounded-xl glass-inner border border-white/10">
+                <div className="text-xs font-semibold text-neutral-400">Transcription Success Rate</div>
+                <div className="text-xl font-bold text-white mt-1">{metrics?.transcription_success_rate ?? 100}%</div>
+                <p className="text-[11px] text-neutral-400 mt-1">Ensemble Groq Whisper Large V3</p>
               </div>
 
-              <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-                <div className="text-xs font-semibold text-neutral-500">Audit Completion (Pre-Order)</div>
-                <div className="text-xl font-bold text-neutral-900 mt-1">{metrics?.audit_completion_rate ?? 100}%</div>
-                <p className="text-[11px] text-neutral-500 mt-1">Pre-order calls successfully audited and scored</p>
+              <div className="p-4 rounded-xl glass-inner border border-white/10">
+                <div className="text-xs font-semibold text-neutral-400">Audit Completion (Pre-Order)</div>
+                <div className="text-xl font-bold text-white mt-1">{metrics?.audit_completion_rate ?? 100}%</div>
+                <p className="text-[11px] text-neutral-400 mt-1">Pre-order calls successfully audited and scored</p>
               </div>
             </div>
           </div>
@@ -481,43 +481,43 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
       {/* TAB 3: MISSING CALL RECONCILIATION */}
       {activeTab === 'reconciliation' && (
         <div className="space-y-4">
-          <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-xs space-y-4">
+          <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
+                <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-teal-400" />
                   <span>Missing Call Reconciliation (SEBI Order Evidence Mandate)</span>
                 </h3>
-                <p className="text-xs text-neutral-500 mt-0.5">
+                <p className="text-xs text-neutral-400 mt-0.5">
                   Identifies executed equity/derivative trades that have NO pre-order call recording matched.
                 </p>
               </div>
 
-              <div className="px-3 py-1.5 rounded-xl bg-neutral-100 text-xs font-mono font-bold text-neutral-800">
+              <div className="px-3 py-1.5 rounded-xl glass-inner text-xs font-mono font-bold text-teal-300 border border-white/10">
                 {reconciliation?.matched_count || 0} / {reconciliation?.total_trades || 0} Trades Matched
               </div>
             </div>
 
             {(!reconciliation?.reconciliation_items || reconciliation.reconciliation_items.filter((i) => i.reconciliation_status !== 'MATCHED').length === 0) ? (
-              <div className="p-8 text-center bg-emerald-50/50 rounded-xl border border-emerald-200 space-y-2">
-                <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                <div className="text-sm font-bold text-emerald-900">100% Trade Order Recording Coverage</div>
-                <p className="text-xs text-emerald-700 max-w-md mx-auto">
+              <div className="p-8 text-center bg-emerald-500/10 rounded-xl border border-emerald-500/20 space-y-2">
+                <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
+                <div className="text-sm font-bold text-emerald-300">100% Trade Order Recording Coverage</div>
+                <p className="text-xs text-emerald-400/80 max-w-md mx-auto">
                   Every executed trade in the system has a verified matching pre-order call recording. Zero regulatory gaps found.
                 </p>
               </div>
             ) : (
               <div className="space-y-3">
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-600" />
+                <div className="p-3 bg-amber-500/10 border border-amber-400/30 rounded-xl text-xs text-amber-200 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
                   <span>
                     Warning: {reconciliation.missing_call_count} executed trade(s) currently lack mandatory pre-order call recording proof ({reconciliation.review_count} ambiguous).
                   </span>
                 </div>
 
-                <div className="overflow-x-auto border border-neutral-200 rounded-xl">
+                <div className="overflow-x-auto border border-white/10 rounded-xl">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-neutral-50 text-neutral-600 border-b border-neutral-200">
+                    <thead className="glass-inner text-neutral-300 border-b border-white/10">
                       <tr>
                         <th className="p-3 font-semibold">Trade ID</th>
                         <th className="p-3 font-semibold">Client Code</th>
@@ -527,25 +527,25 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
                         <th className="p-3 font-semibold">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-200">
+                    <tbody className="divide-y divide-white/5">
                       {reconciliation.reconciliation_items
                         .filter((i) => i.reconciliation_status !== 'MATCHED')
                         .map((t) => (
-                          <tr key={t.trade_id} className="hover:bg-neutral-50/50">
-                            <td className="p-3 font-mono font-bold text-neutral-900">#{t.trade_id}</td>
-                            <td className="p-3 font-mono text-neutral-800">{t.client || '—'}</td>
-                            <td className="p-3 font-bold text-neutral-900">{t.symbol || '—'}</td>
-                            <td className="p-3 font-mono text-neutral-600">
+                          <tr key={t.trade_id} className="hover:bg-white/5">
+                            <td className="p-3 font-mono font-bold text-teal-400">#{t.trade_id}</td>
+                            <td className="p-3 font-mono text-neutral-200">{t.client || '—'}</td>
+                            <td className="p-3 font-bold text-neutral-100">{t.symbol || '—'}</td>
+                            <td className="p-3 font-mono text-neutral-300">
                               {t.quantity} @ ₹{t.price}
                             </td>
-                            <td className="p-3 text-neutral-500">{t.trade_date || '—'}</td>
+                            <td className="p-3 text-neutral-400">{t.trade_date || '—'}</td>
                             <td className="p-3">
                               {t.reconciliation_status === 'MISSING_CALL' ? (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
                                   MISSING RECORDING
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                   UNDER REVIEW
                                 </span>
                               )}
@@ -563,36 +563,36 @@ export const PipelineView: React.FC<PipelineViewProps> = ({
 
       {/* TAB 4: 24/7 SUPERVISOR TELEMETRY */}
       {activeTab === 'worker' && (
-        <div className="bg-white p-6 rounded-2xl border border-neutral-200 shadow-xs space-y-6">
+        <div className="glass-panel p-6 rounded-2xl shadow-xl space-y-6">
           <div>
-            <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-amber-500" />
+            <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2">
+              <Cpu className="w-4 h-4 text-teal-400" />
               <span>24/7 Autonomous Pipeline Supervisor Health & Watchdog</span>
             </h3>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <p className="text-xs text-neutral-400 mt-0.5">
               The supervisor loop continuously monitors the SQLite queue, automatically resets stalled jobs (&gt; 2 mins), and applies exponential backoff on rate limits.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-              <div className="text-xs text-neutral-500 font-semibold">Supervisor State</div>
-              <div className="text-lg font-black text-emerald-600 mt-1 flex items-center gap-1.5">
+            <div className="p-4 rounded-xl glass-inner border border-white/10">
+              <div className="text-xs text-neutral-400 font-semibold">Supervisor State</div>
+              <div className="text-lg font-black text-emerald-400 mt-1 flex items-center gap-1.5">
                 <Check className="w-4 h-4" />
                 <span>ONLINE & SWEEPING</span>
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">Heartbeat every 4,000 ms</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-              <div className="text-xs text-neutral-500 font-semibold">Watchdog Timeout</div>
-              <div className="text-lg font-black text-neutral-900 mt-1">120 seconds</div>
+            <div className="p-4 rounded-xl glass-inner border border-white/10">
+              <div className="text-xs text-neutral-400 font-semibold">Watchdog Timeout</div>
+              <div className="text-lg font-black text-white mt-1">120 seconds</div>
               <p className="text-[11px] text-neutral-400 mt-1">Auto-resets stuck processing back to IDLE</p>
             </div>
 
-            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200">
-              <div className="text-xs text-neutral-500 font-semibold">Total Queue Volume</div>
-              <div className="text-lg font-black text-neutral-900 mt-1">
+            <div className="p-4 rounded-xl glass-inner border border-white/10">
+              <div className="text-xs text-neutral-400 font-semibold">Total Queue Volume</div>
+              <div className="text-lg font-black text-white mt-1">
                 {workerStatus?.queue_summary?.total || 0} calls
               </div>
               <p className="text-[11px] text-neutral-400 mt-1">

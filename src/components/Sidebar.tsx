@@ -89,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="font-bold text-sm tracking-tight flex items-center gap-1.5 text-white">
                   ADAM-AR <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-teal-400/15 text-teal-300 font-mono font-bold border border-teal-400/30">v1.1</span>
                 </div>
-                <div className="text-[11px] text-teal-200/60 truncate font-medium">FundsIndia Quality</div>
+                <div className="text-[11px] text-teal-200/60 truncate font-medium">AuditEQ Quality</div>
               </div>
             )}
           </div>

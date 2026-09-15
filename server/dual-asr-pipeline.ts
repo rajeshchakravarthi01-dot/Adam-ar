@@ -1,11 +1,11 @@
 // =============================================================
 // ADAM-AR v18.0.0 — Dual-ASR & Deterministic Evidence Pipeline
 // Implements the official 12-Stage Audio & SEBI Audit Architecture
+// Exclusively powered by Groq Whisper (Zero Gemini Dependency)
 // =============================================================
 
 import fs from 'fs';
 import path from 'path';
-import { GoogleGenAI } from '@google/genai';
 import {
   preprocessAudioForTranscription,
   PreprocessedAudio,
@@ -124,7 +124,7 @@ async function runPrimaryGroqWhisper(
   parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="temperature"\r\n\r\n0.0\r\n`));
   // Multilingual auto-detection across Hindi, English, Tamil, Telugu, Hinglish
   parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="response_format"\r\n\r\nverbose_json\r\n`));
-  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="prompt"\r\n\r\nFundsIndia equity pre-order call in English, Hindi, Tamil, Telugu, Hinglish: client code, UCC, buy, sell, shares, CMP, current market price, bhav, Welspun Living, Bajaj Finserv, Reliance, Tata Steel, Infosys, quantity, price, order confirmation.\r\n`));
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="prompt"\r\n\r\nEnterprise equity pre-order call in English, Hindi, Tamil, Telugu, Hinglish: client code, UCC, buy, sell, shares, CMP, current market price, bhav, Welspun Living, Bajaj Finserv, Reliance, Tata Steel, Infosys, quantity, price, order confirmation.\r\n`));
   parts.push(Buffer.from(`--${boundary}--\r\n`));
 
   const payload = Buffer.concat(parts);
@@ -167,62 +167,9 @@ async function runPrimaryGroqWhisper(
 }
 
 /**
- * Executes Independent Verification ASR using Gemini 2.5 Flash Native Audio
+ * Executes Independent Verification ASR using Groq Whisper Large-v3-Turbo
  */
-async function runIndependentVerificationGemini(
-  audioPath: string,
-  filename: string,
-  geminiApiKey: string
-): Promise<{ fullText: string; diarizedText: string }> {
-  const fileBuffer = fs.readFileSync(audioPath);
-  const base64Audio = fileBuffer.toString('base64');
-  const ext = path.extname(filename).toLowerCase();
-  const mimeType = ext === '.wav' ? 'audio/wav' : ext === '.m4a' ? 'audio/mp4' : 'audio/mpeg';
-
-  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-  const prompt = `You are an independent acoustic verifier for Indian stock trading regulatory call audits.
-Transcribe this telephone recording verbatim with 100% accuracy.
-RULES:
-1. SCRIPT: Latin / English alphabet ONLY. Transliterate spoken Hindi / Hinglish phonetically into Latin script.
-2. NEVER produce Arabic / Urdu / Perso-Arabic script.
-3. Label each turn of speech as either ADVISOR: or CLIENT: with timestamps like [MM:SS].
-4. Accurately capture stock company names (e.g. Welspun Living, Bajaj Finserv, L&T Finance, Uno Minda, Tata Motors, Reliance), exact quantities (e.g. 757, 16, 180, 500), execution prices (e.g. "current market price", "CMP", market rate), and client UCC codes (e.g. PWA00938, WIC21342).
-5. Do NOT summarize. Return only the timestamped dialogue.`;
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Audio,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
-      },
-    ],
-    config: {
-      temperature: 0.1,
-    },
-  });
-
-  const diarizedText = (response.text || '').trim();
-  const fullText = diarizedText.replace(/\[\d+:\d+(?:\s*-\s*\d+:\d+)?\]/g, '').replace(/^(?:ADVISOR|CUSTOMER):\s*/gim, '').trim();
-
-  return { fullText, diarizedText };
-}
-
-/**
- * Secondary fallback verification ASR if Gemini key is missing
- */
-async function runIndependentVerificationGroqFallback(
+async function runIndependentVerificationGroq(
   audioPath: string,
   filename: string,
   apiKey: string
@@ -256,7 +203,7 @@ async function runIndependentVerificationGroqFallback(
   });
 
   if (!response.ok) {
-    throw new Error('Groq Verification fallback failed');
+    throw new Error('Groq Verification failed');
   }
 
   const json = await response.json();
@@ -339,17 +286,7 @@ export async function executeDualAsrAndDeterministicAudit(
   // STAGE 2: DUAL INDEPENDENT ASR (PRIMARY & VERIFICATION)
   // -----------------------------------------------------------------
   const primaryPromise = runPrimaryGroqWhisper(audioToTranscribe, recordingName, groqApiKey);
-
-  const indepPromise = (async () => {
-    if (geminiApiKey) {
-      try {
-        return await runIndependentVerificationGemini(audioToTranscribe, recordingName, geminiApiKey);
-      } catch (geminiErr: unknown) {
-        console.warn(`[DUAL_ASR] Gemini verification quota or rate notice (${(geminiErr as Error).message}). Smoothly falling back to secondary Groq acoustic verification.`);
-      }
-    }
-    return runIndependentVerificationGroqFallback(audioToTranscribe, recordingName, groqApiKey);
-  })();
+  const indepPromise = runIndependentVerificationGroq(audioToTranscribe, recordingName, groqApiKey);
 
   const [primaryRes, indepRes] = await Promise.all([primaryPromise, indepPromise]);
 
@@ -372,7 +309,7 @@ export async function executeDualAsrAndDeterministicAudit(
 
     // Identify speaker based on context
     let speaker: 'ADVISOR' | 'CUSTOMER' | 'UNKNOWN' = 'UNKNOWN';
-    if (/(?:aapka|sir|madam|fundsindia|welcome|order lagata|confirming|kar deta)/i.test(lower)) {
+    if (/(?:aapka|sir|madam|welcome|order lagata|confirming|kar deta)/i.test(lower)) {
       speaker = 'ADVISOR';
     } else if (/(?:haan|yes|theek hai|laga do|kar do|okay|confirm|sure)/i.test(lower)) {
       speaker = 'CUSTOMER';

@@ -62,6 +62,7 @@ export const SYMBOL_ALIASES: Record<string, string[]> = {
   BAJFINANCE: ['bajaj finance', 'bajfinance', 'bajaj fin', 'bajaj'],
   BAJAJFINSV: ['bajaj finserv', 'bajajfinsv', 'finserv', 'bajaj fin serv', 'bajaj fin', 'bajaj'],
   'BAJAJ-AUTO': ['bajaj auto', 'bajajauto', 'bajaj'],
+  ASHOKLEY: ['ashok leyland', 'ashokley', 'ashok layland', 'ashok leeland', 'ashok leland', 'ashok', 'leyland'],
   WELSPUNLIV: ['welspun', 'welspun living', 'welspunliv', 'welspun liv', 'wellspun', 'wellspun living', 'velspun'],
   WELSPUN: ['welspun', 'welspun living', 'welspunliv', 'welspun liv', 'wellspun', 'wellspun living', 'velspun'],
   KAJARIA: ['kajaria', 'kajaria ceramics', 'kajariacer', 'kajarria', 'kajarirya', 'kajariya'],
@@ -176,7 +177,7 @@ const WORD_TO_DIGIT: Record<string, string> = {
   one: '1', ek: '1',
   two: '2', do: '2',
   three: '3', teen: '3',
-  four: '4', char: '4', chaar: '4',
+  four: '4', char: '4', chaar: '4', fou: '4', for: '4',
   five: '5', paanch: '5', panch: '5',
   six: '6', chhe: '6', che: '6',
   seven: '7', saat: '7',
@@ -448,20 +449,45 @@ export function normalizeSpokenNumbers(text: string): string {
 
 /**
  * Normalizes phone numbers to standard 10-digit format (Indian mobile/landline)
- * User Rule: "match the number given in meta data nad trade data ignore the first 2 digit, if meta data have 12 digit number."
+ * User Rule: "dont consider 0 and 91 in the beigning match the last 10 digits"
  */
 export function normalizePhoneNumber(phone?: string | null): string {
   if (!phone) return '';
-  const digits = String(phone).replace(/[^0-9]/g, '');
-  // If metadata has 12-digit number (e.g. 919904706239), ignore the first 2 digits to get 10-digit number (9904706239)
-  if (digits.length === 12) {
+  let str = String(phone).trim();
+  // Handle Excel scientific notation strings (e.g. 9.199E+11, 9.19884E+11)
+  if (/^[0-9.]+[eE]\+[0-9]+$/i.test(str)) {
+    try {
+      const num = Number(str);
+      if (!isNaN(num) && isFinite(num)) {
+        str = num.toLocaleString('fullwide', { useGrouping: false });
+      }
+    } catch {}
+  }
+  const digits = str.replace(/[^0-9]/g, '');
+  // Ignore 0 or 91 prefix and match the last 10 digits
+  if (digits.length === 12 && digits.startsWith('91')) {
     return digits.slice(2);
   }
-  // If longer than 10 digits (e.g. leading 0 or 091), take trailing 10 digits
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return digits.slice(1);
+  }
   if (digits.length > 10) {
     return digits.slice(-10);
   }
   return digits;
+}
+
+/**
+ * Checks if a phone number is empty, masked, or a corrupted Excel scientific notation artifact (e.g. 9900000000)
+ */
+export function isMaskedOrCorruptedPhoneNumber(phone?: string | null): boolean {
+  if (!phone) return true;
+  const digits = normalizePhoneNumber(phone);
+  if (!digits || digits.length !== 10) return true;
+  if (/^0+$/.test(digits)) return true;
+  // Ends in 5+ zeros (e.g. 9900000000, 9840000000 from float precision loss in CSV exports)
+  if (/0{5,}$/.test(digits)) return true;
+  return false;
 }
 
 export const VALID_CLIENT_PREFIXES = [
@@ -473,6 +499,7 @@ export const VALID_CLIENT_PREFIXES = [
   'WIE',
   'FIA',
   'PWD',
+  'PWA',
 ] as const;
 
 export type ValidClientPrefix = typeof VALID_CLIENT_PREFIXES[number];
@@ -510,16 +537,17 @@ export function formatCleanClientCode(clientCode?: string | null): string {
   // 4. Strip punctuation, whitespace, dashes, dots, underscores
   const squashed = str.replace(/[\s\-._:;,/]/g, '').toUpperCase();
 
-  // 5. Canonical prefix matching with phonetic tolerance (e.g. VIA -> WIA, VIF -> WIF)
+  // 5. Canonical prefix matching with phonetic tolerance (e.g. VIA -> WIA, VIF -> WIF, WIS -> WIA, WAE -> WIA)
   const prefixMap: Array<{ pattern: RegExp; canonical: ValidClientPrefix }> = [
-    { pattern: /^(?:WIA|VIA|W1A|V1A)/, canonical: 'WIA' },
+    { pattern: /^(?:WIA|VIA|W1A|V1A|WIS|WAE|EWAE)/, canonical: 'WIA' },
     { pattern: /^(?:WIF|VIF|W1F|V1F)/, canonical: 'WIF' },
     { pattern: /^(?:WIC|VIC|W1C|V1C)/, canonical: 'WIC' },
     { pattern: /^(?:WID|VID|W1D|V1D)/, canonical: 'WID' },
     { pattern: /^(?:WIG|VIG|W1G|V1G)/, canonical: 'WIG' },
     { pattern: /^(?:WIE|VIE|W1E|V1E)/, canonical: 'WIE' },
-    { pattern: /^(?:FIA)/, canonical: 'FIA' },
-    { pattern: /^(?:PWD)/, canonical: 'PWD' },
+    { pattern: /^(?:FIA|F1A)/, canonical: 'FIA' },
+    { pattern: /^(?:PWD|PVD|PW(?=\d))/, canonical: 'PWD' },
+    { pattern: /^(?:PWA)/, canonical: 'PWA' },
   ];
 
   for (const item of prefixMap) {
@@ -542,14 +570,14 @@ export function formatCleanClientCode(clientCode?: string | null): string {
     }
   }
 
-  // If input was already a clean alphanumeric or digits
-  return squashed;
+  // Strictly reject arbitrary words (e.g. ADDICTION, PRAJA, ENTERPRISE, START)
+  return '';
 }
 
 export function isStrictValidClientCode(code?: string | null): boolean {
   if (!code) return false;
   const clean = formatCleanClientCode(code);
-  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD)\d{2,10}$/.test(clean);
+  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA)\d{2,10}$/.test(clean);
 }
 
 /**
@@ -624,7 +652,7 @@ export function matchClientCodeInTranscript(
   }
 
   // 3. Phonetic letter variations (Whisper/ASR phonetic tolerant matching):
-  // 3. Robust prefix-aware matching for FundsIndia canonical prefixes (WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD)
+  // 3. Robust prefix-aware matching for Enterprise canonical prefixes (WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD)
   const alphaPrefixMatch = normCode.match(/^([A-Z]+)(\d{2,8})$/i);
   if (alphaPrefixMatch) {
     const rawPrefix = alphaPrefixMatch[1].toUpperCase();
@@ -638,9 +666,11 @@ export function matchClientCodeInTranscript(
 
     if (rawPrefix === 'WIA') {
       prefixVariants.push('(?:W\\s*I\\s*A|WIA|WI\\s*A|W\\s*IA)');
+      prefixVariants.push('(?:W\\s*I\\s*E|WIE|WI\\s*E|W\\s*IE)'); // ASR confusion of A for E
       prefixVariants.push('(?:V\\s*I\\s*A|VIA|VI\\s*A|V\\s*IA)');
       prefixVariants.push('(?:W1A|V1A)');
       prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*A');
+      prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*E');
       prefixVariants.push('(?:w\\s*u\\s*i\\s*a)');
     } else if (rawPrefix === 'WIF') {
       prefixVariants.push('(?:W\\s*I\\s*F|WIF|WI\\s*F|W\\s*IF)');
@@ -668,6 +698,7 @@ export function matchClientCodeInTranscript(
       prefixVariants.push('(?:w\\s*u\\s*i\\s*g)');
     } else if (rawPrefix === 'WIE') {
       prefixVariants.push('(?:W\\s*I\\s*E|WIE|WI\\s*E|W\\s*IE)');
+      prefixVariants.push('(?:W\\s*I\\s*A|WIA|WI\\s*A|W\\s*IA)');
       prefixVariants.push('(?:V\\s*I\\s*E|VIE|VI\\s*E|V\\s*IE)');
       prefixVariants.push('(?:W1E|V1E)');
       prefixVariants.push('(?:double\\s*[-_]?\\s*u|double\\s*[-_]?\\s*you|dhablu|dablu)[\\s\\-_.]*I[\\s\\-_.]*E');
@@ -799,13 +830,107 @@ export function matchClientCodeInTranscript(
     }
   }
 
-  // 6. Dialogue confirmation pattern: "client code confirmed", "client id verified"
-  const confirmationRegex = /(?:client|ucc|code|account|party)\s*(?:code|id|no|number|verification)?\s*(?:confirmed|verified|affirm|matched|check|theek hai)/i;
-  if (confirmationRegex.test(transcript)) {
-    return { matched: true, score: 0.35, matchedVariant: normCode };
+  return { matched: false, score: 0 };
+}
+
+/**
+ * Extracts spoken client code from transcript strictly matching authoritative prefixes:
+ * WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD
+ * Handles phonetic spoken letters ("double u I A", "W I E", "W I F", etc.) and spoken digits ("one two three four five").
+ */
+export function extractSpokenClientCode(transcript: string): string | null {
+  if (!transcript) return null;
+
+  // 1. Phonetic letter pre-normalization
+  const phoneticNormalized = transcript
+    .replace(/\bdouble\s*[-_]?\s*u\b/gi, 'w')
+    .replace(/\bdouble\s*[-_]?\s*you\b/gi, 'w')
+    .replace(/\bdhablu\b/gi, 'w')
+    .replace(/\bdablu\b/gi, 'w')
+    .replace(/\bw\s*u\b/gi, 'w');
+
+  // 2. Normalize spoken numbers to digits ("one two three four five" -> "12345")
+  const spokenNormalized = normalizeSpokenNumbers(phoneticNormalized);
+
+  // 3. Search for authoritative enterprise client code patterns
+  // Prefixes: WIA, WIF, WIC, WID, WIG, WIE, FIA, PWD, PWA (plus phonetic ASR variants like VIA, VIF, WIS, WAE, etc.)
+  const clientCodeRegexes = [
+    /\b(W\s*I\s*A|WIA|WI\s*A|W\s*IA|W\s*I\s*E|WIE|V\s*I\s*A|VIA|W1A|WIS|WAE|EWAE)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(W\s*I\s*F|WIF|WI\s*F|W\s*IF|V\s*I\s*F|VIF|W1F)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(W\s*I\s*C|WIC|WI\s*C|W\s*IC|V\s*I\s*C|VIC|W1C)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(W\s*I\s*D|WID|WI\s*D|W\s*ID|V\s*I\s*D|VID|W1D)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(W\s*I\s*G|WIG|WI\s*G|W\s*IG|V\s*I\s*G|VIG|W1G)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(W\s*I\s*E|WIE|WI\s*E|W\s*IE|V\s*I\s*E|VIE|W1E)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(F\s*I\s*A|FIA|FI\s*A|F\s*IA|F1A)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(P\s*W\s*D|PWD|PW\s*D|P\s*WD|P\s*V\s*D|PVD)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+    /\b(P\s*W\s*A|PWA|PW\s*A|P\s*WA)[\s\-.:]*([0-9\s]{3,10})\b/gi,
+  ];
+
+  for (const regex of clientCodeRegexes) {
+    let match;
+    while ((match = regex.exec(spokenNormalized)) !== null) {
+      let rawPrefix = (match[1] || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const rawDigits = (match[2] || '').replace(/\D/g, '');
+      if (rawDigits.length >= 3) {
+        // Map phonetic variants back to canonical enterprise prefix
+        if (rawPrefix === 'VIA' || rawPrefix === 'W1A' || rawPrefix === 'WIS' || rawPrefix === 'WAE' || rawPrefix === 'EWAE') rawPrefix = 'WIA';
+        else if (rawPrefix === 'VIF' || rawPrefix === 'W1F') rawPrefix = 'WIF';
+        else if (rawPrefix === 'VIC' || rawPrefix === 'W1C') rawPrefix = 'WIC';
+        else if (rawPrefix === 'VID' || rawPrefix === 'W1D') rawPrefix = 'WID';
+        else if (rawPrefix === 'VIG' || rawPrefix === 'W1G') rawPrefix = 'WIG';
+        else if (rawPrefix === 'VIE' || rawPrefix === 'W1E') rawPrefix = 'WIE';
+        else if (rawPrefix === 'F1A') rawPrefix = 'FIA';
+        else if (rawPrefix === 'PVD') rawPrefix = 'PWD';
+
+        const cleaned = formatCleanClientCode(`${rawPrefix}${rawDigits}`);
+        if (cleaned && isStrictValidClientCode(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
   }
 
-  return { matched: false, score: 0 };
+  // Also check direct occurrences in raw transcript
+  for (const regex of clientCodeRegexes) {
+    let match;
+    while ((match = regex.exec(transcript)) !== null) {
+      let rawPrefix = (match[1] || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const rawDigits = (match[2] || '').replace(/\D/g, '');
+      if (rawDigits.length >= 3) {
+        if (rawPrefix === 'VIA' || rawPrefix === 'W1A' || rawPrefix === 'WIS' || rawPrefix === 'WAE' || rawPrefix === 'EWAE') rawPrefix = 'WIA';
+        else if (rawPrefix === 'VIF' || rawPrefix === 'W1F') rawPrefix = 'WIF';
+        else if (rawPrefix === 'VIC' || rawPrefix === 'W1C') rawPrefix = 'WIC';
+        else if (rawPrefix === 'VID' || rawPrefix === 'W1D') rawPrefix = 'WID';
+        else if (rawPrefix === 'VIG' || rawPrefix === 'W1G') rawPrefix = 'WIG';
+        else if (rawPrefix === 'VIE' || rawPrefix === 'W1E') rawPrefix = 'WIE';
+        else if (rawPrefix === 'F1A') rawPrefix = 'FIA';
+        else if (rawPrefix === 'PVD') rawPrefix = 'PWD';
+
+        const cleaned = formatCleanClientCode(`${rawPrefix}${rawDigits}`);
+        if (cleaned && isStrictValidClientCode(cleaned)) {
+          return cleaned;
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Checks if total order value or turnover was mentioned in the dialogue
+ * (e.g. "2 lakhs", "50 thousand", "2,00,000 rupees", "value of 1 lakh", "2 cr").
+ * Used for Q3 evaluation when price or quantity is combined with investment value.
+ */
+export function matchValueInTranscript(transcript: string): { matched: boolean; valueText?: string } {
+  if (!transcript) return { matched: false };
+  const lower = transcript.toLowerCase();
+  const valueRegex = /\b(?:value\s*(?:of|is)?\s*)?(\d+(?:\.\d+)?|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|twenty|fifty)\b)\s*(?:lakhs?|lacs?|thousand|hazaar|crores?|cr|k|rupees?|rs\.?)\b/i;
+  const match = lower.match(valueRegex);
+  if (match) {
+    return { matched: true, valueText: match[0] };
+  }
+  return { matched: false };
 }
 
 /**

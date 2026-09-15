@@ -49,32 +49,32 @@ export class ErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         <div className="min-h-[400px] flex items-center justify-center p-6">
-          <div className="max-w-lg w-full bg-white rounded-2xl border border-rose-200 shadow-lg p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-4">
+          <div className="max-w-lg w-full glass-panel border border-rose-500/30 rounded-2xl shadow-2xl p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-rose-500/10">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-base font-bold text-neutral-900 mb-2">
+            <h3 className="text-base font-bold text-neutral-100 mb-2">
               {this.props.fallbackTitle || 'View Rendering Error Recovered'}
             </h3>
-            <p className="text-xs text-neutral-600 mb-4 leading-relaxed">
+            <p className="text-xs text-neutral-400 mb-4 leading-relaxed">
               A temporary issue occurred while rendering this view. You can retry rendering or reload the view safely.
             </p>
             {this.state.error && (
-              <div className="bg-neutral-900 text-rose-300 p-3 rounded-xl font-mono text-[11px] text-left overflow-x-auto mb-4 max-h-32">
+              <div className="glass-inner border border-rose-500/20 text-rose-300 p-3 rounded-xl font-mono text-[11px] text-left overflow-x-auto mb-4 max-h-32">
                 {this.state.error.toString()}
               </div>
             )}
             <div className="flex items-center justify-center gap-3">
               <button
                 onClick={this.handleRetry}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-amber-400 hover:bg-amber-500 text-black text-xs font-bold rounded-xl cursor-pointer transition-colors shadow-xs"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 text-xs font-bold rounded-xl cursor-pointer transition-all shadow-lg shadow-teal-500/20"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 <span>Retry View</span>
               </button>
               <button
                 onClick={this.handleReload}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl cursor-pointer transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 glass-inner hover:bg-white/10 text-neutral-200 text-xs font-semibold rounded-xl cursor-pointer transition-colors border border-white/10"
               >
                 <span>Reload Page</span>
               </button>

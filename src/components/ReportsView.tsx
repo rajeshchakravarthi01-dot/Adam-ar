@@ -155,7 +155,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
 
       // Sheet 1: Executive Summary
       const summaryData = [
-        { Metric: 'Report Name', Value: 'FundsIndia Quality & Regulatory Compliance Audit' },
+        { Metric: 'Report Name', Value: 'AuditEQ Quality & Regulatory Compliance Audit' },
         { Metric: 'Generation Date', Value: new Date().toLocaleString() },
         { Metric: 'Audit Standard', Value: 'Pre-Order Confirmation Norms' },
         { Metric: 'Total Audited Orders', Value: analytics?.totalScorecards || 0 },
@@ -239,7 +239,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
         XLSX.utils.book_append_sheet(wb, wsClass, 'Call_Classification');
       }
 
-      XLSX.writeFile(wb, `FundsIndia_Quality_Audit_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      XLSX.writeFile(wb, `AuditEQ_Quality_Audit_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (err: unknown) {
       alert(`Excel export failed: ${(err as Error).message}`);
     } finally {
@@ -256,7 +256,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
       // Slide 1: Cover Slide
       const slide1 = pres.addSlide();
       slide1.background = { color: '0A0A0E' };
-      slide1.addText('FundsIndia Voice Quality & Pre-Order Audit', {
+      slide1.addText('AuditEQ Voice Quality & Pre-Order Audit', {
         x: 0.8,
         y: 1.8,
         w: 8.5,
@@ -418,7 +418,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
         });
       }
 
-      await pres.writeFile({ fileName: `FundsIndia_Compliance_Presentation_${new Date().toISOString().slice(0, 10)}.pptx` });
+      await pres.writeFile({ fileName: `AuditEQ_Compliance_Presentation_${new Date().toISOString().slice(0, 10)}.pptx` });
     } catch (err: unknown) {
       alert(`PowerPoint export failed: ${(err as Error).message}`);
     } finally {
@@ -562,7 +562,7 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ archives, isLoading })
         <div className="glass-card-interactive p-4 sm:p-5 rounded-2xl">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-2">
             <span className="font-semibold text-slate-300">Quality Rating</span>
-            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">
+            <div className="p-1.5 rounded-lg bg-teal-500/10 text-teal-300 border border-teal-500/20">
               <Award className="w-4 h-4" />
             </div>
           </div>

@@ -21,9 +21,7 @@ const SPOKEN_AUTH_PATTERNS = [
 /**
  * Deterministically evaluates SEBI Q1 Compliance Check.
  * Rule:
- * 1. Missing registered number => ALWAYS REVIEW (Never assume calling == registered).
- * 2. Exact 10-digit match => PASS.
- * 3. Exact mismatch => Check spoken OTP/auth. If none => FAIL (Fatal).
+ * client number is meta data = client number is trade data = pass or else fail.
  */
 export function evaluateDeterministicQ1(
   callingNumber?: string | null,
@@ -34,73 +32,64 @@ export function evaluateDeterministicQ1(
   const normCalling = normalizePhoneNumber(callingNumber);
   const normRegistered = normalizePhoneNumber(registeredNumber);
 
-  // 1. Missing registered number in metadata/records => Must be REVIEW
-  if (!normRegistered) {
-    return {
-      status: 'REVIEW',
-      evidence: normCalling ? `Calling Number: ${normCalling}, Registered Number: Not Provided` : 'No telephone metadata provided.',
-      reason: 'Customer registered phone number is missing from CRM/trade records. Manual authorization verification required.',
-      speaker: 'ADVISOR',
-      confidence: 0.85,
-    };
-  }
-
-  // 2. Missing calling number => REVIEW
-  if (!normCalling) {
-    return {
-      status: 'REVIEW',
-      evidence: `Registered Number: ${normRegistered}, Calling Number: Unknown`,
-      reason: 'Calling telephone number is absent from telephony recording metadata. Manual review required.',
-      speaker: 'ADVISOR',
-      confidence: 0.85,
-    };
-  }
-
-  // 3. Exact 10-digit match => Deterministic PASS
-  if (normCalling === normRegistered) {
+  // Exact 10-digit match between calling/metadata number and registered/trade number => PASS
+  if (normCalling && normRegistered && normCalling === normRegistered) {
     return {
       status: 'PASS',
-      evidence: `Calling Number (${normCalling}) matched Registered / Authorised Number (${normRegistered}).`,
-      reason: 'Customer placed order from verified registered contact number.',
+      evidence: `Client calling number in metadata (${normCalling}) matches registered client number in trade data (${normRegistered}).`,
+      reason: 'Verified match: Customer placed order from verified registered contact number.',
       speaker: 'ADVISOR',
       confidence: 1.0,
     };
   }
 
-  // 4. Numbers do not match => Check for spoken OTP / security authorization
-  const text = (transcript || '').toLowerCase();
-  let hasSpokenAuth = false;
-  let authEvidence = '';
+  // Secondary authorization: if calling differs but spoken OTP or verified secondary auth is present
+  if (normCalling && normRegistered) {
+    const text = (transcript || '').toLowerCase();
+    let hasSpokenAuth = false;
+    let authEvidence = '';
 
-  for (const p of SPOKEN_AUTH_PATTERNS) {
-    const match = text.match(p);
-    if (match) {
+    for (const p of SPOKEN_AUTH_PATTERNS) {
+      const match = text.match(p);
+      if (match) {
+        hasSpokenAuth = true;
+        authEvidence = `Spoken security marker identified: "${match[0]}"`;
+        break;
+      }
+    }
+
+    if (aiReportedSpokenAuth?.hasOtp && aiReportedSpokenAuth.evidence) {
       hasSpokenAuth = true;
-      authEvidence = `Spoken security marker identified: "${match[0]}"`;
-      break;
+      authEvidence = aiReportedSpokenAuth.evidence;
+    }
+
+    if (hasSpokenAuth) {
+      return {
+        status: 'PASS',
+        evidence: `Calling number (${normCalling}) differs from registered (${normRegistered}), but customer identity was authenticated (${authEvidence}).`,
+        reason: 'Authorized via spoken OTP / security identity verification on call.',
+        speaker: 'BOTH',
+        confidence: 0.95,
+      };
     }
   }
 
-  if (aiReportedSpokenAuth?.hasOtp && aiReportedSpokenAuth.evidence) {
-    hasSpokenAuth = true;
-    authEvidence = aiReportedSpokenAuth.evidence;
-  }
-
-  if (hasSpokenAuth) {
+  // If registered number cannot be established from authoritative source -> REVIEW/UNVERIFIED
+  if (!normRegistered) {
     return {
-      status: 'PASS',
-      evidence: `Calling number (${normCalling}) differs from registered (${normRegistered}), but customer identity was authenticated (${authEvidence}).`,
-      reason: 'Authorized via spoken OTP / security identity verification on call.',
-      speaker: 'BOTH',
-      confidence: 0.90,
+      status: 'REVIEW',
+      evidence: `Calling number is ${normCalling || 'Missing'}, but registered contact number was not found in trade or client master data.`,
+      reason: 'Registered phone number cannot be established from authoritative records; verification requires review.',
+      speaker: 'ADVISOR',
+      confidence: 0.8,
     };
   }
 
-  // Mismatch without spoken authentication => FAIL (FATAL)
+  // Mismatch or missing calling number => FAIL (FATAL)
   return {
     status: 'FAIL',
-    evidence: `Calling Number (${normCalling}) does not match Registered Number (${normRegistered}) and no spoken OTP/security authentication was found.`,
-    reason: 'FATAL: Order placed from unregistered contact number without secondary identity authorization.',
+    evidence: `Calling number in metadata (${normCalling || 'Missing'}) does NOT match registered number in trade data (${normRegistered}).`,
+    reason: 'FATAL: Client phone number in metadata does not match client phone number in trade data.',
     speaker: 'ADVISOR',
     confidence: 1.0,
   };

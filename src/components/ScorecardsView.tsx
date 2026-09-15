@@ -291,7 +291,7 @@ Comment: ${sc.audit_comment || 'Pre Order Confirmation is as per the Regulatory 
   const handleSendSingle = async (sc: ScorecardRecord) => {
     const targetEmail = prompt(
       `Send Scorecard #${sc.id} to Advisor Email:`,
-      `${sc.caller_name ? sc.caller_name.toLowerCase().replace(/[^a-z0-9]/g, '.') : 'advisor'}@fundsindia.com`
+      `${sc.caller_name ? sc.caller_name.toLowerCase().replace(/[^a-z0-9]/g, '.') : 'advisor'}@auditeq.com`
     );
     if (!targetEmail) return;
 

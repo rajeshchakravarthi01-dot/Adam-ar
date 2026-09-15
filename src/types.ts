@@ -597,9 +597,13 @@ export interface SystemIntegrations {
   smtp_host?: string;
   smtp_port?: string;
   smtp_user?: string;
-  smtp_encryption?: string;
+  smtp_from?: string;
   smtp_from_email?: string;
   smtp_from_name?: string;
+  smtp_secure?: boolean;
+  smtp_pass_set?: boolean;
+  smtp_configured?: boolean;
+  tata_webhook_secret?: string;
   versions: {
     rubric: string;
     prompt: string;

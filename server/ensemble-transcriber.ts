@@ -1,10 +1,10 @@
 // =============================================================
-// ADAM-AR — 10-12 Multi-Pass Ensemble Transcription Engine
+// ADAM-AR — Multi-Pass Groq Whisper Ensemble Transcription Engine
+// Exclusively powered by Groq Whisper (Zero Gemini Dependency)
 // =============================================================
 
 import fs from 'fs';
 import path from 'path';
-import { GoogleGenAI } from '@google/genai';
 import {
   matchSymbolInTranscript,
   mentionsMarketPriceOrCMP,
@@ -16,7 +16,7 @@ import type { TradeRecord } from '../src/types';
 
 export interface PassResult {
   passIndex: number;
-  engine: 'groq' | 'gemini';
+  engine: 'groq';
   model: string;
   temperature: number;
   promptDescription: string;
@@ -64,7 +64,7 @@ export interface EnsembleTranscriptionResult {
 }
 
 interface PassConfig {
-  engine: 'groq' | 'gemini';
+  engine: 'groq';
   model: string;
   temperature: number;
   prompt: string;
@@ -72,125 +72,60 @@ interface PassConfig {
 }
 
 /**
- * Builds diverse pass configurations (10-12 variations)
+ * Builds diverse Groq Whisper pass configurations (varying temperatures, models, prompts)
  */
-function buildEnsemblePassConfigs(hasGroq: boolean, hasGemini: boolean, matchedTrade?: TradeRecord, clientCode?: string): PassConfig[] {
+function buildEnsemblePassConfigs(matchedTrade?: TradeRecord, clientCode?: string): PassConfig[] {
   const stockHint = matchedTrade?.symbol ? matchedTrade.symbol : 'Welspun Living, Bajaj Finserv, L&T Finance, Uno Minda, Tata Motors, Reliance';
   const qtyHint = matchedTrade?.quantity ? `${matchedTrade.quantity} shares` : 'shares, quantity';
   const clientHint = clientCode ? `Client code ${clientCode}` : 'Client UCC account code';
 
-  const geminiPromptDetailed = `You are an expert SEBI compliance auditor and stock trading telephone call transcriber.
-Transcribe this entire recorded telephone conversation verbatim with 100% accuracy.
-
-CRITICAL INSTRUCTIONS:
-1. OUTPUT SCRIPT: Output MUST be strictly in the Latin / English alphabet.
-2. TRANSLITERATION: Transliterate any spoken Hindi, Hinglish, Marathi, or Gujarati words phonetically into Latin script (e.g. "Haan sir, Ajeet bol raha hoon Finns India se...").
-3. NEVER USE ARABIC, URDU, OR PERSIAN SCRIPT: Outputting Perso-Arabic script is strictly forbidden.
-4. FINANCIAL PRECISION: Accurately capture stock company names (e.g. ${stockHint}), exact numerical quantities (e.g. ${qtyHint}), execution prices (e.g. "current market price", "CMP", limit rates), and client UCC codes (e.g. ${clientHint}).
-5. Label speakers as "Advisor:" and "Client:" where distinguishable.
-6. Do NOT output meta descriptions like "Hindi-English telephonic conversation". Return only the verbatim dialogue.`;
-
   const whisperVocabPrompt = `Welspun Living, Bajaj Finserv, L&T Finance, Uno Minda, Tata Motors, Reliance, CMP, current market price, market rate, shares, quantity, client code, buy, sell, execute.`;
+  const detailedPrompt = `Enterprise equity pre-order call: ${stockHint}, ${qtyHint}, ${clientHint}, buy, sell, CMP, market price, execution price, limit order.`;
 
-  const baseConfigs: PassConfig[] = [
-    // 1. Primary Gemini Multimodal Audio Passes (Top Priority for Accuracy)
+  return [
     {
-      engine: 'gemini',
-      model: 'gemini-2.5-flash',
-      temperature: 0.1,
-      prompt: geminiPromptDetailed,
-      description: 'Gemini 2.5 Flash Native Verbatim Audio Transcription (Primary)',
-    },
-    {
-      engine: 'gemini',
-      model: 'gemini-2.5-flash',
-      temperature: 0.2,
-      prompt: `${geminiPromptDetailed}\nFocus especially on acoustic clarity of numbers, share quantities, and market price expressions.`,
-      description: 'Gemini 2.5 Flash Acoustic Precision Audio Pass',
-    },
-    {
-      engine: 'gemini',
-      model: 'gemini-2.5-flash',
+      engine: 'groq',
+      model: 'whisper-large-v3-turbo',
       temperature: 0.0,
-      prompt: `${geminiPromptDetailed}\nDeterministic strict verbatim transcript without omissions.`,
-      description: 'Gemini 2.5 Flash Deterministic Precision Audio Pass',
+      prompt: whisperVocabPrompt,
+      description: 'Groq Whisper V3 Turbo Deterministic Verbatim Pass (Temp 0.0)',
     },
-    // 2. Groq Whisper Large-v3 with language='en' and vocabulary prompts
     {
       engine: 'groq',
       model: 'whisper-large-v3',
       temperature: 0.0,
       prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 Vocabulary Guided Pass (Temp 0.0, En)',
+      description: 'Groq Whisper V3 Vocabulary Guided Pass (Temp 0.0)',
+    },
+    {
+      engine: 'groq',
+      model: 'whisper-large-v3-turbo',
+      temperature: 0.1,
+      prompt: detailedPrompt,
+      description: 'Groq Whisper V3 Turbo Detailed Prompt Pass (Temp 0.1)',
+    },
+    {
+      engine: 'groq',
+      model: 'whisper-large-v3',
+      temperature: 0.1,
+      prompt: detailedPrompt,
+      description: 'Groq Whisper V3 High Sensitivity Pass (Temp 0.1)',
+    },
+    {
+      engine: 'groq',
+      model: 'whisper-large-v3-turbo',
+      temperature: 0.15,
+      prompt: whisperVocabPrompt,
+      description: 'Groq Whisper V3 Turbo Acoustic Resilience (Temp 0.15)',
     },
     {
       engine: 'groq',
       model: 'whisper-large-v3',
       temperature: 0.15,
       prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 High Sensitivity Pass (Temp 0.15, En)',
-    },
-    {
-      engine: 'groq',
-      model: 'whisper-large-v3-turbo',
-      temperature: 0.0,
-      prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 Turbo Precision Entities (Temp 0.0, En)',
-    },
-    {
-      engine: 'groq',
-      model: 'whisper-large-v3-turbo',
-      temperature: 0.2,
-      prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 Turbo Acoustic Resilience (Temp 0.2, En)',
-    },
-    {
-      engine: 'gemini',
-      model: 'gemini-2.5-flash',
-      temperature: 0.15,
-      prompt: geminiPromptDetailed,
-      description: 'Gemini 2.5 Flash Conversational Focus Pass',
-    },
-    {
-      engine: 'groq',
-      model: 'whisper-large-v3',
-      temperature: 0.05,
-      prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 Compliance Strict Log (Temp 0.05, En)',
-    },
-    {
-      engine: 'groq',
-      model: 'whisper-large-v3-turbo',
-      temperature: 0.1,
-      prompt: whisperVocabPrompt,
-      description: 'Groq Whisper V3 Turbo Trade Execution (Temp 0.1, En)',
+      description: 'Groq Whisper V3 Balanced Verification Pass (Temp 0.15)',
     },
   ];
-
-  // Filter based on available engines
-  if (hasGroq && hasGemini) {
-    return baseConfigs.slice(0, 10);
-  } else if (hasGroq && !hasGemini) {
-    // Re-map Gemini configs to Groq Whisper variants
-    return baseConfigs.map((cfg, idx) => ({
-      ...cfg,
-      engine: 'groq' as const,
-      model: idx % 2 === 0 ? 'whisper-large-v3' : 'whisper-large-v3-turbo',
-      temperature: (idx * 0.02) % 0.25,
-      prompt: whisperVocabPrompt,
-    })).slice(0, 10);
-  } else if (!hasGroq && hasGemini) {
-    // Re-map Groq configs to Gemini Flash variants
-    return baseConfigs.map((cfg, idx) => ({
-      ...cfg,
-      engine: 'gemini' as const,
-      model: 'gemini-2.5-flash',
-      temperature: (idx * 0.03) % 0.25,
-      prompt: geminiPromptDetailed,
-    })).slice(0, 10);
-  }
-
-  return baseConfigs.slice(0, 10);
 }
 
 /**
@@ -265,47 +200,6 @@ async function runGroqWhisperPass(
     clearTimeout(timeoutId);
     throw err;
   }
-}
-
-/**
- * Executes a single Gemini Flash native audio pass
- */
-async function runGeminiAudioPass(
-  filePath: string,
-  mimeType: string,
-  geminiApiKey: string,
-  model: string,
-  temperature: number,
-  prompt: string
-): Promise<string> {
-  const fileBuffer = fs.readFileSync(filePath);
-  const base64Audio = fileBuffer.toString('base64');
-  const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            inlineData: {
-              mimeType,
-              data: base64Audio,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
-      },
-    ],
-    config: {
-      temperature,
-    },
-  });
-
-  return (response.text || '').trim();
 }
 
 /**
@@ -443,7 +337,7 @@ export async function transcribeWithMultiPassEnsemble(
   filePath: string,
   filename: string,
   groqApiKey?: string | null,
-  geminiApiKey?: string | null,
+  _geminiApiKey?: string | null,
   matchedTrade?: TradeRecord,
   clientCode?: string,
   onProgress?: (current: number, total: number, msg: string) => void
@@ -459,20 +353,19 @@ export async function transcribeWithMultiPassEnsemble(
   else if (ext === '.ogg') mimeType = 'audio/ogg';
   else if (ext === '.flac') mimeType = 'audio/flac';
 
-  const hasGroq = Boolean(groqApiKey);
-  const hasGemini = Boolean(geminiApiKey);
+  const activeGroqKey = groqApiKey || process.env.GROQ_API_KEY;
 
-  if (!hasGroq && !hasGemini) {
-    throw new Error('Neither GROQ_API_KEY nor GEMINI_API_KEY is configured for transcription.');
+  if (!activeGroqKey || !activeGroqKey.trim()) {
+    throw new Error('GROQ_API_KEY is required for Groq Whisper transcription.');
   }
 
-  const passConfigs = buildEnsemblePassConfigs(hasGroq, hasGemini, matchedTrade, clientCode);
+  const passConfigs = buildEnsemblePassConfigs(matchedTrade, clientCode);
   const totalPasses = passConfigs.length;
 
   const passResults: PassResult[] = [];
 
-  // Execute passes in batches of 3 for optimal performance and rate-limit safety
-  const BATCH_SIZE = 3;
+  // Execute passes in batches of 2 for optimal performance and rate-limit safety
+  const BATCH_SIZE = 2;
   for (let i = 0; i < totalPasses; i += BATCH_SIZE) {
     const batch = passConfigs.slice(i, i + BATCH_SIZE);
 
@@ -480,47 +373,18 @@ export async function transcribeWithMultiPassEnsemble(
       const passIndex = i + batchOffset + 1;
       try {
         if (onProgress) {
-          onProgress(passIndex, totalPasses, `Running multi-pass audio transcription #${passIndex}/${totalPasses} (${config.description})...`);
+          onProgress(passIndex, totalPasses, `Running Groq Whisper multi-pass transcription #${passIndex}/${totalPasses} (${config.description})...`);
         }
 
-        let rawTranscript = '';
-        if (config.engine === 'groq' && groqApiKey) {
-          rawTranscript = await runGroqWhisperPass(
-            filePath,
-            filename,
-            mimeType,
-            groqApiKey,
-            config.model,
-            config.temperature,
-            config.prompt
-          );
-        } else if (geminiApiKey) {
-          try {
-            rawTranscript = await runGeminiAudioPass(
-              filePath,
-              mimeType,
-              geminiApiKey,
-              config.model,
-              config.temperature,
-              config.prompt
-            );
-          } catch (geminiErr: unknown) {
-            if (groqApiKey) {
-              console.warn(`[ENSEMBLE] Gemini pass notice (${(geminiErr as Error).message}). Substituting Groq Whisper pass.`);
-              rawTranscript = await runGroqWhisperPass(
-                filePath,
-                filename,
-                mimeType,
-                groqApiKey,
-                'whisper-large-v3',
-                config.temperature,
-                config.prompt
-              );
-            } else {
-              throw geminiErr;
-            }
-          }
-        }
+        const rawTranscript = await runGroqWhisperPass(
+          filePath,
+          filename,
+          mimeType,
+          activeGroqKey.trim(),
+          config.model,
+          config.temperature,
+          config.prompt
+        );
 
         if (!rawTranscript || rawTranscript.trim().length === 0) {
           throw new Error('Empty transcript returned');

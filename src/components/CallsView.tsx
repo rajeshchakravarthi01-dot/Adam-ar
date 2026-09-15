@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import JSZip from 'jszip';
 import {
   Upload,
   PhoneCall,
@@ -134,19 +135,111 @@ export const CallsView: React.FC<CallsViewProps> = ({
     e.preventDefault();
     if (!uploadFiles || uploadFiles.length === 0) return;
 
-    const fd = new FormData();
-    for (let i = 0; i < uploadFiles.length; i++) {
-      fd.append('files[]', uploadFiles[i], uploadFiles[i].name);
-    }
-    if (uploadMeta) {
-      fd.append('metadata', uploadMeta, uploadMeta.name);
-    }
-
     setIsUploading(true);
-    setUploadStatus('Uploading recordings, extracting Caller ID from filenames, resolving metadata & trades...');
+
     try {
-      await onUploadCalls(fd);
-      setUploadStatus(`Upload completed successfully! Ingested calls and resolved metadata automatically.`);
+      const allAudioFiles: File[] = [];
+      let detectedMetadataFile: File | null = uploadMeta;
+
+      setUploadStatus('Scanning files and unpacking archives...');
+
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        const isZip = file.name.toLowerCase().endsWith('.zip') || file.type.includes('zip');
+
+        if (isZip) {
+          setUploadStatus(`Unpacking ZIP archive "${file.name}" in browser memory... Please wait.`);
+          const zip = await JSZip.loadAsync(file);
+          const zipEntries = Object.values(zip.files);
+          let extractedCount = 0;
+
+          for (const entry of zipEntries) {
+            if (entry.dir || entry.name.startsWith('__MACOSX/') || entry.name.includes('/.')) continue;
+            const cleanName = entry.name.split('/').pop() || entry.name;
+            if (!cleanName || cleanName.startsWith('.')) continue;
+
+            const ext = cleanName.toLowerCase().split('.').pop() || '';
+            const validAudioExts = ['mp3', 'wav', 'm4a', 'ogg', 'aac', 'flac', 'gsm', 'wma', 'webm'];
+
+            if (validAudioExts.includes(ext)) {
+              const blob = await entry.async('blob');
+              let mimeType = 'audio/mpeg';
+              if (ext === 'wav') mimeType = 'audio/wav';
+              else if (ext === 'ogg') mimeType = 'audio/ogg';
+              else if (ext === 'm4a' || ext === 'aac') mimeType = 'audio/mp4';
+
+              const extractedFile = new File([blob], cleanName, { type: blob.type || mimeType });
+              allAudioFiles.push(extractedFile);
+              extractedCount++;
+            } else if (!detectedMetadataFile && ['csv', 'xlsx', 'xls'].includes(ext)) {
+              const blob = await entry.async('blob');
+              detectedMetadataFile = new File([blob], cleanName, {
+                type: blob.type || (ext === 'csv' ? 'text/csv' : 'application/vnd.ms-excel'),
+              });
+            }
+          }
+          setUploadStatus(`Extracted ${extractedCount} audio recordings from "${file.name}".`);
+        } else {
+          allAudioFiles.push(file);
+        }
+      }
+
+      if (allAudioFiles.length === 0) {
+        throw new Error('No valid audio files (.wav, .mp3, .m4a, etc.) found in the selected files or ZIP archive.');
+      }
+
+      // Safe chunking: Max 6 audio files OR Max 8MB per chunk to stay well beneath reverse-proxy 32MB body limits
+      const MAX_FILES_PER_BATCH = 6;
+      const MAX_BYTES_PER_BATCH = 8 * 1024 * 1024; // 8 MB
+
+      const batches: File[][] = [];
+      let currentBatch: File[] = [];
+      let currentBatchBytes = 0;
+
+      for (const file of allAudioFiles) {
+        if (
+          currentBatch.length >= MAX_FILES_PER_BATCH ||
+          (currentBatch.length > 0 && currentBatchBytes + file.size > MAX_BYTES_PER_BATCH)
+        ) {
+          batches.push(currentBatch);
+          currentBatch = [];
+          currentBatchBytes = 0;
+        }
+        currentBatch.push(file);
+        currentBatchBytes += file.size;
+      }
+      if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+      }
+
+      const totalRecordings = allAudioFiles.length;
+      const totalBatches = batches.length;
+      let uploadedCount = 0;
+
+      for (let b = 0; b < totalBatches; b++) {
+        const batchFiles = batches[b];
+        const progressPct = Math.round((uploadedCount / totalRecordings) * 100);
+
+        setUploadStatus(
+          `Uploading calls: Batch ${b + 1} of ${totalBatches} (${uploadedCount}/${totalRecordings} uploaded - ${progressPct}%)...`
+        );
+
+        const fd = new FormData();
+        for (const file of batchFiles) {
+          fd.append('files[]', file, file.name);
+        }
+
+        // Attach metadata sheet on first batch (server persists to SQLite call_metadata_cache)
+        // or on subsequent batches if under 1MB
+        if (detectedMetadataFile && (b === 0 || detectedMetadataFile.size < 1024 * 1024)) {
+          fd.append('metadata', detectedMetadataFile, detectedMetadataFile.name);
+        }
+
+        await onUploadCalls(fd);
+        uploadedCount += batchFiles.length;
+      }
+
+      setUploadStatus(`Upload completed successfully! Ingested ${totalRecordings} call(s) and mapped metadata & trades.`);
       setUploadFiles(null);
       setUploadMeta(null);
       if (onRefresh) await onRefresh();
@@ -373,7 +466,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
     <div className="space-y-6">
       {/* Notice Banner */}
       {actionNotice && (
-        <div className="bg-amber-400 text-black px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs">
+        <div className="bg-teal-400 text-slate-950 px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-between shadow-xs">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4" />
             <span>{actionNotice}</span>
@@ -384,30 +477,30 @@ export const CallsView: React.FC<CallsViewProps> = ({
         </div>
       )}
 
-      {/* Upload Card - Classy Black & Yellow / Amber Theme */}
-      <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-xs">
+      {/* Upload Card - Liquid Glass Theme */}
+      <div className="glass-panel p-5 rounded-2xl relative overflow-hidden shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-              <span className="p-1.5 rounded-lg bg-amber-400 text-black">
+            <h2 className="text-base font-bold text-neutral-100 flex items-center gap-2">
+              <span className="p-1.5 rounded-lg bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20">
                 <Upload className="w-4 h-4" />
               </span>
               <span>Import Call Recordings &amp; Automated Categorization</span>
             </h2>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <p className="text-xs text-neutral-400 mt-0.5">
               Upload bulk call audio (or ZIP archive where files are named by Caller ID) + metadata sheet. System classifies calls into Pre-Order, Regular, and Scrap (&le;6s) and correlates client trade details.
             </p>
           </div>
-          <span className="text-[11px] font-semibold bg-amber-400/10 text-amber-900 px-3 py-1 rounded-full border border-amber-400/30 flex items-center gap-1.5 shrink-0 self-start">
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+          <span className="text-[11px] font-semibold bg-teal-400/15 text-teal-300 px-3 py-1 rounded-full border border-teal-400/30 flex items-center gap-1.5 shrink-0 self-start shadow-inner">
+            <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
             <span>3-Category Ingestion Pipeline</span>
           </span>
         </div>
 
         {/* 3 Call Types Guidance Banner */}
-        <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2.5 p-3.5 bg-neutral-950 text-neutral-200 rounded-xl border border-neutral-800 text-xs">
-          <div className="border-l-2 border-amber-400 pl-3">
-            <div className="font-bold text-amber-400 text-[11px] flex items-center gap-1">
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-3 gap-2.5 p-3.5 glass-inner rounded-xl border border-white/10 text-xs text-neutral-200">
+          <div className="border-l-2 border-teal-400 pl-3">
+            <div className="font-bold text-teal-300 text-[11px] flex items-center gap-1">
               <span>1. Pre-Order Calls</span>
             </div>
             <p className="text-[11px] text-neutral-400 mt-0.5">
@@ -434,9 +527,9 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
         {/* Upload Form */}
         <form onSubmit={handleUploadSubmit} className="space-y-4">
-          <div className="p-3 bg-amber-400/5 border border-amber-400/20 rounded-xl text-xs text-neutral-700 flex items-center justify-between">
+          <div className="p-3 bg-teal-400/10 border border-teal-400/20 rounded-xl text-xs text-teal-200 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
               <span>
                 <strong>Automated Metadata &amp; Trade Resolution:</strong> Caller ID is derived from filenames. Advisor Name, Dealer ID, Team, Client Code/UCC, and Call Date are resolved automatically from metadata and trade records.
               </span>
@@ -445,17 +538,17 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {/* Audio Files Input */}
-            <div className="p-4 bg-neutral-50 border border-dashed border-neutral-300 rounded-xl hover:border-amber-400 transition-colors">
+            <div className="p-4 glass-inner-subtle border border-dashed border-white/20 rounded-xl hover:border-teal-400/60 transition-colors">
               <div className="flex items-center gap-2 mb-2">
-                <FileAudio className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-bold text-neutral-900">Audio Files or Bulk ZIP Archive *</span>
+                <FileAudio className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-bold text-neutral-100">Audio Files or Bulk ZIP Archive *</span>
               </div>
               <input
                 type="file"
                 accept=".zip,.mp3,.wav,.ogg,.m4a,.flac"
                 multiple
                 onChange={(e) => setUploadFiles(e.target.files)}
-                className="w-full text-xs text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black file:cursor-pointer cursor-pointer"
+                className="w-full text-xs text-neutral-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-gradient-to-r file:from-teal-400 file:to-emerald-500 file:text-slate-950 hover:file:brightness-110 file:cursor-pointer cursor-pointer"
               />
               <p className="text-[11px] text-neutral-400 mt-1.5">
                 Upload raw audio files or a single .ZIP package. Filenames act as Caller IDs.
@@ -463,16 +556,16 @@ export const CallsView: React.FC<CallsViewProps> = ({
             </div>
 
             {/* Companion Metadata Input */}
-            <div className="p-4 bg-neutral-50 border border-dashed border-neutral-300 rounded-xl hover:border-amber-400 transition-colors">
+            <div className="p-4 glass-inner-subtle border border-dashed border-white/20 rounded-xl hover:border-teal-400/60 transition-colors">
               <div className="flex items-center gap-2 mb-2">
-                <FileText className="w-4 h-4 text-amber-500" />
-                <span className="text-xs font-bold text-neutral-900">Companion Metadata Spreadsheet (Optional)</span>
+                <FileText className="w-4 h-4 text-teal-400" />
+                <span className="text-xs font-bold text-neutral-100">Companion Metadata Spreadsheet (Optional)</span>
               </div>
               <input
                 type="file"
                 accept=".xlsx,.xls,.csv"
                 onChange={(e) => setUploadMeta(e.target.files?.[0] || null)}
-                className="w-full text-xs text-neutral-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-neutral-900 file:text-white hover:file:bg-black file:cursor-pointer cursor-pointer"
+                className="w-full text-xs text-neutral-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-white/10 file:text-neutral-200 hover:file:bg-white/20 file:cursor-pointer cursor-pointer"
               />
               <p className="text-[11px] text-neutral-400 mt-1.5">
                 Contains Caller ID &rarr; Registered Client Number &rarr; Date &rarr; Duration correlation.
@@ -481,10 +574,12 @@ export const CallsView: React.FC<CallsViewProps> = ({
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-            <div className="text-xs text-neutral-500">
+            <div className="text-xs text-neutral-400">
               {uploadFiles && uploadFiles.length > 0 ? (
-                <span className="text-emerald-700 font-medium">
-                  Ready to ingest {uploadFiles.length} file(s)
+                <span className="text-emerald-400 font-medium">
+                  {uploadFiles.length === 1 && uploadFiles[0].name.toLowerCase().endsWith('.zip')
+                    ? `Ready to ingest "${uploadFiles[0].name}" (archive will auto-unpack in browser & stream in chunks)`
+                    : `Ready to ingest ${uploadFiles.length} file(s)`}
                   {uploadMeta ? ` + metadata (${uploadMeta.name})` : ''}
                 </span>
               ) : (
@@ -495,7 +590,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
             <button
               type="submit"
               disabled={isUploading || !uploadFiles || uploadFiles.length === 0}
-              className="px-5 py-2.5 bg-amber-400 hover:bg-amber-500 disabled:opacity-50 text-black font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="px-5 py-2.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 disabled:opacity-50 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               <Upload className="w-4 h-4" />
               <span>{isUploading ? 'Ingesting & Categorizing...' : 'Upload & Process Calls'}</span>
@@ -506,8 +601,8 @@ export const CallsView: React.FC<CallsViewProps> = ({
             <div
               className={`p-3 rounded-xl text-xs font-medium ${
                 uploadStatus.includes('error') || uploadStatus.includes('Error')
-                  ? 'bg-rose-50 text-rose-800 border border-rose-200'
-                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                  : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
               }`}
             >
               {uploadStatus}
@@ -520,19 +615,19 @@ export const CallsView: React.FC<CallsViewProps> = ({
       {playingCall && (
         <div className="bg-neutral-900 text-white p-4 rounded-2xl border border-neutral-800 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="w-10 h-10 rounded-xl bg-amber-400 text-black flex items-center justify-center font-bold">
-              <Volume2 className="w-5 h-5 text-black" />
+            <div className="w-10 h-10 rounded-xl bg-teal-500 text-slate-950 flex items-center justify-center font-bold">
+              <Volume2 className="w-5 h-5 text-slate-950" />
             </div>
             <div>
               <div className="text-xs font-bold text-white flex items-center gap-2">
                 <span>Listening: {playingCall.recording_name}</span>
-                <span className="text-[10px] font-mono text-amber-400">#{playingCall.id}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-amber-300 font-bold">
+                <span className="text-[10px] font-mono text-teal-400">#{playingCall.id}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 text-teal-300 font-bold">
                   {playingCall.call_type === 'pre_order' ? 'Pre-Order' : playingCall.call_type === 'scrap' ? 'Scrap' : 'Regular'}
                 </span>
               </div>
               <div className="text-[11px] text-neutral-400">
-                Client ID: <span className="text-amber-400 font-mono font-bold">{playingCall.client || '—'}</span> · Advisor: {cleanCallerName(playingCall.caller_name) || '—'} · Duration: {formatDuration(playingCall.duration_seconds)}
+                Client ID: <span className="text-teal-400 font-mono font-bold">{playingCall.client || '—'}</span> · Advisor: {cleanCallerName(playingCall.caller_name) || '—'} · Duration: {formatDuration(playingCall.duration_seconds)}
               </div>
             </div>
           </div>
@@ -551,78 +646,78 @@ export const CallsView: React.FC<CallsViewProps> = ({
       )}
 
       {/* Categorization & Download Control Bar */}
-      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs space-y-4">
+      <div className="glass-panel p-4 rounded-xl shadow-lg space-y-4">
         {/* Category Pills Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setCategoryFilter('all')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 categoryFilter === 'all'
-                  ? 'bg-neutral-900 text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-md shadow-teal-500/20'
+                  : 'glass-inner-subtle text-neutral-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <span>All Recordings</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'all' ? 'bg-neutral-700 text-neutral-200' : 'bg-neutral-200 text-neutral-700'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'all' ? 'bg-black/20 text-black font-extrabold' : 'bg-white/10 text-neutral-300'}`}>
                 {counts.all}
               </span>
             </button>
 
             <button
               onClick={() => setCategoryFilter('pre_order')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 categoryFilter === 'pre_order'
-                  ? 'bg-amber-400 text-black shadow-xs'
-                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-200'
+                  ? 'bg-gradient-to-r from-teal-400 to-emerald-500 text-slate-950 shadow-md shadow-teal-500/20'
+                  : 'bg-teal-400/10 text-teal-300 hover:bg-teal-400/20 border border-teal-400/20'
               }`}
             >
               <Tag className="w-3.5 h-3.5" />
               <span>Pre-Order Calls (Orders)</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'pre_order' ? 'bg-amber-500 text-black' : 'bg-amber-200 text-amber-900'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'pre_order' ? 'bg-slate-950 text-teal-300' : 'bg-teal-400/20 text-teal-200'}`}>
                 {counts.preOrder}
               </span>
             </button>
 
             <button
               onClick={() => setCategoryFilter('regular')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 categoryFilter === 'regular'
-                  ? 'bg-neutral-800 text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+                  ? 'bg-white/20 text-white shadow-md border border-white/20'
+                  : 'glass-inner-subtle text-neutral-300 hover:text-white hover:bg-white/10'
               }`}
             >
               <span>Regular Calls (Advisory)</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'regular' ? 'bg-neutral-600 text-neutral-200' : 'bg-neutral-200 text-neutral-700'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'regular' ? 'bg-white/20 text-white' : 'bg-white/10 text-neutral-300'}`}>
                 {counts.regular}
               </span>
             </button>
 
             <button
               onClick={() => setCategoryFilter('scrap')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 categoryFilter === 'scrap'
-                  ? 'bg-rose-600 text-white'
-                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 border border-rose-200'
+                  ? 'bg-rose-500 text-white shadow-md shadow-rose-500/20'
+                  : 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 border border-rose-500/20'
               }`}
             >
               <span>Scrap Calls (&lt; 6s)</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'scrap' ? 'bg-rose-800 text-rose-100' : 'bg-rose-200 text-rose-800'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'scrap' ? 'bg-rose-700 text-rose-100' : 'bg-rose-500/20 text-rose-200'}`}>
                 {counts.scrap}
               </span>
             </button>
 
             <button
               onClick={() => setCategoryFilter('review')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 categoryFilter === 'review'
-                  ? 'bg-amber-500 text-black shadow-xs'
-                  : 'bg-amber-50 text-amber-900 hover:bg-amber-100 border border-amber-300'
+                  ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20'
+                  : 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 border border-amber-500/20'
               }`}
             >
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>Review Required</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'review' ? 'bg-black text-white' : 'bg-amber-200 text-amber-900'}`}>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-md ${categoryFilter === 'review' ? 'bg-black text-white' : 'bg-amber-500/20 text-amber-200'}`}>
                 {counts.review}
               </span>
             </button>
@@ -633,10 +728,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
             <button
               onClick={() => handleDownloadZip(categoryFilter)}
               disabled={isDownloadingZip || filteredCalls.length === 0}
-              className="px-3.5 py-2 bg-neutral-900 hover:bg-black text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 shadow-xs"
+              className="px-3.5 py-2 glass-inner-subtle hover:bg-white/10 text-neutral-100 font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 border border-white/15 shadow-sm"
               title="Download currently filtered recordings as a ZIP file"
             >
-              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <Download className="w-3.5 h-3.5 text-teal-400" />
               <span>
                 {isDownloadingZip
                   ? 'Packaging ZIP...'
@@ -650,10 +745,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
               <button
                 onClick={handleDeleteSelected}
                 disabled={isDeleting}
-                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-rose-200 cursor-pointer transition-colors"
+                className="px-3 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-rose-500/30 cursor-pointer transition-colors"
                 title="Delete selected recordings from database and storage"
               >
-                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                 <span>Delete Selected ({selectedCallIds.size})</span>
               </button>
             )}
@@ -662,10 +757,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
               <button
                 onClick={handleDeleteAllScrap}
                 disabled={isDeleting}
-                className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-amber-300 cursor-pointer transition-colors"
+                className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-rose-500/25 cursor-pointer transition-colors"
                 title="Purge all short scrap recordings (< 6 seconds)"
               >
-                <Trash2 className="w-3.5 h-3.5 text-amber-700" />
+                <Trash2 className="w-3.5 h-3.5 text-rose-400" />
                 <span>Purge Scrap ({counts.scrap})</span>
               </button>
             )}
@@ -673,31 +768,31 @@ export const CallsView: React.FC<CallsViewProps> = ({
             <button
               onClick={handleReclassifyAll}
               disabled={isReclassifying || calls.length === 0}
-              className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-neutral-200 cursor-pointer disabled:opacity-40"
+              className="px-3 py-2 glass-inner-subtle hover:bg-white/10 text-neutral-300 text-xs font-semibold rounded-xl flex items-center gap-1.5 border border-white/10 cursor-pointer disabled:opacity-40"
               title="Re-run categorization engine across all recordings"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-neutral-600 ${isReclassifying ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 text-teal-400 ${isReclassifying ? 'animate-spin' : ''}`} />
               <span>Re-classify All</span>
             </button>
           </div>
         </div>
 
         {/* Search Input & Select All Row */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-neutral-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-white/10">
           <div className="flex items-center gap-3">
             <button
               onClick={toggleSelectAll}
-              className="text-xs font-semibold text-neutral-700 hover:text-black flex items-center gap-1.5 cursor-pointer"
+              className="text-xs font-semibold text-neutral-300 hover:text-white flex items-center gap-1.5 cursor-pointer"
             >
               {selectedCallIds.size > 0 && selectedCallIds.size === filteredCalls.length ? (
-                <CheckSquare className="w-4 h-4 text-amber-500" />
+                <CheckSquare className="w-4 h-4 text-teal-400" />
               ) : (
                 <Square className="w-4 h-4 text-neutral-400" />
               )}
               <span>Select All Filtered ({filteredCalls.length})</span>
             </button>
             {selectedCallIds.size > 0 && (
-              <span className="text-[11px] font-mono text-amber-600 font-bold">
+              <span className="text-[11px] font-mono text-teal-400 font-bold">
                 {selectedCallIds.size} Selected
               </span>
             )}
@@ -710,14 +805,14 @@ export const CallsView: React.FC<CallsViewProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search recordings, transcripts, clients…"
-              className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs text-neutral-800 placeholder:text-neutral-400 focus:outline-hidden focus:border-amber-400 focus:ring-1 focus:ring-amber-400"
+              className="w-full pl-8 pr-3 py-1.5 glass-input rounded-lg text-xs placeholder:text-neutral-500"
             />
           </div>
         </div>
       </div>
 
       {/* Calls Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+      <div className="glass-panel rounded-xl border border-white/10 shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-[#111115] text-neutral-200 font-semibold border-b border-neutral-800 text-[11px] uppercase tracking-wider">
@@ -725,7 +820,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 <th className="py-2.5 px-3 w-8">
                   <span className="sr-only">Select</span>
                 </th>
-                <th className="py-2.5 px-3 text-amber-400">ID</th>
+                <th className="py-2.5 px-3 text-teal-300">ID</th>
                 <th className="py-2.5 px-3">Category</th>
                 <th className="py-2.5 px-3">Recording Name</th>
                 <th className="py-2.5 px-3">Duration</th>
@@ -737,7 +832,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-200 text-neutral-800">
+            <tbody className="divide-y divide-white/5 text-neutral-200">
               {filteredCalls.length === 0 ? (
                 <tr>
                   <td colSpan={11} className="py-12 text-center text-neutral-400">
@@ -755,16 +850,16 @@ export const CallsView: React.FC<CallsViewProps> = ({
                   return (
                     <tr
                       key={call.id}
-                      className={`transition-colors ${isSelected ? 'bg-amber-50/60' : 'hover:bg-neutral-50/50'}`}
+                      className={`transition-colors ${isSelected ? 'bg-teal-400/10' : 'hover:bg-white/5'}`}
                     >
                       {/* Checkbox */}
                       <td className="py-2.5 px-3">
                         <button
                           onClick={() => toggleSelectCall(call.id)}
-                          className="text-neutral-400 hover:text-black cursor-pointer"
+                          className="text-neutral-400 hover:text-white cursor-pointer"
                         >
                           {isSelected ? (
-                            <CheckSquare className="w-3.5 h-3.5 text-amber-500" />
+                            <CheckSquare className="w-3.5 h-3.5 text-teal-400" />
                           ) : (
                             <Square className="w-3.5 h-3.5" />
                           )}
@@ -772,14 +867,14 @@ export const CallsView: React.FC<CallsViewProps> = ({
                       </td>
 
                       {/* ID & Listen */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-amber-700 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-400 whitespace-nowrap">
                         <div className="flex items-center gap-1">
                           <button
                             onClick={() => setPlayingCall(call)}
-                            className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-200 rounded-sm cursor-pointer"
+                            className="p-1 text-neutral-400 hover:text-white hover:bg-white/10 rounded-sm cursor-pointer transition-colors"
                             title="Play call recording"
                           >
-                            <Play className="w-3.5 h-3.5 fill-current text-amber-500" />
+                            <Play className="w-3.5 h-3.5 fill-current text-teal-400" />
                           </button>
                           <span>#{call.id}</span>
                         </div>
@@ -792,7 +887,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                             <select
                               value={editCategoryVal}
                               onChange={(e) => setEditCategoryVal(e.target.value)}
-                              className="text-xs font-bold px-1.5 py-0.5 border rounded-sm bg-white"
+                              className="text-xs font-bold px-1.5 py-0.5 border border-white/20 rounded-sm bg-neutral-900 text-neutral-200"
                             >
                               <option value="pre_order">Pre-Order</option>
                               <option value="regular">Regular</option>
@@ -800,14 +895,14 @@ export const CallsView: React.FC<CallsViewProps> = ({
                             </select>
                             <button
                               onClick={() => handleUpdateCategory(call.id)}
-                              className="p-1 bg-amber-400 text-black rounded-sm cursor-pointer"
+                              className="p-1 bg-teal-400 text-slate-950 rounded-sm cursor-pointer font-bold"
                               title="Save category"
                             >
                               <Check className="w-3 h-3" />
                             </button>
                             <button
                               onClick={() => setEditingCallId(null)}
-                              className="p-1 text-neutral-500 hover:text-black cursor-pointer"
+                              className="p-1 text-neutral-400 hover:text-white cursor-pointer"
                             >
                               <X className="w-3 h-3" />
                             </button>
@@ -815,17 +910,17 @@ export const CallsView: React.FC<CallsViewProps> = ({
                         ) : (
                           <div className="flex items-center gap-1.5">
                             {call.classification === 'REVIEW' || call.status === 'review' || call.pipeline_stage === 'REVIEW_PENDING' ? (
-                              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-400">
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-400/20 text-amber-300 border border-amber-400/40">
                                 Review Required
                               </span>
                             ) : (
                               <span
                                 className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
                                   isPreOrder
-                                    ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                    ? 'bg-teal-400/15 text-teal-300 border border-teal-400/30'
                                     : isShortScrap
-                                    ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                                    : 'bg-neutral-100 text-neutral-800 border border-neutral-300'
+                                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                    : 'bg-white/10 text-neutral-300 border border-white/10'
                                 }`}
                               >
                                 {isPreOrder ? 'Pre-Order' : isShortScrap ? 'Scrap Call' : 'Regular Call'}
@@ -836,7 +931,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                                 setEditingCallId(call.id);
                                 setEditCategoryVal(call.call_type || 'regular');
                               }}
-                              className="text-neutral-400 hover:text-black p-0.5 cursor-pointer opacity-40 hover:opacity-100"
+                              className="text-neutral-400 hover:text-white p-0.5 cursor-pointer opacity-40 hover:opacity-100 transition-opacity"
                               title="Change call category"
                             >
                               <Edit2 className="w-3 h-3" />
@@ -846,7 +941,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                       </td>
 
                       {/* Recording Name */}
-                      <td className="py-2.5 px-3 font-medium text-neutral-900 max-w-[200px] truncate" title={call.recording_name}>
+                      <td className="py-2.5 px-3 font-medium text-neutral-200 max-w-[200px] truncate" title={call.recording_name}>
                         {call.recording_name}
                       </td>
 
@@ -854,36 +949,36 @@ export const CallsView: React.FC<CallsViewProps> = ({
                       <td className="py-2.5 px-3 whitespace-nowrap">
                         <span
                           className={`font-mono text-xs ${
-                            isShortScrap ? 'text-rose-600 font-bold' : 'text-neutral-700'
+                            isShortScrap ? 'text-rose-400 font-bold' : 'text-neutral-300'
                           }`}
                         >
                           {formatDuration(call.duration_seconds)}
-                          {isShortScrap && <span className="ml-1 text-[10px] text-rose-500 font-sans">(&le;6s)</span>}
+                          {isShortScrap && <span className="ml-1 text-[10px] text-rose-400 font-sans">(&le;6s)</span>}
                         </span>
                       </td>
 
                       {/* Caller */}
-                      <td className="py-2.5 px-3 text-neutral-800 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-neutral-300 whitespace-nowrap">
                         {cleanCallerName(call.caller_name) || '—'}
                       </td>
 
                       {/* Client Code */}
-                      <td className="py-2.5 px-3 font-mono font-bold text-neutral-900 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-mono font-bold text-teal-300 whitespace-nowrap">
                         {call.client || '—'}
                       </td>
 
                       {/* Phone Number */}
-                      <td className="py-2.5 px-3 font-mono text-neutral-700 whitespace-nowrap">
+                      <td className="py-2.5 px-3 font-mono text-neutral-400 whitespace-nowrap">
                         {call.calling_number || call.phone_number || '—'}
                       </td>
 
                       {/* Date */}
-                      <td className="py-2.5 px-3 text-neutral-600 whitespace-nowrap">
+                      <td className="py-2.5 px-3 text-neutral-400 whitespace-nowrap">
                         {call.call_date || (call.created_at ? call.created_at.slice(0, 10) : '—')}
                       </td>
 
                       {/* Classification Evidence / Reason */}
-                      <td className="py-2.5 px-3 max-w-[240px] truncate text-neutral-600" title={call.preorder_evidence || ''}>
+                      <td className="py-2.5 px-3 max-w-[240px] truncate text-neutral-400" title={call.preorder_evidence || ''}>
                         {call.preorder_evidence || (isPreOrder ? 'Order confirmation detected' : isShortScrap ? 'Duration < 6s' : 'Advisory / Market discussion')}
                       </td>
 
@@ -893,7 +988,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                           {(call.classification === 'REVIEW' || call.status === 'review' || call.pipeline_stage === 'REVIEW_PENDING') && (
                             <button
                               onClick={() => handleOpenCallDetail(call)}
-                              className="px-2 py-1 bg-amber-500 hover:bg-amber-600 text-black font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-xs"
+                              className="px-2 py-1 bg-amber-400 hover:bg-amber-300 text-black font-bold text-[11px] rounded-md transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
                               title="Resolve compliance review"
                             >
                               <AlertTriangle className="w-3 h-3" />
@@ -903,7 +998,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                           {isPreOrder && (
                             <button
                               onClick={() => onForceAudit(call.id)}
-                              className="px-2 py-1 bg-amber-400 hover:bg-amber-500 text-black font-bold text-[11px] rounded-md transition-colors cursor-pointer"
+                              className="px-2 py-1 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold text-[11px] rounded-md transition-all cursor-pointer shadow-sm"
                               title="Run immediate pre-order quality audit"
                             >
                               Audit
@@ -911,14 +1006,14 @@ export const CallsView: React.FC<CallsViewProps> = ({
                           )}
                           <button
                             onClick={() => handleOpenCallDetail(call)}
-                            className="p-1 text-neutral-400 hover:text-black hover:bg-neutral-200 rounded-md cursor-pointer"
+                            className="p-1 text-neutral-400 hover:text-white hover:bg-white/10 rounded-md cursor-pointer transition-colors"
                             title="View speech transcript and detail"
                           >
                             <FileText className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => handleDeleteCall(call.id, call.recording_name)}
-                            className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-md cursor-pointer"
+                            className="p-1 text-neutral-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-md cursor-pointer transition-colors"
                             title="Delete this call recording"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -936,64 +1031,64 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
       {/* Detail Modal */}
       {selectedCall && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto border border-neutral-300 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-200 pb-3">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-panel rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto border border-white/15 shadow-2xl p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <div>
-                <h3 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-                  <span className="p-1 rounded-md bg-amber-400 text-black">
+                <h3 className="text-base font-bold text-neutral-100 flex items-center gap-2">
+                  <span className="p-1.5 rounded-lg bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20">
                     <PhoneCall className="w-4 h-4" />
                   </span>
                   <span>Recording #{selectedCall.id} Detail</span>
                 </h3>
-                <p className="text-xs text-neutral-500">{selectedCall.recording_name}</p>
+                <p className="text-xs text-neutral-400">{selectedCall.recording_name}</p>
               </div>
               <button
                 onClick={() => setSelectedCall(null)}
-                className="p-1.5 text-neutral-400 hover:text-black rounded-lg cursor-pointer"
+                className="p-1.5 text-neutral-400 hover:text-white rounded-lg cursor-pointer transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 bg-neutral-50 rounded-xl border border-neutral-200 text-xs">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-3 glass-inner rounded-xl border border-white/10 text-xs">
               <div>
-                <span className="text-neutral-500">Category:</span>
-                <span className="font-bold text-neutral-900 ml-1.5 uppercase">
+                <span className="text-neutral-400">Category:</span>
+                <span className="font-bold text-teal-300 ml-1.5 uppercase">
                   {selectedCall.call_type || 'Regular'}
                 </span>
               </div>
               <div>
-                <span className="text-neutral-500">Duration:</span>
-                <span className="font-mono font-bold text-neutral-900 ml-1.5">
+                <span className="text-neutral-400">Duration:</span>
+                <span className="font-mono font-bold text-neutral-100 ml-1.5">
                   {formatDuration(selectedCall.duration_seconds)}
                 </span>
               </div>
               <div>
-                <span className="text-neutral-500">Advisor:</span>
-                <span className="font-medium text-neutral-900 ml-1.5">{cleanCallerName(selectedCall.caller_name) || '—'}</span>
+                <span className="text-neutral-400">Advisor:</span>
+                <span className="font-medium text-neutral-100 ml-1.5">{cleanCallerName(selectedCall.caller_name) || '—'}</span>
               </div>
               <div>
-                <span className="text-neutral-500">Client Code:</span>
-                <span className="font-mono font-bold text-neutral-900 ml-1.5">{selectedCall.client || '—'}</span>
+                <span className="text-neutral-400">Client Code:</span>
+                <span className="font-mono font-bold text-teal-300 ml-1.5">{selectedCall.client || '—'}</span>
               </div>
               <div>
-                <span className="text-neutral-500">Calling CLI:</span>
-                <span className="font-mono text-neutral-900 ml-1.5">{selectedCall.calling_number || '—'}</span>
+                <span className="text-neutral-400">Calling CLI:</span>
+                <span className="font-mono text-neutral-200 ml-1.5">{selectedCall.calling_number || '—'}</span>
               </div>
               <div>
-                <span className="text-neutral-500">Registered No:</span>
-                <span className="font-mono text-neutral-900 ml-1.5">{selectedCall.registered_number || '—'}</span>
+                <span className="text-neutral-400">Registered No:</span>
+                <span className="font-mono text-neutral-200 ml-1.5">{selectedCall.registered_number || '—'}</span>
               </div>
             </div>
 
             {/* Pipeline Stage, Gate & Diagnostics */}
-            <div className="p-3 bg-neutral-900 text-white rounded-xl border border-neutral-800 text-xs space-y-2">
+            <div className="p-3 glass-inner text-white rounded-xl border border-white/10 text-xs space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-amber-400 font-bold uppercase tracking-wider text-[10px]">
+                <span className="text-teal-400 font-bold uppercase tracking-wider text-[10px]">
                   Pipeline Stage &amp; Diagnostic Telemetry
                 </span>
-                <span className="px-2 py-0.5 rounded bg-neutral-800 font-mono text-[10px] text-neutral-300">
+                <span className="px-2 py-0.5 rounded glass-inner-subtle font-mono text-[10px] text-neutral-300 border border-white/10">
                   Gate: {selectedCall.current_gate || 'N/A'}
                 </span>
               </div>
@@ -1016,7 +1111,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                 </div>
               </div>
               {(selectedCall.gate_reason || selectedCall.failure_reason) && (
-                <div className="pt-1 border-t border-neutral-800 text-[11px] text-neutral-300">
+                <div className="pt-1 border-t border-white/10 text-[11px] text-neutral-300">
                   <span className="text-neutral-400">Gate Reason: </span>
                   <span>{selectedCall.gate_reason || selectedCall.failure_reason}</span>
                 </div>
@@ -1025,45 +1120,45 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
             {/* Human-in-the-Loop Review Resolution Workflow */}
             {(selectedCall.classification === 'REVIEW' || selectedCall.status === 'review' || selectedCall.pipeline_stage === 'REVIEW_PENDING') && (
-              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-xl space-y-3">
+              <div className="p-4 bg-amber-400/10 border border-amber-400/30 rounded-xl space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-600" />
-                    <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider">
+                    <AlertTriangle className="w-5 h-5 text-amber-400" />
+                    <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
                       Compliance Review Required (REVIEW_PENDING)
                     </h4>
                   </div>
-                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-bold rounded-full">
+                  <span className="px-2 py-0.5 bg-amber-400/20 text-amber-300 text-[10px] font-bold rounded-full border border-amber-400/30">
                     Awaiting Officer Decision
                   </span>
                 </div>
 
-                <p className="text-xs text-amber-900">
+                <p className="text-xs text-neutral-300">
                   Order intent was marked ambiguous during automatic intent classification. Review the transcript below and specify resolution.
                 </p>
 
                 <div className="space-y-2 pt-1">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-semibold text-neutral-800">Target Category:</label>
+                    <label className="text-xs font-semibold text-neutral-200">Target Category:</label>
                     <select
                       value={resolvedClassification}
                       onChange={(e) => setResolvedClassification(e.target.value as any)}
-                      className="text-xs font-bold px-2 py-1 border border-neutral-300 rounded-md bg-white"
+                      className="text-xs font-bold px-2 py-1 glass-input rounded-md"
                     >
-                      <option value="PRE_ORDER">PRE_ORDER (Spoken order instruction)</option>
-                      <option value="REGULAR">REGULAR (Advisory / Query only)</option>
-                      <option value="SCRAP">SCRAP (Non-actionable / noise)</option>
+                      <option value="PRE_ORDER" className="bg-[#10131c] text-white">PRE_ORDER (Spoken order instruction)</option>
+                      <option value="REGULAR" className="bg-[#10131c] text-white">REGULAR (Advisory / Query only)</option>
+                      <option value="SCRAP" className="bg-[#10131c] text-white">SCRAP (Non-actionable / noise)</option>
                     </select>
                   </div>
 
                   <div>
-                    <label className="text-xs font-semibold text-neutral-800 block mb-1">Compliance Notes:</label>
+                    <label className="text-xs font-semibold text-neutral-300 block mb-1">Compliance Notes:</label>
                     <input
                       type="text"
                       placeholder="e.g., Confirmed client instructed buy order at 01:23; proceeding to audit."
                       value={reviewNotes}
                       onChange={(e) => setReviewNotes(e.target.value)}
-                      className="w-full text-xs px-3 py-1.5 border border-neutral-300 rounded-lg bg-white"
+                      className="w-full text-xs px-3 py-1.5 glass-input rounded-lg"
                     />
                   </div>
 
@@ -1071,7 +1166,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                     <button
                       onClick={() => handleResolveReview(selectedCall.id, 'CONTINUE')}
                       disabled={isResolvingReview}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                      className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-emerald-500/20"
                     >
                       <Check className="w-4 h-4" />
                       <span>{isResolvingReview ? 'Resolving...' : 'Approve & Continue Audit'}</span>
@@ -1079,7 +1174,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
                     <button
                       onClick={() => handleResolveReview(selectedCall.id, 'REJECT')}
                       disabled={isResolvingReview}
-                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-rose-600/20"
                     >
                       <X className="w-4 h-4" />
                       <span>{isResolvingReview ? 'Resolving...' : 'Reject & Exclude'}</span>
@@ -1091,17 +1186,17 @@ export const CallsView: React.FC<CallsViewProps> = ({
 
             {/* Previous Review Resolution History */}
             {selectedCall.review_resolution && (
-              <div className="p-3 bg-neutral-100 border border-neutral-300 rounded-xl text-xs space-y-1">
+              <div className="p-3 glass-inner border border-white/10 rounded-xl text-xs space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-neutral-800">Human Resolution History:</span>
+                  <span className="font-bold text-neutral-200">Human Resolution History:</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    selectedCall.review_resolution === 'CONTINUED' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+                    selectedCall.review_resolution === 'CONTINUED' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                   }`}>
                     {selectedCall.review_resolution}
                   </span>
                 </div>
                 {selectedCall.review_resolution_notes && (
-                  <p className="text-neutral-700 text-[11px]">Notes: "{selectedCall.review_resolution_notes}"</p>
+                  <p className="text-neutral-300 text-[11px]">Notes: "{selectedCall.review_resolution_notes}"</p>
                 )}
                 {selectedCall.review_resolved_at && (
                   <p className="text-neutral-400 text-[10px]">Resolved at: {selectedCall.review_resolved_at}</p>
@@ -1110,10 +1205,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
             )}
 
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-1.5">
+              <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                 Classification Reason
               </h4>
-              <p className="text-xs p-3 bg-neutral-50 border border-neutral-200 rounded-lg text-neutral-800">
+              <p className="text-xs p-3 glass-inner rounded-lg text-neutral-200 border border-white/10">
                 {selectedCall.preorder_evidence || 'Standard advisory discussion detected.'}
               </p>
             </div>
@@ -1121,9 +1216,9 @@ export const CallsView: React.FC<CallsViewProps> = ({
             {/* SEBI Hierarchical Correlation: Orders & Executions */}
             {selectedCall.orders && selectedCall.orders.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider flex items-center justify-between">
+                <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider flex items-center justify-between">
                   <span>Extracted Call Orders ({selectedCall.orders.length})</span>
-                  <span className="text-[10px] font-normal text-neutral-500">
+                  <span className="text-[10px] font-normal text-neutral-400">
                     1 Call → Multiple Orders &amp; Executions
                   </span>
                 </h4>
@@ -1133,34 +1228,34 @@ export const CallsView: React.FC<CallsViewProps> = ({
                     const totalFilled = orderExecs.reduce((acc, curr) => acc + curr.matched_quantity, 0);
                     const isFullyFilled = order.quantity != null && totalFilled >= order.quantity;
                     return (
-                      <div key={order.id || idx} className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-xs space-y-2">
+                      <div key={order.id || idx} className="p-3 glass-inner border border-white/10 rounded-xl text-xs space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${order.intent_type === 'SELL' ? 'bg-rose-100 text-rose-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${order.intent_type === 'SELL' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
                               {order.intent_type}
                             </span>
-                            <span className="font-bold text-neutral-900">{order.symbol || 'Stock'}</span>
-                            <span className="text-neutral-500">Qty: {order.quantity || '—'}</span>
-                            <span className="text-neutral-500">Price: {order.price_type === 'CMP' ? 'CMP' : (order.limit_price ? `₹${order.limit_price}` : 'Market')}</span>
+                            <span className="font-bold text-neutral-100">{order.symbol || 'Stock'}</span>
+                            <span className="text-neutral-400">Qty: {order.quantity || '—'}</span>
+                            <span className="text-neutral-400">Price: {order.price_type === 'CMP' ? 'CMP' : (order.limit_price ? `₹${order.limit_price}` : 'Market')}</span>
                           </div>
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            isFullyFilled ? 'bg-emerald-100 text-emerald-800' : totalFilled > 0 ? 'bg-amber-100 text-amber-800' : 'bg-neutral-200 text-neutral-700'
+                            isFullyFilled ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : totalFilled > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-white/10 text-neutral-300'
                           }`}>
                             {isFullyFilled ? 'FULLY EXECUTED' : totalFilled > 0 ? `PARTIAL (${totalFilled}/${order.quantity || '?'})` : 'UNMATCHED'}
                           </span>
                         </div>
 
                         {orderExecs.length > 0 && (
-                          <div className="mt-2 pt-2 border-t border-neutral-200 space-y-1">
-                            <div className="text-[10px] font-bold text-neutral-600">
+                          <div className="mt-2 pt-2 border-t border-white/10 space-y-1">
+                            <div className="text-[10px] font-bold text-neutral-400">
                               Linked Executions ({orderExecs.length}):
                             </div>
                             {orderExecs.map((exec, eIdx) => (
-                              <div key={exec.id || eIdx} className="flex items-center justify-between text-[11px] bg-white p-2 rounded border border-neutral-200">
-                                <span className="font-mono text-neutral-700">
+                              <div key={exec.id || eIdx} className="flex items-center justify-between text-[11px] glass-inner-subtle p-2 rounded border border-white/5">
+                                <span className="font-mono text-neutral-300">
                                   Trade #{exec.trade_id}: {exec.matched_quantity} shares @ ₹{exec.trade_price || '—'}
                                 </span>
-                                <span className="text-neutral-500">
+                                <span className="text-neutral-400">
                                   {exec.trade_time ? `${exec.trade_date || ''} ${exec.trade_time}` : 'Executed'}
                                 </span>
                               </div>
@@ -1175,10 +1270,10 @@ export const CallsView: React.FC<CallsViewProps> = ({
             )}
 
             <div>
-              <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-1.5">
+              <h4 className="text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
                 Spoken Speech Transcript &amp; Speaker Diarization
               </h4>
-              <div className="p-3 bg-neutral-950 text-neutral-200 text-xs rounded-xl border border-neutral-800">
+              <div className="p-3 glass-inner text-neutral-200 text-xs rounded-xl border border-white/10">
                 <TranscriptHighlighter
                   transcript={selectedCall.transcript || ''}
                   clientCode={selectedCall.client}
@@ -1190,7 +1285,7 @@ export const CallsView: React.FC<CallsViewProps> = ({
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedCall(null)}
-                className="px-4 py-2 bg-neutral-200 hover:bg-neutral-300 text-neutral-900 font-bold text-xs rounded-xl cursor-pointer"
+                className="px-4 py-2 glass-inner-subtle hover:bg-white/10 text-neutral-200 font-bold text-xs rounded-xl cursor-pointer border border-white/10 transition-colors"
               >
                 Close
               </button>

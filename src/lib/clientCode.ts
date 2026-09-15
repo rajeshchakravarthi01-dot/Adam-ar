@@ -17,6 +17,7 @@ export const VALID_CLIENT_PREFIXES = [
   'WIE',
   'FIA',
   'PWD',
+  'PWA',
 ] as const;
 
 export type ValidClientPrefix = typeof VALID_CLIENT_PREFIXES[number];
@@ -83,6 +84,7 @@ export function formatCleanClientCode(rawInput?: string | null): string {
     { pattern: /^(?:WIE|VIE|W1E|V1E)/, canonical: 'WIE' },
     { pattern: /^(?:FIA)/, canonical: 'FIA' },
     { pattern: /^(?:PWD|PVD|PW(?=\d))/, canonical: 'PWD' },
+    { pattern: /^(?:PWA)/, canonical: 'PWA' },
   ];
 
   for (const item of prefixMap) {
@@ -116,7 +118,7 @@ export function formatCleanClientCode(rawInput?: string | null): string {
 export function isStrictValidClientCode(code?: string | null): boolean {
   if (!code) return false;
   const clean = formatCleanClientCode(code);
-  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD)\d{2,10}$/.test(clean);
+  return /^(WIA|WIF|WIC|WID|WIG|WIE|FIA|PWD|PWA)\d{2,10}$/.test(clean);
 }
 
 /**

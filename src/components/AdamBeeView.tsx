@@ -150,7 +150,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
       <div className="bg-[#0b0b0e] text-white p-6 rounded-2xl border border-neutral-800 shadow-xl relative overflow-hidden">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
           <div>
-            <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-2 text-teal-400 font-bold text-xs uppercase tracking-wider mb-1">
               <span className="text-lg">🐝</span>
               <span>Function 12 · AdamBee Autonomous Web &amp; Ticket Extractor</span>
             </div>
@@ -165,7 +165,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               onClick={onTriggerBee}
-              className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-black font-black text-xs rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
+              className="px-4 py-2.5 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-black text-xs rounded-xl shadow-lg flex items-center gap-2 cursor-pointer transition-transform active:scale-95"
               title="Launch AdamBee to crawl this screen"
             >
               <span className="text-base">🐝</span>
@@ -174,7 +174,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
 
             <button
               onClick={() => setShowManualModal(true)}
-              className="px-3.5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-amber-400 text-xs font-bold rounded-xl border border-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="px-3.5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-teal-400 text-xs font-bold rounded-xl border border-neutral-700 flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Import Ticket Data</span>
@@ -183,16 +183,16 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
         </div>
 
         {/* Extension Integration Bar */}
-        <div className="mt-5 pt-4 border-t border-neutral-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-400">
+        <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-300">
           <div className="flex items-center gap-2">
-            <Code className="w-4 h-4 text-amber-400" />
+            <Code className="w-4 h-4 text-teal-400" />
             <span>
-              <b>AdamBee Web Bookmarklet:</b> Drag or copy code to audit tickets across FundsIndia CRM, Zendesk, or Tata Teleservices portal.
+              <b>AdamBee Web Bookmarklet:</b> Drag or copy code to audit tickets across Enterprise CRM, Zendesk, or CTI portal.
             </span>
           </div>
           <button
             onClick={handleCopyBookmarklet}
-            className="px-3 py-1.5 bg-neutral-850 hover:bg-neutral-800 text-amber-400 border border-amber-400/30 rounded-lg font-mono text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0"
+            className="px-3 py-1.5 glass-inner hover:bg-teal-400/20 text-teal-300 border border-teal-400/40 rounded-lg font-mono text-[11px] font-bold flex items-center gap-1.5 cursor-pointer transition-all shrink-0"
           >
             {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
             <span>{copiedCode ? 'Bookmarklet Copied!' : 'Copy AdamBee Bookmarklet'}</span>
@@ -200,41 +200,45 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
         </div>
       </div>
 
-      {/* Metrics Row */}
+      {/* Metrics Row - Liquid Glass Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-neutral-500">Harvested Tickets</div>
-          <div className="text-2xl font-black text-neutral-900 mt-1">{tickets.length}</div>
+        <div className="glass-panel p-4.5 rounded-2xl relative overflow-hidden group hover:border-teal-400/40 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/5 to-transparent pointer-events-none" />
+          <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Harvested Tickets</div>
+          <div className="text-2xl font-black text-white mt-1 group-hover:text-teal-300 transition-colors">{tickets.length}</div>
           <div className="text-[10px] text-neutral-400 mt-0.5">Scanned from DOM &amp; CRM</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-emerald-600">Compliant Tickets</div>
-          <div className="text-2xl font-black text-emerald-600 mt-1">
+        <div className="glass-panel p-4.5 rounded-2xl relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent pointer-events-none" />
+          <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">Compliant Tickets</div>
+          <div className="text-2xl font-black text-emerald-300 mt-1">
             {tickets.filter((t) => t.complianceStatus === 'COMPLIANT').length}
           </div>
           <div className="text-[10px] text-neutral-400 mt-0.5">Norms verified</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-amber-600">Flagged for Review</div>
-          <div className="text-2xl font-black text-amber-600 mt-1">
+        <div className="glass-panel p-4.5 rounded-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent pointer-events-none" />
+          <div className="text-[11px] font-bold uppercase tracking-wider text-cyan-400">Flagged for Review</div>
+          <div className="text-2xl font-black text-cyan-300 mt-1">
             {tickets.filter((t) => t.complianceStatus === 'FLAGGED').length}
           </div>
           <div className="text-[10px] text-neutral-400 mt-0.5">Risk cues detected</div>
         </div>
 
-        <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs">
-          <div className="text-[11px] font-bold uppercase text-rose-600">Fatal Risk Detected</div>
-          <div className="text-2xl font-black text-rose-600 mt-1">
+        <div className="glass-panel p-4.5 rounded-2xl relative overflow-hidden group hover:border-rose-500/40 transition-all duration-300">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent pointer-events-none" />
+          <div className="text-[11px] font-bold uppercase tracking-wider text-rose-400">Fatal Risk Detected</div>
+          <div className="text-2xl font-black text-rose-300 mt-1">
             {tickets.filter((t) => t.complianceStatus === 'FATAL').length}
           </div>
           <div className="text-[10px] text-neutral-400 mt-0.5">Immediate auditor action</div>
         </div>
       </div>
 
-      {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Filters and Search Bar */}
+      <div className="glass-panel p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex flex-1 items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -243,19 +247,19 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by Ticket ID, Client Code, Advisor, or findings..."
-              className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs text-neutral-900 focus:outline-hidden focus:border-amber-400"
+              className="w-full pl-8 pr-3 py-2 glass-input rounded-xl text-xs text-neutral-100 placeholder-neutral-500 focus:outline-hidden focus:border-teal-400/70"
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-neutral-100 p-1 rounded-xl text-xs">
+          <div className="flex items-center gap-1 glass-inner p-1 rounded-xl text-xs">
             {(['ALL', 'COMPLIANT', 'FLAGGED', 'FATAL'] as const).map((st) => (
               <button
                 key={st}
                 onClick={() => setFilterStatus(st)}
                 className={`px-3 py-1.5 rounded-lg font-bold text-[11px] transition-all cursor-pointer ${
                   filterStatus === st
-                    ? 'bg-white text-black shadow-xs'
-                    : 'text-neutral-500 hover:text-neutral-900'
+                    ? 'bg-teal-400/20 text-teal-300 border border-teal-400/40 shadow-sm'
+                    : 'text-neutral-400 hover:text-white'
                 }`}
               >
                 {st}
@@ -269,16 +273,16 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
             <>
               <button
                 onClick={handleExportCSV}
-                className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-semibold rounded-xl border border-neutral-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3.5 py-2 glass-panel-subtle hover:bg-white/10 text-neutral-200 text-xs font-semibold rounded-xl border border-white/15 flex items-center gap-1.5 transition-all cursor-pointer"
                 title="Download CSV"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3.5 h-3.5 text-teal-400" />
                 <span>Export CSV</span>
               </button>
 
               <button
                 onClick={onClearTickets}
-                className="px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold rounded-xl border border-rose-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="px-3.5 py-2 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 text-xs font-semibold rounded-xl border border-rose-500/30 flex items-center gap-1.5 transition-all cursor-pointer"
                 title="Clear all extracted tickets"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -290,9 +294,9 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
       </div>
 
       {/* Ticket Table */}
-      <div className="bg-white rounded-2xl border border-neutral-200 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+      <div className="glass-panel rounded-2xl overflow-hidden">
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <span className="text-base">🐝</span>
             <span>Harvested Tickets &amp; Audit Trail ({filteredTickets.length})</span>
           </h3>
@@ -302,7 +306,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-semibold uppercase tracking-wider">
+              <tr className="border-b border-white/10 bg-white/[0.02] text-neutral-400 font-semibold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4">Ticket ID</th>
                 <th className="py-3 px-3">Client Code</th>
                 <th className="py-3 px-3">Advisor</th>
@@ -312,13 +316,13 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                 <th className="py-3 px-3">Harvested At</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-white/5">
               {filteredTickets.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-neutral-400 space-y-2">
                     <div className="text-3xl">🐝</div>
-                    <div className="text-sm font-bold text-neutral-700">No tickets harvested yet</div>
-                    <p className="text-xs max-w-sm mx-auto text-neutral-500">
+                    <div className="text-sm font-bold text-neutral-200">No tickets harvested yet</div>
+                    <p className="text-xs max-w-sm mx-auto text-neutral-400">
                       Click the small bee icon in the top right corner, click &ldquo;Release AdamBee&rdquo; above, or paste CRM ticket logs to begin ticket auditing.
                     </p>
                   </td>
@@ -330,25 +334,25 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                   const isCompliant = t.complianceStatus === 'COMPLIANT';
 
                   return (
-                    <tr key={t.id} className="hover:bg-neutral-50/80 transition-colors">
+                    <tr key={t.id} className="hover:bg-white/[0.04] transition-colors">
                       <td className="py-3 px-4">
-                        <div className="font-mono font-bold text-neutral-900 flex items-center gap-1.5">
+                        <div className="font-mono font-bold text-neutral-100 flex items-center gap-1.5">
                           <span>{t.ticketId || 'TKT-AUTO'}</span>
                         </div>
                         <div className="text-[10px] text-neutral-400 truncate max-w-[140px]">{t.pageTitle}</div>
                       </td>
 
                       <td className="py-3 px-3">
-                        <span className="font-mono font-bold text-neutral-800 bg-neutral-100 px-2 py-0.5 rounded">
+                        <span className="font-mono font-bold text-cyan-300 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded">
                           {t.clientId || '—'}
                         </span>
                       </td>
 
                       <td className="py-3 px-3">
-                        <div className="font-medium text-neutral-800">{t.advisorName || 'CRM Agent'}</div>
+                        <div className="font-medium text-neutral-200">{t.advisorName || 'CRM Agent'}</div>
                       </td>
 
-                      <td className="py-3 px-3 font-mono text-neutral-600">
+                      <td className="py-3 px-3 font-mono text-neutral-400">
                         {t.phoneNumber || '—'}
                       </td>
 
@@ -356,10 +360,10 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                         <span
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
                             isFatal
-                              ? 'bg-rose-100 text-rose-800 border-rose-300'
+                              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
                               : isFlagged
-                              ? 'bg-amber-100 text-amber-800 border-amber-300'
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
                           }`}
                         >
                           {isFatal ? (
@@ -374,17 +378,17 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                       </td>
 
                       <td className="py-3 px-4 max-w-md">
-                        <div className="text-neutral-800 text-xs font-medium leading-relaxed">
+                        <div className="text-neutral-200 text-xs font-medium leading-relaxed">
                           {t.findings}
                         </div>
                         {t.rawSnippets && t.rawSnippets.length > 0 && (
-                          <div className="text-[10px] text-neutral-500 font-mono mt-1 line-clamp-1 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-100">
+                          <div className="text-[10px] text-neutral-400 font-mono mt-1 line-clamp-1 glass-inner px-2 py-0.5 rounded border border-white/5">
                             &ldquo;{t.rawSnippets[0]}&rdquo;
                           </div>
                         )}
                       </td>
 
-                      <td className="py-3 px-3 text-[11px] font-mono text-neutral-500 whitespace-nowrap">
+                      <td className="py-3 px-3 text-[11px] font-mono text-neutral-400 whitespace-nowrap">
                         {t.extractedAt ? t.extractedAt.slice(0, 16).replace('T', ' ') : '—'}
                       </td>
                     </tr>
@@ -398,16 +402,16 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
 
       {/* Manual CRM Ticket Modal */}
       {showManualModal && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full border border-neutral-300 shadow-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <h3 className="text-sm font-bold text-neutral-900 flex items-center gap-2">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="glass-panel rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl border border-white/20">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <span className="text-base">🐝</span>
                 <span>Ingest CRM Ticket for Compliance Audit</span>
               </h3>
               <button
                 onClick={() => setShowManualModal(false)}
-                className="text-neutral-400 hover:text-black cursor-pointer"
+                className="text-neutral-400 hover:text-white cursor-pointer"
               >
                 ✕
               </button>
@@ -416,41 +420,41 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
             <form onSubmit={handleManualSubmit} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 mb-1">Ticket ID / Ref</label>
+                  <label className="block text-[11px] font-bold text-neutral-300 mb-1">Ticket ID / Ref</label>
                   <input
                     type="text"
                     value={manualTicketId}
                     onChange={(e) => setManualTicketId(e.target.value)}
                     placeholder="e.g. TKT-98124"
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    className="w-full px-3 py-2 glass-input rounded-lg text-xs text-neutral-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold text-neutral-700 mb-1">Client Code (UCC)</label>
+                  <label className="block text-[11px] font-bold text-neutral-300 mb-1">Client Code (UCC)</label>
                   <input
                     type="text"
                     value={manualClient}
                     onChange={(e) => setManualClient(e.target.value)}
-                    placeholder="e.g. FI99182"
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                    placeholder="e.g. CL99182"
+                    className="w-full px-3 py-2 glass-input rounded-lg text-xs text-neutral-100"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1">Advisor / Agent Name</label>
+                <label className="block text-[11px] font-bold text-neutral-300 mb-1">Advisor / Agent Name</label>
                 <input
                   type="text"
                   value={manualAdvisor}
                   onChange={(e) => setManualAdvisor(e.target.value)}
                   placeholder="e.g. Ajeetkumar"
-                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs"
+                  className="w-full px-3 py-2 glass-input rounded-lg text-xs text-neutral-100"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-neutral-700 mb-1">
-                  Ticket Content / Dialogue / Notes <span className="text-rose-500">*</span>
+                <label className="block text-[11px] font-bold text-neutral-300 mb-1">
+                  Ticket Content / Dialogue / Notes <span className="text-rose-400">*</span>
                 </label>
                 <textarea
                   rows={4}
@@ -458,7 +462,7 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                   value={manualTicketText}
                   onChange={(e) => setManualTicketText(e.target.value)}
                   placeholder="Paste ticket conversation, client request, or advisor notes here..."
-                  className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-lg text-xs focus:outline-hidden focus:border-amber-400"
+                  className="w-full p-3 glass-input rounded-lg text-xs text-neutral-100 focus:outline-hidden focus:border-teal-400/80"
                 />
               </div>
 
@@ -466,13 +470,13 @@ export const AdamBeeView: React.FC<AdamBeeViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowManualModal(false)}
-                  className="px-4 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-xs rounded-xl cursor-pointer"
+                  className="px-4 py-2 glass-panel-subtle hover:bg-white/10 text-neutral-300 font-bold text-xs rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-neutral-900 hover:bg-black text-amber-400 font-bold text-xs rounded-xl shadow-xs cursor-pointer"
+                  className="px-5 py-2 bg-gradient-to-r from-teal-400 to-emerald-500 hover:brightness-110 text-slate-950 font-bold text-xs rounded-xl shadow-lg cursor-pointer transition-all"
                 >
                   Audit Ticket
                 </button>

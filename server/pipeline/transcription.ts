@@ -1,6 +1,6 @@
 // =============================================================
-// Stage 3: INDEPENDENT TRANSCRIPTION (Google Gemini 3.5 Transcribe)
-// Audio -> Gemini 3.5 Transcribe -> Full Transcript -> Timestamped Segments.
+// Stage 3: INDEPENDENT TRANSCRIPTION (Groq Whisper Large-v3)
+// Audio -> Groq Whisper Large-v3 Turbo -> Full Transcript -> Timestamped Segments.
 // MANDATE: Absolutely NO trade context/hints passed into transcription.
 // Pure independent acoustic hearing.
 // Stores: transcript_id, call_id, segment_id, start_time, end_time, speaker, text.
@@ -42,13 +42,13 @@ function sanitizeTranscript(text: string): string {
 
 /**
  * Stage 3 Entry Point: Transcribes call independently and stores segments in call_segments.
- * Prioritizes Google Gemini 3.5 Transcribe API with continuous rate-limit and quota management.
+ * Exclusively uses Groq Whisper (Large-v3 Turbo primary, Large-v3 fallback).
  */
 export async function stage3TranscribeCall(
   db: DatabaseSync,
   callId: number,
   groqApiKey?: string,
-  geminiApiKey?: string
+  _geminiApiKey?: string
 ): Promise<TranscriptionOutput> {
   const call = db.prepare('SELECT * FROM calls WHERE id = ?').get(callId) as unknown as CallRecord | undefined;
   if (!call) {
@@ -90,15 +90,15 @@ export async function stage3TranscribeCall(
     throw new Error(`Audio recording file missing from disk: ${audioPath || 'NO_PATH'}`);
   }
 
-  const activeGeminiKey = geminiApiKey || process.env.GEMINI_API_KEY;
+  const activeGroqKey = groqApiKey || process.env.GROQ_API_KEY;
 
-  if (!activeGeminiKey && !groqApiKey) {
-    throw new Error('AWAITING_API_KEY: GEMINI_API_KEY is required for Gemini 3.5 Transcribe.');
+  if (!activeGroqKey || !activeGroqKey.trim()) {
+    throw new Error('AWAITING_API_KEY: GROQ_API_KEY is required for Groq Whisper audio transcription.');
   }
 
   let asrResult;
   try {
-    asrResult = await transcribeAudioFile(audioPath, groqApiKey, activeGeminiKey);
+    asrResult = await transcribeAudioFile(audioPath, activeGroqKey.trim());
   } catch (err: any) {
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
     db.prepare(`

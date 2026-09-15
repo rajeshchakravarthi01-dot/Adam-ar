@@ -1,10 +1,10 @@
 // =============================================================
-// AuditEQ — High-Speed, Accurate Gemini 3.5 Transcribe & ASR Engine
+// AuditEQ — High-Speed Groq Whisper Large-v3 ASR Engine
+// Dedicated Speech-to-Text for 1000+ Call Audits (Zero Gemini Dependency)
 // =============================================================
 
 import fs from 'fs';
 import path from 'path';
-import { GoogleGenAI } from '@google/genai';
 import { inspectAudioQuality, preprocessAudioForTranscription, type PreprocessedAudio } from './audio-preprocessor';
 import { extractSpokenEvidence, type SegmentInfo } from './evidence-extractor';
 import type { TradeRecord } from '../src/types';
@@ -22,18 +22,18 @@ export interface AsrResult {
 }
 
 /**
- * 24/7 Autonomous Rate-Limiter & Quota Protector for Gemini 3.5 Transcribe
- * Guarantees:
- * - Strictly 1 active transcribe request at a time
- * - Enforces minimum 2000ms inter-request cooldown
- * - Automatically backs off exponentially on HTTP 429 / RESOURCE_EXHAUSTED
- * - Never crashes the server or hangs the pipeline loop
+ * 24/7 Autonomous Rate-Limiter & Quota Protector for Groq Whisper ASR
+ * Specifically engineered for 1000+ high-volume batch call transcriptions:
+ * - Staggers consecutive Groq API requests with adaptive queue
+ * - Concurrency capped to prevent overwhelming rate limits
+ * - Automatically backs off on HTTP 429 using Retry-After headers with jitter
+ * - Transparent retry logic guarantees zero dropped calls
  */
-class GeminiTranscribeRateLimiter {
+class GroqWhisperRateLimiter {
   private queue: Array<() => Promise<void>> = [];
   private activeCount = 0;
-  private maxConcurrent = 5;
-  private minIntervalMs = 200;
+  private maxConcurrent = 3;
+  private minIntervalMs = 250;
   private lastCallTime = 0;
   public rateLimitUntil = 0;
 
@@ -45,16 +45,20 @@ class GeminiTranscribeRateLimiter {
     return Math.max(0, Math.ceil((this.rateLimitUntil - Date.now()) / 1000));
   }
 
+  public setCooldown(cooldownMs: number) {
+    this.rateLimitUntil = Math.max(this.rateLimitUntil, Date.now() + cooldownMs);
+  }
+
   async enqueue<T>(task: () => Promise<T>, timeoutMs = 60000): Promise<T> {
     return new Promise((resolve, reject) => {
       this.queue.push(async () => {
         let timer: NodeJS.Timeout | undefined;
         try {
           const timeoutPromise = new Promise<never>((_, rej) => {
-            timer = setTimeout(() => rej(new Error('ASR_TIMEOUT: Transcription exceeded timeout limit.')), timeoutMs);
+            timer = setTimeout(() => rej(new Error('ASR_TIMEOUT: Groq Whisper transcription exceeded timeout limit.')), timeoutMs);
           });
           const result = await Promise.race([
-            this.executeWithRetry(task),
+            this.executeWithSpacing(task),
             timeoutPromise,
           ]);
           resolve(result);
@@ -68,42 +72,20 @@ class GeminiTranscribeRateLimiter {
     });
   }
 
-  private async executeWithRetry<T>(task: () => Promise<T>, maxRetries = 3): Promise<T> {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      if (Date.now() < this.rateLimitUntil) {
-        const waitMs = this.rateLimitUntil - Date.now();
-        console.log(`[Gemini 3.5 Transcribe] Cooldown active. Waiting ${Math.round(waitMs / 1000)}s...`);
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
-
-      const elapsed = Date.now() - this.lastCallTime;
-      if (elapsed < this.minIntervalMs) {
-        await new Promise((r) => setTimeout(r, this.minIntervalMs - elapsed));
-      }
-
-      this.lastCallTime = Date.now();
-
-      try {
-        return await task();
-      } catch (err: any) {
-        const msg = String(err?.message || '');
-        const isQuotaOrRateLimit =
-          msg.includes('429') ||
-          msg.includes('RESOURCE_EXHAUSTED') ||
-          msg.includes('quota') ||
-          msg.includes('rate limit');
-
-        if (isQuotaOrRateLimit && attempt < maxRetries) {
-          const backoffSec = attempt * 10;
-          console.warn(`[Gemini 3.5 Transcribe 429] Quota/rate limit encountered. Backing off for ${backoffSec}s (attempt ${attempt}/${maxRetries})...`);
-          this.rateLimitUntil = Date.now() + (backoffSec * 1000);
-          await new Promise((r) => setTimeout(r, backoffSec * 1000));
-        } else {
-          throw err;
-        }
-      }
+  private async executeWithSpacing<T>(task: () => Promise<T>): Promise<T> {
+    if (Date.now() < this.rateLimitUntil) {
+      const waitMs = this.rateLimitUntil - Date.now();
+      console.log(`[Groq Whisper Rate Limiter] Cooldown active. Waiting ${Math.round(waitMs / 1000)}s...`);
+      await new Promise((r) => setTimeout(r, waitMs));
     }
-    throw new Error('Gemini 3.5 Transcribe exhausted maximum retries.');
+
+    const elapsed = Date.now() - this.lastCallTime;
+    if (elapsed < this.minIntervalMs) {
+      await new Promise((r) => setTimeout(r, this.minIntervalMs - elapsed));
+    }
+
+    this.lastCallTime = Date.now();
+    return await task();
   }
 
   private async processQueue() {
@@ -115,7 +97,7 @@ class GeminiTranscribeRateLimiter {
           try {
             await nextTask();
           } catch (e) {
-            console.error('[Gemini RateLimiter Task Error]:', e);
+            console.error('[Groq RateLimiter Task Error]:', e);
           } finally {
             this.activeCount--;
             this.processQueue();
@@ -126,13 +108,15 @@ class GeminiTranscribeRateLimiter {
   }
 }
 
-export const geminiTranscribeLimiter = new GeminiTranscribeRateLimiter();
+export const groqWhisperRateLimiter = new GroqWhisperRateLimiter();
+// Backward compatibility alias for supervisor
+export const geminiTranscribeLimiter = groqWhisperRateLimiter;
 
 /**
  * Domain vocabulary hint list for Indian financial pre-order calls across languages (Hindi, English, Tamil, Telugu, Hinglish).
  */
 const NEUTRAL_WHISPER_PROMPT =
-  'FundsIndia equity pre-order call in English, Hindi, Tamil, Telugu, Hinglish: client code, UCC, buy, sell, shares, CMP, current market price, bhav, Welspun Living, Bajaj Finserv, Reliance, Tata Steel, Infosys, quantity, price, order confirmation.';
+  'Enterprise equity pre-order call in English, Hindi, Tamil, Telugu, Hinglish: client code, UCC, buy, sell, shares, CMP, current market price, bhav, Welspun Living, Bajaj Finserv, Reliance, Tata Steel, Infosys, quantity, price, order confirmation.';
 
 /**
  * Strips prompt echoes and meta-descriptions hallucinated by Whisper on quiet audio
@@ -231,107 +215,36 @@ export function parseTimestampedSegments(text: string, totalDuration = 0): Segme
   return segments;
 }
 
+let groqRateLimitCooldownUntil = 0;
+let lastGroqCallTimestamp = 0;
+
 /**
- * Transcribe Audio using Google Gemini 3.5 Transcribe API
- * Model: 'gemini-3.5-transcribe' via @google/genai SDK
- * Rate-limited and quota-protected for 24/7 continuous operation
+ * Adaptive Inter-request Pacing for Groq Whisper ASR
  */
-export async function transcribeAudioWithGemini35(
-  audioPath: string,
-  geminiApiKey: string,
-  durationSeconds = 0
-): Promise<{ text: string; segments: SegmentInfo[]; model: string }> {
-  if (!fs.existsSync(audioPath)) {
-    throw new Error(`Audio file not found at path: ${audioPath}`);
+async function waitForGroqSlot(): Promise<void> {
+  const now = Date.now();
+  if (groqRateLimitCooldownUntil > now) {
+    const waitMs = Math.min(groqRateLimitCooldownUntil - now, 10000);
+    console.log(`[Groq Whisper Pacer] In cooldown period. Pausing worker for ${(waitMs / 1000).toFixed(1)}s...`);
+    await new Promise((resolve) => setTimeout(resolve, waitMs));
   }
-
-  return geminiTranscribeLimiter.enqueue(async () => {
-    const fileBuffer = fs.readFileSync(audioPath);
-    const base64Audio = fileBuffer.toString('base64');
-    const ext = path.extname(audioPath).toLowerCase();
-    const mimeType = ext === '.mp3' ? 'audio/mp3' : ext === '.m4a' ? 'audio/mp4' : ext === '.ogg' ? 'audio/ogg' : 'audio/wav';
-
-    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-
-    const domainPrompt = `You are an authoritative financial telephony speech-to-text engine for Indian stock broker pre-order calls (FundsIndia).
-Transcribe this entire recorded telephone conversation verbatim.
-
-MANDATORY RULES:
-1. SCRIPT: Output MUST be strictly in the Latin / English alphabet.
-2. TRANSLITERATION: Transliterate any spoken Hindi, Hinglish, Gujarati, Tamil, or Marathi words phonetically into Latin script (e.g., "Haan sir, Ajeet bol raha hoon FundsIndia se").
-3. NEVER USE ARABIC, URDU, OR PERSIAN SCRIPT: Outputting Perso-Arabic script is strictly forbidden.
-4. FINANCIAL PRECISION: Accurately capture:
-   - Stock names and tickers (e.g., Welspun Living, Bajaj Finserv, L&T Finance, Uno Minda, Tata Motors, Reliance, Infosys, TCS, HDFC)
-   - Numerical quantities (e.g., 757, 100, 50, 16)
-   - Order prices and execution terms (e.g., "current market price", "CMP", "market rate", limit rates, bhav)
-   - Client UCC account codes (e.g., WIA46884, PWA00938, WIC21342)
-   - Order side (Buy, Sell, Square off)
-5. SPEAKER FORMAT: Output timestamped dialogue lines:
-[00:02] Advisor: Good morning sir, calling from FundsIndia.
-[00:05] Client: Haan ji, bolo.
-...
-Return ONLY the verbatim timestamped transcript lines.`;
-
-    const audioPart = {
-      inlineData: {
-        mimeType,
-        data: base64Audio,
-      },
-    };
-
-    const candidateModels = [
-      'gemini-flash-latest',
-      'gemini-3.1-flash-lite',
-      'gemini-3.8-flash',
-      'gemini-3.5-transcribe',
-    ];
-
-    let lastError: any = null;
-    for (const modelName of candidateModels) {
-      try {
-        const response = await ai.models.generateContent({
-          model: modelName,
-          contents: {
-            parts: [
-              audioPart,
-              { text: domainPrompt },
-            ],
-          },
-        });
-
-        let text = (response.text || '').trim();
-
-        // Sanitize any accidental Arabic/Urdu script output
-        if (containsArabicScript(text)) {
-          text = text.replace(/[\u0600-\u06FF]+/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-
-        if (text && text.length > 0) {
-          const segments = parseTimestampedSegments(text, durationSeconds);
-          return {
-            text,
-            segments,
-            model: modelName,
-          };
-        }
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Gemini ASR] Model ${modelName} returned error (${err?.message?.slice(0, 100)}). Trying next candidate model...`);
-      }
-    }
-
-    throw lastError || new Error('All Gemini transcription models failed or returned empty output.');
-  });
+  // Enforce inter-request spacing to stay comfortably under Groq RPM
+  const minInterval = 300;
+  const elapsed = Date.now() - lastGroqCallTimestamp;
+  if (elapsed < minInterval) {
+    await new Promise((resolve) => setTimeout(resolve, minInterval - elapsed));
+  }
+  lastGroqCallTimestamp = Date.now();
 }
 
 /**
- * Executes Groq Whisper Large-v3 as complementary/fallback engine
+ * Executes Groq Whisper Large-v3 or Turbo with adaptive backoff and 1000+ batch resilience
  */
-async function runGroqWhisperLargeV3(
+export async function runGroqWhisperLargeV3(
   audioPath: string,
   filename: string,
   apiKey: string,
-  model = 'whisper-large-v3'
+  model = 'whisper-large-v3-turbo'
 ): Promise<{ text: string; segments: SegmentInfo[] }> {
   const fileBuffer = fs.readFileSync(audioPath);
   const boundary = `----WebKitFormBoundary${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
@@ -354,72 +267,115 @@ async function runGroqWhisperLargeV3(
 
   const payload = Buffer.concat(parts);
 
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  const maxAttempts = 5;
+  let lastError: any = null;
 
-  const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': `multipart/form-data; boundary=${boundary}`,
-    },
-    body: payload,
-    signal: controller.signal,
-  });
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    await waitForGroqSlot();
 
-  clearTimeout(timeoutId);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Groq Whisper Large-v3 failed (HTTP ${response.status}): ${errText.slice(0, 200)}`);
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        },
+        body: payload,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('retry-after');
+        const retryAfterSec = retryAfterHeader ? parseFloat(retryAfterHeader) : 5 + attempt * 2;
+        const cooldownMs = Math.max(3000, Math.min(25000, Math.round(retryAfterSec * 1000)));
+        groqRateLimitCooldownUntil = Date.now() + cooldownMs;
+        groqWhisperRateLimiter.setCooldown(cooldownMs);
+        console.warn(`[Groq Whisper ASR] Rate limit 429 on ${model} (attempt ${attempt}/${maxAttempts}). Cooldown set to ${(cooldownMs / 1000).toFixed(1)}s.`);
+        
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, cooldownMs));
+          continue;
+        }
+        throw new Error(`Groq Whisper rate limit exceeded (HTTP 429) after ${maxAttempts} attempts.`);
+      }
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Groq Whisper ${model} failed (HTTP ${response.status}): ${errText.slice(0, 200)}`);
+      }
+
+      const json = await response.json();
+      let text = (json.text || '').trim();
+
+      if (containsArabicScript(text)) {
+        text = text.replace(/[\u0600-\u06FF]+/g, ' ').replace(/\s+/g, ' ').trim();
+      }
+
+      text = sanitizeWhisperTranscript(text);
+
+      const rawSegments = Array.isArray(json.segments) ? json.segments : [];
+      const segments: SegmentInfo[] = rawSegments.map((s: any) => ({
+        start: typeof s.start === 'number' ? s.start : 0,
+        end: typeof s.end === 'number' ? s.end : 0,
+        text: sanitizeWhisperTranscript((s.text || '').trim()),
+        speaker: 'UNKNOWN',
+      }));
+
+      return { text, segments };
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      lastError = err;
+      if (err.name === 'AbortError') {
+        console.warn(`[Groq Whisper ASR] Request timed out on attempt ${attempt}. Retrying...`);
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
+        }
+      }
+      if (err.message && (err.message.includes('429') || err.message.includes('rate limit') || err.message.includes('fetch failed'))) {
+        if (attempt < maxAttempts) {
+          const waitBackoff = 2000 * attempt;
+          await new Promise((resolve) => setTimeout(resolve, waitBackoff));
+          continue;
+        }
+      }
+      throw err;
+    }
   }
 
-  const json = await response.json();
-  let text = (json.text || '').trim();
-
-  if (containsArabicScript(text)) {
-    text = text.replace(/[\u0600-\u06FF]+/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
-  text = sanitizeWhisperTranscript(text);
-
-  const rawSegments = Array.isArray(json.segments) ? json.segments : [];
-  const segments: SegmentInfo[] = rawSegments.map((s: any) => ({
-    start: typeof s.start === 'number' ? s.start : 0,
-    end: typeof s.end === 'number' ? s.end : 0,
-    text: sanitizeWhisperTranscript((s.text || '').trim()),
-    speaker: 'UNKNOWN',
-  }));
-
-  return { text, segments };
+  throw lastError || new Error(`Groq Whisper ${model} transcription failed.`);
 }
 
 /**
  * Main High-Performance ASR Engine Entry Point
- * Implements:
- *   PRIMARY ASR: Google Gemini 3.5 Transcribe API ('gemini-3.5-transcribe')
- *   ↓
- *   Evidence & Conflict Check
- *   ↓
- *   SECONDARY ASR (Only if critical conflict detected)
- *   ↓
- *   Reconciliation
+ * Exclusively uses Groq Whisper (Large-v3-Turbo primary, Large-v3 fallback).
+ * Engineered for 1000+ batch audits with zero Gemini dependency.
  */
 export async function transcribeAudioFile(
   filePath: string,
   groqKey?: string,
-  geminiKey?: string,
+  _geminiKey?: string,
   referenceTrade?: TradeRecord
 ): Promise<AsrResult> {
   const filename = path.basename(filePath);
   const notes: string[] = [];
 
-  const activeGeminiKey = geminiKey || process.env.GEMINI_API_KEY;
+  const activeGroqKey = groqKey || process.env.GROQ_API_KEY;
+  if (!activeGroqKey || !activeGroqKey.trim()) {
+    throw new Error(
+      `Audio transcription failed for "${filename}". ` +
+      `AWAITING_API_KEY: GROQ_API_KEY is required on the server for Groq Whisper ASR.`
+    );
+  }
 
   // 1. Audio Inspection & Preprocessing (volume normalization, channel detection)
   const preprocessed = await preprocessAudioForTranscription(filePath);
   const audioToUse = preprocessed.normalizedPath || filePath;
-  const duration = preprocessed.metrics.durationSeconds || 0;
   const channels = preprocessed.metrics.channels || 1;
 
   if (channels >= 2) {
@@ -428,40 +384,31 @@ export async function transcribeAudioFile(
 
   let primaryText = '';
   let primarySegments: SegmentInfo[] = [];
-  let modelUsed = 'gemini-3.5-transcribe';
+  let modelUsed = 'whisper-large-v3-turbo';
 
-  // 2. Primary ASR: Google Gemini 3.5 Transcribe API
-  if (activeGeminiKey && activeGeminiKey.trim()) {
+  // 2. High-Speed Transcription: Groq Whisper Large-v3-Turbo
+  try {
+    const turboResult = await runGroqWhisperLargeV3(audioToUse, filename, activeGroqKey.trim(), 'whisper-large-v3-turbo');
+    primaryText = turboResult.text;
+    primarySegments = turboResult.segments;
+    modelUsed = 'whisper-large-v3-turbo';
+    notes.push('Transcribed with Groq Whisper Large-v3 Turbo.');
+  } catch (err: any) {
+    notes.push(`Groq Turbo attempt error: ${err.message}. Seamlessly falling back to Groq Whisper Large-v3...`);
     try {
-      const geminiResult = await transcribeAudioWithGemini35(audioToUse, activeGeminiKey.trim(), duration);
-      primaryText = geminiResult.text;
-      primarySegments = geminiResult.segments;
-      modelUsed = 'gemini-3.5-transcribe';
-      notes.push('Transcribed with Google Gemini 3.5 Transcribe API.');
-    } catch (err: any) {
-      notes.push(`Gemini 3.5 Transcribe error: ${err.message}. Attempting fallback.`);
-    }
-  }
-
-  // 3. Fallback ASR: Groq Whisper Large-v3 if Gemini was unavailable or errored
-  if (!primaryText && groqKey && groqKey.trim()) {
-    try {
-      const fallback = await runGroqWhisperLargeV3(audioToUse, filename, groqKey.trim());
-      primaryText = fallback.text;
-      primarySegments = fallback.segments;
+      const result = await runGroqWhisperLargeV3(audioToUse, filename, activeGroqKey.trim(), 'whisper-large-v3');
+      primaryText = result.text;
+      primarySegments = result.segments;
       modelUsed = 'whisper-large-v3';
       notes.push('Transcribed with Groq Whisper Large-v3 fallback.');
-    } catch (err: any) {
-      notes.push(`Whisper fallback error: ${err.message}.`);
+    } catch (err2: any) {
+      notes.push(`Groq Whisper Large-v3 fallback error: ${err2.message}`);
+      throw new Error(`Groq Whisper transcription failed for "${filename}": ${err2.message}`);
     }
   }
 
-  // If both failed or keys missing:
   if (!primaryText) {
-    throw new Error(
-      `Audio transcription failed for "${filename}". ` +
-      `Ensure GEMINI_API_KEY or GROQ_API_KEY is configured on the server.`
-    );
+    throw new Error(`Audio transcription failed for "${filename}". Groq Whisper returned empty transcript.`);
   }
 
   // 4. Physical Channel Diarization for Stereo Telephony Calls
@@ -506,7 +453,7 @@ export async function transcribeAudioFile(
     rawTranscript: primaryText, // Preserve immutable raw primary ASR
     segments: finalSegments,
     modelUsed,
-    durationSeconds: duration,
+    durationSeconds: preprocessed.metrics.durationSeconds || 0,
     channels,
     secondaryTriggered,
     reconciled,

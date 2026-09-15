@@ -135,6 +135,15 @@ const DEFAULT_SECURITIES: Record<string, string[]> = {
     'bajaj auto',
     'bajajauto',
   ],
+  ASHOKLEY: [
+    'ashok leyland',
+    'ashokley',
+    'ashok layland',
+    'ashok leeland',
+    'ashok leland',
+    'ashok',
+    'leyland',
+  ],
   ZOMATO: [
     'zomato',
     'zomato limited',
