@@ -48,6 +48,12 @@ class GroqWhisperRateLimiter {
     return Math.max(0, Math.ceil((until - Date.now()) / 1000));
   }
 
+  public clearCooldown() {
+    this.rateLimitUntil = 0;
+    this.lastCallTime = 0;
+    console.log('[Groq Rate Limiter] Cooldown cleared.');
+  }
+
   public setCooldown(cooldownMs: number) {
     this.rateLimitUntil = Math.max(this.rateLimitUntil, Date.now() + cooldownMs);
     console.warn(`[Groq Rate Limiter] Global cooldown active across all 3 workers. Resuming in ${(cooldownMs / 1000).toFixed(1)}s.`);
@@ -77,10 +83,14 @@ class GroqWhisperRateLimiter {
   }
 
   private async executeWithSpacing<T>(task: () => Promise<T>): Promise<T> {
-    // 1. Wait out any active 429 cooldown
+    // 1. Check any active 429 cooldown
     if (Date.now() < this.rateLimitUntil) {
       const waitMs = this.rateLimitUntil - Date.now();
-      console.log(`[Groq Whisper Rate Limiter] 429 Cooldown active. Pausing all 3 workers for ${Math.round(waitMs / 1000)}s...`);
+      if (waitMs > 35000) {
+        // High cooldown (e.g. 2163s daily quota lockout). Fail fast so Gemini ASR can transcribe immediately.
+        throw new Error(`GROQ_RATE_LIMITED: Global cooldown active (${Math.round(waitMs / 1000)}s remaining). Fast failover to Gemini ASR.`);
+      }
+      console.log(`[Groq Whisper Rate Limiter] Short 429 Cooldown active. Pausing all 3 workers for ${Math.round(waitMs / 1000)}s...`);
       await new Promise((r) => setTimeout(r, waitMs));
     }
 
@@ -315,13 +325,10 @@ export async function runGroqWhisperLargeV3(
           const cooldownMs = Math.max(35000, Math.round(retryAfterSec * 1000));
           groqRateLimitCooldownUntil = Date.now() + cooldownMs;
           groqWhisperRateLimiter.setCooldown(cooldownMs);
-          console.warn(`[Groq Whisper ASR] Rate limit 429 on ${model} (attempt ${attempt}/${maxAttempts}). Global 3-worker cooldown set to ${(cooldownMs / 1000).toFixed(1)}s.`);
+          console.warn(`[Groq Whisper ASR] Rate limit 429 on ${model}. Global 3-worker cooldown set to ${(cooldownMs / 1000).toFixed(1)}s. Fast failover to Gemini ASR.`);
           
-          if (attempt < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, cooldownMs));
-            continue;
-          }
-          throw new Error(`Groq Whisper rate limit exceeded (HTTP 429) after ${maxAttempts} attempts.`);
+          // Throw immediately so caller seamlessly fails over to Gemini Multimodal ASR without delay
+          throw new Error(`Groq Whisper rate limit (HTTP 429, retry-after: ${(cooldownMs / 1000).toFixed(1)}s). Fast failover to Gemini ASR.`);
         }
 
         if (!response.ok) {
@@ -534,8 +541,8 @@ export async function transcribeAudioFile(
     }
   }
 
-  // Fallback to Groq Whisper standard if Gemini was not available or failed and Groq wasn't tried with large-v3
-  if (!primaryText && activeGroqKey && (!groqAttempted || groqWhisperRateLimiter.isRateLimited())) {
+  // Fallback to Groq Whisper standard if Gemini was not available and Groq wasn't tried and not rate-limited
+  if (!primaryText && activeGroqKey && !groqAttempted && !groqWhisperRateLimiter.isRateLimited()) {
     try {
       const result = await runGroqWhisperLargeV3(audioToUse, filename, activeGroqKey, 'whisper-large-v3');
       primaryText = result.text;
